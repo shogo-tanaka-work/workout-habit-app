@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -16,6 +17,7 @@ import {
   Vibration,
   View,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 
 import timerCompleteSound from './assets/timer-complete.wav';
 
@@ -284,6 +286,8 @@ export default function App() {
   const [workoutSets, setWorkoutSets] = useState<WorkoutSet[]>([]);
   const [timer, setTimer] = useState<TimerState | null>(null);
   const [newExerciseName, setNewExerciseName] = useState('');
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [restPicker, setRestPicker] = useState<{ exerciseId: string; seconds: number } | null>(null);
 
   const activeWorkout = useMemo(
     () => workouts.find((workout) => workout.status === 'active') ?? null,
@@ -297,6 +301,10 @@ export default function App() {
 
   const exerciseById = useMemo(() => new Map(exercises.map((exercise) => [exercise.id, exercise])), [exercises]);
   const bodyPartById = useMemo(() => new Map(bodyParts.map((bodyPart) => [bodyPart.id, bodyPart])), [bodyParts]);
+  const workoutExerciseById = useMemo(
+    () => new Map(workoutExercises.map((item) => [item.id, item])),
+    [workoutExercises],
+  );
 
   const activeWorkoutExercises = useMemo(() => {
     if (!activeWorkout) {
@@ -528,6 +536,25 @@ export default function App() {
     setTab('history');
   };
 
+  const pauseWorkout = async () => {
+    if (activeWorkout) {
+      await updateWorkoutSavedAt(ensureDb(), activeWorkout.id);
+    }
+    setTab('home');
+  };
+
+  const deleteWorkout = async (workoutId: string) => {
+    const database = ensureDb();
+    const items = workoutExercises.filter((item) => item.workoutId === workoutId);
+    for (const item of items) {
+      await database.runAsync('DELETE FROM workout_sets WHERE workout_exercise_id = ?', item.id);
+    }
+    await database.runAsync('DELETE FROM workout_exercises WHERE workout_id = ?', workoutId);
+    await database.runAsync('DELETE FROM workouts WHERE id = ?', workoutId);
+    setEditingWorkoutId(null);
+    await reloadData(database);
+  };
+
   const addExerciseToWorkout = async (exercise: Exercise) => {
     const database = ensureDb();
     const workout = activeWorkout;
@@ -586,8 +613,8 @@ export default function App() {
       timestamp,
       timestamp,
     );
-    if (activeWorkout) {
-      await updateWorkoutSavedAt(database, activeWorkout.id);
+    if (workoutExercise.workoutId) {
+      await updateWorkoutSavedAt(database, workoutExercise.workoutId);
     }
     await reloadData(database);
   };
@@ -615,8 +642,9 @@ export default function App() {
       nowIso(),
       setId,
     );
-    if (activeWorkout) {
-      await updateWorkoutSavedAt(database, activeWorkout.id);
+    const owningWorkoutId = workoutExerciseById.get(current.workoutExerciseId)?.workoutId;
+    if (owningWorkoutId) {
+      await updateWorkoutSavedAt(database, owningWorkoutId);
     }
     await reloadData(database);
   };
@@ -624,7 +652,7 @@ export default function App() {
   const startRestTimer = async (set: WorkoutSet, workoutExercise: WorkoutExercise) => {
     const database = ensureDb();
     const exercise = exerciseById.get(workoutExercise.exerciseId);
-    const duration = Math.max(1, set.restSeconds ?? workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120);
+    const duration = Math.max(1, workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? set.restSeconds ?? 120);
     await patchSet(set.id, { isCompleted: true, restSeconds: duration });
     const timestamp = nowIso();
     await database.runAsync(
@@ -683,6 +711,20 @@ export default function App() {
     const database = ensureDb();
     await database.runAsync('UPDATE exercises SET default_rest_seconds = ?, updated_at = ? WHERE id = ?', restSeconds, nowIso(), exercise.id);
     await reloadData(database);
+  };
+
+  const openRestPicker = (exerciseId: string, seconds: number) => {
+    setRestPicker({ exerciseId, seconds });
+  };
+
+  const confirmRestPicker = async (seconds: number) => {
+    if (restPicker) {
+      const exercise = exerciseById.get(restPicker.exerciseId);
+      if (exercise) {
+        await updateExerciseRest(exercise, Math.max(0, seconds));
+      }
+    }
+    setRestPicker(null);
   };
 
   const stats = useMemo(() => {
@@ -764,10 +806,12 @@ export default function App() {
               bodyPartById={bodyPartById}
               onStart={startWorkout}
               onComplete={completeWorkout}
+              onPause={pauseWorkout}
               onAddExercise={addExerciseToWorkout}
               onAddSet={addSet}
               onPatchSet={patchSet}
               onStartRestTimer={startRestTimer}
+              onOpenRestPicker={openRestPicker}
             />
           ) : null}
 
@@ -777,6 +821,14 @@ export default function App() {
               workoutExercises={workoutExercises}
               visibleSets={visibleSets}
               exerciseById={exerciseById}
+              editingWorkoutId={editingWorkoutId}
+              onEdit={setEditingWorkoutId}
+              onStopEdit={() => setEditingWorkoutId(null)}
+              onAddSet={addSet}
+              onPatchSet={patchSet}
+              onStartRestTimer={startRestTimer}
+              onOpenRestPicker={openRestPicker}
+              onDeleteWorkout={deleteWorkout}
             />
           ) : null}
 
@@ -788,11 +840,15 @@ export default function App() {
               newExerciseName={newExerciseName}
               onChangeNewExerciseName={setNewExerciseName}
               onAddCustomExercise={addCustomExercise}
-              onUpdateExerciseRest={updateExerciseRest}
+              onOpenRestPicker={openRestPicker}
             />
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {restPicker ? (
+        <RestPickerModal value={restPicker.seconds} onConfirm={confirmRestPicker} onCancel={() => setRestPicker(null)} />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -879,10 +935,12 @@ function WorkoutScreen({
   bodyPartById,
   onStart,
   onComplete,
+  onPause,
   onAddExercise,
   onAddSet,
   onPatchSet,
   onStartRestTimer,
+  onOpenRestPicker,
 }: {
   activeWorkout: Workout | null;
   workoutExercises: WorkoutExercise[];
@@ -892,10 +950,12 @@ function WorkoutScreen({
   bodyPartById: Map<string, BodyPart>;
   onStart: () => void;
   onComplete: () => void;
+  onPause: () => void;
   onAddExercise: (exercise: Exercise) => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
+  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
   if (!activeWorkout) {
     return (
@@ -922,9 +982,14 @@ function WorkoutScreen({
             <Text style={styles.sectionTitle}>今日のワークアウト</Text>
             <Text style={styles.muted}>最終保存 {new Date(activeWorkout.lastSavedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</Text>
           </View>
-          <Pressable style={styles.secondaryButton} onPress={onComplete}>
-            <Text style={styles.secondaryButtonText}>完了</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.ghostButton} onPress={onPause}>
+              <Text style={styles.ghostButtonText}>一時保存</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={onComplete}>
+              <Text style={styles.secondaryButtonText}>完了</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={styles.metricGrid}>
           <Metric label="種目" value={`${workoutExercises.length}`} />
@@ -948,15 +1013,51 @@ function WorkoutScreen({
         </View>
       </View>
 
+      <WorkoutExerciseList
+        workoutExercises={workoutExercises}
+        visibleSets={visibleSets}
+        exerciseById={exerciseById}
+        onAddSet={onAddSet}
+        onPatchSet={onPatchSet}
+        onStartRestTimer={onStartRestTimer}
+        onOpenRestPicker={onOpenRestPicker}
+        showTimer
+      />
+    </View>
+  );
+}
+
+function WorkoutExerciseList({
+  workoutExercises,
+  visibleSets,
+  exerciseById,
+  onAddSet,
+  onPatchSet,
+  onStartRestTimer,
+  onOpenRestPicker,
+  showTimer,
+}: {
+  workoutExercises: WorkoutExercise[];
+  visibleSets: WorkoutSet[];
+  exerciseById: Map<string, Exercise>;
+  onAddSet: (workoutExercise: WorkoutExercise) => void;
+  onPatchSet: (setId: string, patch: SetPatch) => void;
+  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
+  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
+  showTimer: boolean;
+}) {
+  return (
+    <>
       {workoutExercises.map((workoutExercise) => {
         const exercise = exerciseById.get(workoutExercise.exerciseId);
         const sets = visibleSets.filter((set) => set.workoutExerciseId === workoutExercise.id).sort((a, b) => a.orderIndex - b.orderIndex);
         const volume = sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
         const bestOneRepMax = sets.reduce((best, set) => Math.max(best, estimateOneRepMax(set.weightKg, set.reps)), 0);
+        const restSeconds = workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120;
         return (
           <View key={workoutExercise.id} style={styles.panel}>
             <View style={styles.rowBetween}>
-              <View>
+              <View style={styles.flex}>
                 <Text style={styles.exerciseTitle}>{exercise?.name ?? '種目'}</Text>
                 <Text style={styles.muted}>{sets.length} セット / {Math.round(volume).toLocaleString()}kg / 推定1RM {bestOneRepMax}kg</Text>
               </View>
@@ -964,6 +1065,15 @@ function WorkoutScreen({
                 <Text style={styles.smallButtonText}>+ セット</Text>
               </Pressable>
             </View>
+            {showTimer ? (
+              <Pressable
+                style={styles.restRow}
+                onPress={() => exercise && onOpenRestPicker(exercise.id, restSeconds)}
+              >
+                <Text style={styles.muted}>休憩タイマー</Text>
+                <Text style={styles.restValue}>{formatTimer(restSeconds)} ›</Text>
+              </Pressable>
+            ) : null}
             {sets.length === 0 ? <Text style={styles.muted}>セットを追加すると、すぐ保存されます。</Text> : null}
             {sets.map((set) => (
               <SetEditor
@@ -972,12 +1082,13 @@ function WorkoutScreen({
                 workoutExercise={workoutExercise}
                 onPatchSet={onPatchSet}
                 onStartRestTimer={onStartRestTimer}
+                showTimer={showTimer}
               />
             ))}
           </View>
         );
       })}
-    </View>
+    </>
   );
 }
 
@@ -986,11 +1097,13 @@ function SetEditor({
   workoutExercise,
   onPatchSet,
   onStartRestTimer,
+  showTimer,
 }: {
   set: WorkoutSet;
   workoutExercise: WorkoutExercise;
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
+  showTimer: boolean;
 }) {
   return (
     <View style={[styles.setCard, set.isCompleted && styles.completedSetCard]}>
@@ -1009,7 +1122,6 @@ function SetEditor({
         <LabeledNumber label="重量" value={set.weightKg} suffix="kg" onChange={(value) => onPatchSet(set.id, { weightKg: value })} />
         <LabeledNumber label="回数" value={set.reps} suffix="回" onChange={(value) => onPatchSet(set.id, { reps: Math.max(0, Math.round(value)) })} />
         <LabeledNumber label="RPE" value={set.rpe} suffix="" onChange={(value) => onPatchSet(set.id, { rpe: value })} />
-        <LabeledNumber label="休憩" value={set.restSeconds} suffix="秒" onChange={(value) => onPatchSet(set.id, { restSeconds: Math.max(0, Math.round(value)) })} />
       </View>
       <TextInput
         value={set.memo}
@@ -1020,9 +1132,11 @@ function SetEditor({
       />
       <View style={styles.rowBetween}>
         <Text style={styles.muted}>推定1RM {estimateOneRepMax(set.weightKg, set.reps)}kg</Text>
-        <Pressable style={[styles.timerButton, set.isCompleted && styles.doneButton]} onPress={() => onStartRestTimer(set, workoutExercise)}>
-          <Text style={styles.timerButtonText}>{set.isCompleted ? '再タイマー' : '完了+タイマー'}</Text>
-        </Pressable>
+        {showTimer ? (
+          <Pressable style={[styles.timerButton, set.isCompleted && styles.doneButton]} onPress={() => onStartRestTimer(set, workoutExercise)}>
+            <Text style={styles.timerButtonText}>{set.isCompleted ? '再タイマー' : '完了+タイマー'}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -1075,43 +1189,98 @@ function HistoryScreen({
   workoutExercises,
   visibleSets,
   exerciseById,
+  editingWorkoutId,
+  onEdit,
+  onStopEdit,
+  onAddSet,
+  onPatchSet,
+  onStartRestTimer,
+  onOpenRestPicker,
+  onDeleteWorkout,
 }: {
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
+  editingWorkoutId: string | null;
+  onEdit: (workoutId: string) => void;
+  onStopEdit: () => void;
+  onAddSet: (workoutExercise: WorkoutExercise) => void;
+  onPatchSet: (setId: string, patch: SetPatch) => void;
+  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
+  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
+  onDeleteWorkout: (workoutId: string) => void;
 }) {
+  const confirmDelete = (workoutId: string, label: string) => {
+    Alert.alert('記録を削除', `${label} の記録を削除します。元に戻せません。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: () => onDeleteWorkout(workoutId) },
+    ]);
+  };
+
   return (
     <View style={styles.stack}>
       <Text style={styles.pageTitle}>履歴</Text>
       {workouts.length === 0 ? <Text style={styles.muted}>完了したワークアウトはまだありません。</Text> : null}
       {workouts.map((workout) => {
-        const items = workoutExercises.filter((item) => item.workoutId === workout.id);
+        const items = workoutExercises
+          .filter((item) => item.workoutId === workout.id)
+          .sort((a, b) => a.orderIndex - b.orderIndex);
         const sets = visibleSets.filter((set) => items.some((item) => item.id === set.workoutExerciseId));
         const totalVolume = sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
         const totalReps = sets.reduce((sum, set) => sum + set.reps, 0);
+        const isEditing = editingWorkoutId === workout.id;
         return (
           <View key={workout.id} style={styles.panel}>
-            <Text style={styles.sectionTitle}>{workout.performedAt}</Text>
+            <View style={styles.rowBetween}>
+              <Text style={styles.sectionTitle}>{workout.performedAt}</Text>
+              {isEditing ? (
+                <Pressable style={styles.secondaryButton} onPress={onStopEdit}>
+                  <Text style={styles.secondaryButtonText}>編集を終了</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.ghostButton} onPress={() => onEdit(workout.id)}>
+                  <Text style={styles.ghostButtonText}>編集</Text>
+                </Pressable>
+              )}
+            </View>
             <View style={styles.metricGrid}>
               <Metric label="種目" value={`${items.length}`} />
               <Metric label="セット" value={`${sets.length}`} />
               <Metric label="総レップ" value={`${totalReps}`} />
               <Metric label="ボリューム" value={`${Math.round(totalVolume).toLocaleString()}kg`} />
             </View>
-            {items.map((item) => {
-              const exercise = exerciseById.get(item.exerciseId);
-              const itemSets = sets.filter((set) => set.workoutExerciseId === item.id);
-              const best = itemSets.reduce((max, set) => Math.max(max, estimateOneRepMax(set.weightKg, set.reps)), 0);
-              return (
-                <View key={item.id} style={styles.historyItem}>
-                  <Text style={styles.historyTitle}>{exercise?.name ?? '種目'}</Text>
-                  <Text style={styles.muted}>
-                    {itemSets.length} セット / 推定1RM {best}kg / {itemSets.map((set) => `${set.weightKg}kgx${set.reps}`).join(', ')}
-                  </Text>
-                </View>
-              );
-            })}
+            {isEditing ? (
+              <>
+                <WorkoutExerciseList
+                  workoutExercises={items}
+                  visibleSets={visibleSets}
+                  exerciseById={exerciseById}
+                  onAddSet={onAddSet}
+                  onPatchSet={onPatchSet}
+                  onStartRestTimer={onStartRestTimer}
+                  onOpenRestPicker={onOpenRestPicker}
+                  showTimer={false}
+                />
+                <Pressable style={styles.dangerButton} onPress={() => confirmDelete(workout.id, workout.performedAt)}>
+                  <Text style={styles.dangerButtonText}>この記録を削除</Text>
+                </Pressable>
+              </>
+            ) : (
+              items.map((item) => {
+                const exercise = exerciseById.get(item.exerciseId);
+                const itemSets = sets.filter((set) => set.workoutExerciseId === item.id);
+                const best = itemSets.reduce((max, set) => Math.max(max, estimateOneRepMax(set.weightKg, set.reps)), 0);
+                return (
+                  <View key={item.id} style={styles.historyItem}>
+                    <Text style={styles.historyTitle}>{exercise?.name ?? '種目'}</Text>
+                    <Text style={styles.muted}>
+                      {itemSets.length} セット / 推定1RM {best}kg / {itemSets.map((set) => `${set.weightKg}kgx${set.reps}`).join(', ')}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
           </View>
         );
       })}
@@ -1126,7 +1295,7 @@ function ExerciseScreen({
   newExerciseName,
   onChangeNewExerciseName,
   onAddCustomExercise,
-  onUpdateExerciseRest,
+  onOpenRestPicker,
 }: {
   bodyParts: BodyPart[];
   exercises: Exercise[];
@@ -1134,7 +1303,7 @@ function ExerciseScreen({
   newExerciseName: string;
   onChangeNewExerciseName: (value: string) => void;
   onAddCustomExercise: () => void;
-  onUpdateExerciseRest: (exercise: Exercise, restSeconds: number) => void;
+  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
   return (
     <View style={styles.stack}>
@@ -1169,11 +1338,70 @@ function ExerciseScreen({
           <View key={exercise.id} style={styles.panel}>
             <Text style={styles.exerciseTitle}>{exercise.name}</Text>
             <Text style={styles.muted}>{bodyPart?.name ?? '未分類'} / バー {exercise.defaultBarWeightKg}kg</Text>
-            <LabeledNumber label="デフォルト休憩" value={exercise.defaultRestSeconds} suffix="秒" onChange={(value) => onUpdateExerciseRest(exercise, Math.max(0, Math.round(value)))} />
+            <Pressable style={styles.restRow} onPress={() => onOpenRestPicker(exercise.id, exercise.defaultRestSeconds)}>
+              <Text style={styles.muted}>デフォルト休憩</Text>
+              <Text style={styles.restValue}>{formatTimer(exercise.defaultRestSeconds)} ›</Text>
+            </Pressable>
           </View>
         );
       })}
     </View>
+  );
+}
+
+function RestPickerModal({
+  value,
+  onConfirm,
+  onCancel,
+}: {
+  value: number;
+  onConfirm: (seconds: number) => void;
+  onCancel: () => void;
+}) {
+  const [minutes, setMinutes] = useState(Math.floor(value / 60));
+  const [seconds, setSeconds] = useState(Math.round((value % 60) / 5) * 5);
+
+  return (
+    <Modal transparent animationType="slide" visible onRequestClose={onCancel}>
+      <Pressable style={styles.modalBackdrop} onPress={onCancel}>
+        <Pressable style={styles.modalCard} onPress={() => undefined}>
+          <Text style={styles.sectionTitle}>休憩タイマー</Text>
+          <Text style={styles.muted}>セット完了後に使う休憩時間です。</Text>
+          <View style={styles.pickerRow}>
+            <Picker
+              selectedValue={minutes}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
+              onValueChange={(next) => setMinutes(Number(next))}
+            >
+              {Array.from({ length: 16 }, (_, index) => index).map((minute) => (
+                <Picker.Item key={minute} label={`${minute}`} value={minute} color="#f4f7fb" />
+              ))}
+            </Picker>
+            <Text style={styles.pickerUnit}>分</Text>
+            <Picker
+              selectedValue={seconds}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
+              onValueChange={(next) => setSeconds(Number(next))}
+            >
+              {Array.from({ length: 12 }, (_, index) => index * 5).map((second) => (
+                <Picker.Item key={second} label={`${second.toString().padStart(2, '0')}`} value={second} color="#f4f7fb" />
+              ))}
+            </Picker>
+            <Text style={styles.pickerUnit}>秒</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.ghostButton} onPress={onCancel}>
+              <Text style={styles.ghostButtonText}>キャンセル</Text>
+            </Pressable>
+            <Pressable style={styles.primaryButtonFlat} onPress={() => onConfirm(minutes * 60 + seconds)}>
+              <Text style={styles.primaryButtonText}>決定</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -1611,5 +1839,94 @@ const styles = StyleSheet.create({
   historyTitle: {
     color: '#f4f7fb',
     fontWeight: '800',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ghostButton: {
+    minHeight: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#3a4656',
+    backgroundColor: '#1a2230',
+  },
+  ghostButtonText: {
+    color: '#cdd6e3',
+    fontWeight: '800',
+  },
+  restRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#101820',
+    borderColor: '#2b3644',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  restValue: {
+    color: '#ffe09b',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  dangerButton: {
+    minHeight: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#7a2f33',
+    backgroundColor: '#2a1618',
+  },
+  dangerButtonText: {
+    color: '#ff8a8a',
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 9, 13, 0.72)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#171d25',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderColor: '#2c3643',
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  picker: {
+    flex: 1,
+    color: '#f4f7fb',
+  },
+  pickerItem: {
+    color: '#f4f7fb',
+    fontSize: 22,
+  },
+  pickerUnit: {
+    color: '#aeb7c4',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  primaryButtonFlat: {
+    backgroundColor: '#2d7df0',
+    minHeight: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
   },
 });

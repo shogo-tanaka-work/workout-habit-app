@@ -68,8 +68,10 @@ export type SetPatch = Partial<
   >
 >;
 
-export type WorkoutStats = {
-  completedSetCount: number;
+// ホームに出す「今週（月曜はじまり）」の集計。
+export type WeeklyStats = {
+  workoutCount: number;
+  setCount: number;
   totalVolume: number;
   totalReps: number;
 };

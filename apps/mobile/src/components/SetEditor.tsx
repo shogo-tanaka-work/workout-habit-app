@@ -1,6 +1,7 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
+import { colors } from '../styles/theme';
 import type { SetPatch, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { nowIso } from '../utils/datetime';
 import { estimateOneRepMax } from '../utils/number';
@@ -8,21 +9,27 @@ import { LabeledNumber } from './LabeledNumber';
 
 export function SetEditor({
   set,
+  setNumber,
   workoutExercise,
   onPatchSet,
   onStartRestTimer,
   showTimer,
 }: {
   set: WorkoutSet;
+  // 表示上の連番（削除を除いた並び順）。orderIndex は欠番が出るため使わない。
+  setNumber: number;
   workoutExercise: WorkoutExercise;
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   showTimer: boolean;
 }) {
   return (
-    <View style={[styles.setCard, set.isCompleted && styles.completedSetCard]}>
+    <View style={styles.setEditor}>
       <View style={styles.rowBetween}>
-        <Text style={styles.setTitle}>Set {set.orderIndex}</Text>
+        <Text style={[styles.setTitle, set.isCompleted && styles.completedSetTitle]}>
+          セット {setNumber}
+          {set.isCompleted ? ' ✓' : ''}
+        </Text>
         <View style={styles.setActions}>
           <Pressable
             style={[styles.pill, set.isWarmup && styles.activePill]}
@@ -62,18 +69,18 @@ export function SetEditor({
         value={set.memo}
         onChangeText={(memo) => onPatchSet(set.id, { memo })}
         placeholder="メモ"
-        placeholderTextColor="#7a7f8a"
+        placeholderTextColor={colors.textFaint}
         style={styles.memoInput}
       />
       <View style={styles.rowBetween}>
-        <Text style={styles.muted}>推定1RM {estimateOneRepMax(set.weightKg, set.reps)}kg</Text>
+        <Text style={styles.muted}>推定1RM {estimateOneRepMax(set.weightKg, set.reps)} kg</Text>
         {showTimer ? (
           <Pressable
             style={[styles.timerButton, set.isCompleted && styles.doneButton]}
             onPress={() => onStartRestTimer(set, workoutExercise)}
           >
             <Text style={styles.timerButtonText}>
-              {set.isCompleted ? '再タイマー' : '完了+タイマー'}
+              {set.isCompleted ? '再タイマー' : '完了＋タイマー'}
             </Text>
           </Pressable>
         ) : null}

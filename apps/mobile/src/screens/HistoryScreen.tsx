@@ -1,10 +1,11 @@
 import { Alert, Pressable, Text, View } from 'react-native';
 
-import { Metric } from '../components/Metric';
+import { StatStrip } from '../components/StatStrip';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
 import { styles } from '../styles/appStyles';
 import type { Exercise, SetPatch, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
-import { estimateOneRepMax } from '../utils/number';
+import { summarizeSets } from '../utils/aggregate';
+import { formatJapaneseDate } from '../utils/datetime';
 
 export function HistoryScreen({
   workouts,
@@ -19,6 +20,7 @@ export function HistoryScreen({
   onStartRestTimer,
   onOpenRestPicker,
   onDeleteWorkout,
+  onSelectExercise,
 }: {
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
@@ -32,6 +34,7 @@ export function HistoryScreen({
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onDeleteWorkout: (workoutId: string) => void;
+  onSelectExercise: (exerciseId: string) => void;
 }) {
   const confirmDelete = (workoutId: string, label: string) => {
     Alert.alert('記録を削除', `${label} の記録を削除します。元に戻せません。`, [
@@ -42,7 +45,6 @@ export function HistoryScreen({
 
   return (
     <View style={styles.stack}>
-      <Text style={styles.pageTitle}>履歴</Text>
       {workouts.length === 0 ? (
         <Text style={styles.muted}>完了したワークアウトはまだありません。</Text>
       ) : null}
@@ -50,16 +52,23 @@ export function HistoryScreen({
         const items = workoutExercises
           .filter((item) => item.workoutId === workout.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);
-        const sets = visibleSets.filter((set) =>
+        const workoutSets = visibleSets.filter((set) =>
           items.some((item) => item.id === set.workoutExerciseId),
         );
-        const totalVolume = sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
-        const totalReps = sets.reduce((sum, set) => sum + set.reps, 0);
+        const workoutSummary = summarizeSets(workoutSets);
         const isEditing = editingWorkoutId === workout.id;
         return (
-          <View key={workout.id} style={styles.panel}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.sectionTitle}>{workout.performedAt}</Text>
+          <View key={workout.id} style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionHeaderText}>
+                  {formatJapaneseDate(workout.performedAt)}
+                </Text>
+                <Text style={styles.faint}>
+                  総ボリューム {Math.round(workoutSummary.totalVolume).toLocaleString()} kg ・{' '}
+                  {workoutSummary.setCount} セット
+                </Text>
+              </View>
               {isEditing ? (
                 <Pressable style={styles.secondaryButton} onPress={onStopEdit}>
                   <Text style={styles.secondaryButtonText}>編集を終了</Text>
@@ -70,14 +79,8 @@ export function HistoryScreen({
                 </Pressable>
               )}
             </View>
-            <View style={styles.metricGrid}>
-              <Metric label="種目" value={`${items.length}`} />
-              <Metric label="セット" value={`${sets.length}`} />
-              <Metric label="総レップ" value={`${totalReps}`} />
-              <Metric label="ボリューム" value={`${Math.round(totalVolume).toLocaleString()}kg`} />
-            </View>
             {isEditing ? (
-              <>
+              <View style={styles.sectionBody}>
                 <WorkoutExerciseList
                   workoutExercises={items}
                   visibleSets={visibleSets}
@@ -94,23 +97,36 @@ export function HistoryScreen({
                 >
                   <Text style={styles.dangerButtonText}>この記録を削除</Text>
                 </Pressable>
-              </>
+              </View>
             ) : (
               items.map((item) => {
                 const exercise = exerciseById.get(item.exerciseId);
-                const itemSets = sets.filter((set) => set.workoutExerciseId === item.id);
-                const best = itemSets.reduce(
-                  (max, set) => Math.max(max, estimateOneRepMax(set.weightKg, set.reps)),
-                  0,
-                );
+                const itemSets = workoutSets.filter((set) => set.workoutExerciseId === item.id);
+                const itemSummary = summarizeSets(itemSets);
                 return (
-                  <View key={item.id} style={styles.historyItem}>
-                    <Text style={styles.historyTitle}>{exercise?.name ?? '種目'}</Text>
-                    <Text style={styles.muted}>
-                      {itemSets.length} セット / 推定1RM {best}kg /{' '}
-                      {itemSets.map((set) => `${set.weightKg}kgx${set.reps}`).join(', ')}
-                    </Text>
-                  </View>
+                  <Pressable
+                    key={item.id}
+                    style={styles.exerciseRow}
+                    onPress={() => onSelectExercise(item.exerciseId)}
+                  >
+                    <View style={styles.exerciseRowHeader}>
+                      <View style={styles.exerciseDot} />
+                      <Text style={styles.exerciseRowName}>{exercise?.name ?? '種目'}</Text>
+                      <Text style={styles.chevron}>›</Text>
+                    </View>
+                    <StatStrip
+                      items={[
+                        { label: 'セット', value: `${itemSummary.setCount} セット` },
+                        {
+                          label: 'ボリューム',
+                          value: `${Math.round(itemSummary.totalVolume).toLocaleString()} kg`,
+                        },
+                        { label: '推定1RM', value: `${itemSummary.bestOneRepMax} kg` },
+                        { label: '総レップ数', value: `${itemSummary.totalReps} 回` },
+                        { label: '最大レップ', value: `${itemSummary.maxReps} 回` },
+                      ]}
+                    />
+                  </Pressable>
                 );
               })
             )}

@@ -1,6 +1,7 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
+import { colors } from '../styles/theme';
 import type { BodyPart, Exercise } from '../types/domain';
 import { formatTimer } from '../utils/format';
 
@@ -12,6 +13,7 @@ export function ExerciseScreen({
   onChangeNewExerciseName,
   onAddCustomExercise,
   onOpenRestPicker,
+  onSelectExercise,
 }: {
   bodyParts: BodyPart[];
   exercises: Exercise[];
@@ -20,52 +22,77 @@ export function ExerciseScreen({
   onChangeNewExerciseName: (value: string) => void;
   onAddCustomExercise: () => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
+  onSelectExercise: (exerciseId: string) => void;
 }) {
   return (
     <View style={styles.stack}>
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>種目を追加</Text>
-        <TextInput
-          value={newExerciseName}
-          onChangeText={onChangeNewExerciseName}
-          placeholder="例: インクラインダンベルプレス"
-          placeholderTextColor="#7a7f8a"
-          style={styles.textInput}
-        />
-        <Pressable style={styles.primaryButton} onPress={onAddCustomExercise}>
-          <Text style={styles.primaryButtonText}>種目を登録</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>部位マスター</Text>
-        <View style={styles.chipWrap}>
-          {bodyParts.map((part) => (
-            <View key={part.id} style={styles.staticChip}>
-              <Text style={styles.staticChipText}>{part.name}</Text>
-            </View>
-          ))}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>種目を追加</Text>
+        </View>
+        <View style={styles.sectionBody}>
+          <TextInput
+            value={newExerciseName}
+            onChangeText={onChangeNewExerciseName}
+            placeholder="例: インクラインダンベルプレス"
+            placeholderTextColor={colors.textFaint}
+            style={styles.textInput}
+          />
+          <Pressable style={styles.primaryButton} onPress={onAddCustomExercise}>
+            <Text style={styles.primaryButtonText}>種目を登録</Text>
+          </Pressable>
         </View>
       </View>
 
-      {exercises.map((exercise) => {
-        const bodyPart = bodyPartById.get(exercise.primaryBodyPartId);
-        return (
-          <View key={exercise.id} style={styles.panel}>
-            <Text style={styles.exerciseTitle}>{exercise.name}</Text>
-            <Text style={styles.muted}>
-              {bodyPart?.name ?? '未分類'} / バー {exercise.defaultBarWeightKg}kg
-            </Text>
-            <Pressable
-              style={styles.restRow}
-              onPress={() => onOpenRestPicker(exercise.id, exercise.defaultRestSeconds)}
-            >
-              <Text style={styles.muted}>デフォルト休憩</Text>
-              <Text style={styles.restValue}>{formatTimer(exercise.defaultRestSeconds)} ›</Text>
-            </Pressable>
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>部位マスター</Text>
+        </View>
+        <View style={styles.sectionBody}>
+          <View style={styles.chipWrap}>
+            {bodyParts.map((part) => (
+              <View key={part.id} style={styles.staticChip}>
+                <Text style={styles.staticChipText}>{part.name}</Text>
+              </View>
+            ))}
           </View>
-        );
-      })}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>種目一覧</Text>
+        </View>
+        {exercises.map((exercise) => {
+          const bodyPart = bodyPartById.get(exercise.primaryBodyPartId);
+          return (
+            <View key={exercise.id} style={styles.exerciseRow}>
+              <Pressable
+                style={styles.exerciseRowHeader}
+                onPress={() => onSelectExercise(exercise.id)}
+              >
+                <View style={styles.exerciseDot} />
+                <View style={styles.flex}>
+                  <Text style={styles.exerciseRowName}>{exercise.name}</Text>
+                  <Text style={styles.faint}>
+                    {bodyPart?.name ?? '未分類'} ・ バー {exercise.defaultBarWeightKg} kg
+                  </Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+              <View style={styles.sectionBody}>
+                <Pressable
+                  style={styles.restRow}
+                  onPress={() => onOpenRestPicker(exercise.id, exercise.defaultRestSeconds)}
+                >
+                  <Text style={styles.muted}>デフォルト休憩</Text>
+                  <Text style={styles.restValue}>{formatTimer(exercise.defaultRestSeconds)} ›</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
+import { colors } from '../styles/theme';
 
 export function RestPickerModal({
   value,
@@ -30,7 +31,12 @@ export function RestPickerModal({
               onValueChange={(next) => setMinutes(Number(next))}
             >
               {Array.from({ length: 16 }, (_, index) => index).map((minute) => (
-                <Picker.Item key={minute} label={`${minute}`} value={minute} color="#f4f7fb" />
+                <Picker.Item
+                  key={minute}
+                  label={`${minute}`}
+                  value={minute}
+                  color={colors.textPrimary}
+                />
               ))}
             </Picker>
             <Text style={styles.pickerUnit}>分</Text>
@@ -45,7 +51,7 @@ export function RestPickerModal({
                   key={second}
                   label={`${second.toString().padStart(2, '0')}`}
                   value={second}
-                  color="#f4f7fb"
+                  color={colors.textPrimary}
                 />
               ))}
             </Picker>

@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,12 +14,15 @@ import { RestPickerModal } from './src/components/RestPickerModal';
 import { TimerBanner } from './src/components/TimerBanner';
 import { useRestTimer } from './src/hooks/useRestTimer';
 import { useWorkoutData } from './src/hooks/useWorkoutData';
+import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
 import { ExerciseScreen } from './src/screens/ExerciseScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
 import type { Tab, WorkoutExercise, WorkoutSet } from './src/types/domain';
+import type { ExerciseSession } from './src/utils/aggregate';
+import { buildExerciseSessions, findPreviousSession } from './src/utils/aggregate';
 
 export default function App() {
   const data = useWorkoutData();
@@ -29,9 +32,52 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [newExerciseName, setNewExerciseName] = useState('');
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [restPicker, setRestPicker] = useState<{ exerciseId: string; seconds: number } | null>(
     null,
   );
+
+  // 記録中の各種目について、直近の完了済み実施記録（前回実績）を引く。
+  const previousSessionByExerciseId = useMemo(() => {
+    const map = new Map<string, ExerciseSession | null>();
+    if (!data.activeWorkout) {
+      return map;
+    }
+    for (const workoutExercise of data.activeWorkoutExercises) {
+      map.set(
+        workoutExercise.exerciseId,
+        findPreviousSession(
+          workoutExercise.exerciseId,
+          data.activeWorkout.id,
+          data.completedWorkouts,
+          data.workoutExercises,
+          data.visibleSets,
+        ),
+      );
+    }
+    return map;
+  }, [
+    data.activeWorkout,
+    data.activeWorkoutExercises,
+    data.completedWorkouts,
+    data.workoutExercises,
+    data.visibleSets,
+  ]);
+
+  const selectedExercise = selectedExerciseId
+    ? (data.exerciseById.get(selectedExerciseId) ?? null)
+    : null;
+  const selectedExerciseSessions = useMemo(() => {
+    if (!selectedExerciseId) {
+      return [];
+    }
+    return buildExerciseSessions(
+      selectedExerciseId,
+      data.completedWorkouts,
+      data.workoutExercises,
+      data.visibleSets,
+    );
+  }, [selectedExerciseId, data.completedWorkouts, data.workoutExercises, data.visibleSets]);
 
   const handleStart = async () => {
     await data.startWorkout();
@@ -109,98 +155,113 @@ export default function App() {
         style={styles.flex}
       >
         <View style={styles.header}>
-          <View>
+          {selectedExercise ? (
+            <Pressable style={styles.headerBackButton} onPress={() => setSelectedExerciseId(null)}>
+              <Text style={styles.headerBackText}>‹</Text>
+              <Text style={styles.appName}>{selectedExercise.name}</Text>
+            </Pressable>
+          ) : (
             <Text style={styles.appName}>Workout Habit</Text>
-            <Text style={styles.headerSub}>記録は都度保存。間違えても後から直せます。</Text>
-          </View>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>MVP</Text>
-          </View>
+          )}
         </View>
 
         {timer ? <TimerBanner timer={timer} setTimer={setTimer} /> : null}
 
-        <View style={styles.tabs}>
-          {(
-            [
-              ['home', 'ホーム'],
-              ['workout', '記録'],
-              ['history', '履歴'],
-              ['exercises', '種目'],
-            ] as const
-          ).map(([key, label]) => (
-            <Pressable
-              key={key}
-              onPress={() => setTab(key)}
-              style={[styles.tab, tab === key && styles.activeTab]}
-            >
-              <Text style={[styles.tabText, tab === key && styles.activeTabText]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {selectedExercise ? null : (
+          <View style={styles.tabs}>
+            {(
+              [
+                ['home', 'ホーム'],
+                ['workout', '記録'],
+                ['history', '履歴'],
+                ['exercises', '種目'],
+              ] as const
+            ).map(([key, label]) => (
+              <Pressable
+                key={key}
+                onPress={() => setTab(key)}
+                style={[styles.tab, tab === key && styles.activeTab]}
+              >
+                <Text style={[styles.tabText, tab === key && styles.activeTabText]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.contentContainer}
           keyboardShouldPersistTaps="handled"
         >
-          {tab === 'home' ? (
-            <HomeScreen
-              activeWorkout={data.activeWorkout}
-              completedWorkouts={data.completedWorkouts}
-              stats={data.stats}
-              onStart={handleStart}
-              onResume={() => setTab('workout')}
-            />
-          ) : null}
+          {selectedExercise ? (
+            <ExerciseDetailScreen exercise={selectedExercise} sessions={selectedExerciseSessions} />
+          ) : (
+            <>
+              {tab === 'home' ? (
+                <HomeScreen
+                  activeWorkout={data.activeWorkout}
+                  completedWorkouts={data.completedWorkouts}
+                  workoutExercises={data.workoutExercises}
+                  visibleSets={data.visibleSets}
+                  exerciseById={data.exerciseById}
+                  stats={data.stats}
+                  onStart={handleStart}
+                  onResume={() => setTab('workout')}
+                />
+              ) : null}
 
-          {tab === 'workout' ? (
-            <WorkoutScreen
-              activeWorkout={data.activeWorkout}
-              workoutExercises={data.activeWorkoutExercises}
-              visibleSets={data.visibleSets}
-              exercises={data.exercises}
-              exerciseById={data.exerciseById}
-              bodyPartById={data.bodyPartById}
-              onStart={handleStart}
-              onComplete={handleComplete}
-              onPause={handlePause}
-              onAddExercise={data.addExerciseToWorkout}
-              onAddSet={data.addSet}
-              onPatchSet={data.patchSet}
-              onStartRestTimer={handleStartRestTimer}
-              onOpenRestPicker={openRestPicker}
-            />
-          ) : null}
+              {tab === 'workout' ? (
+                <WorkoutScreen
+                  activeWorkout={data.activeWorkout}
+                  workoutExercises={data.activeWorkoutExercises}
+                  visibleSets={data.visibleSets}
+                  exercises={data.exercises}
+                  exerciseById={data.exerciseById}
+                  bodyPartById={data.bodyPartById}
+                  previousSessionByExerciseId={previousSessionByExerciseId}
+                  onStart={handleStart}
+                  onComplete={handleComplete}
+                  onPause={handlePause}
+                  onAddExercise={data.addExerciseToWorkout}
+                  onAddSet={data.addSet}
+                  onPatchSet={data.patchSet}
+                  onStartRestTimer={handleStartRestTimer}
+                  onOpenRestPicker={openRestPicker}
+                />
+              ) : null}
 
-          {tab === 'history' ? (
-            <HistoryScreen
-              workouts={data.completedWorkouts}
-              workoutExercises={data.workoutExercises}
-              visibleSets={data.visibleSets}
-              exerciseById={data.exerciseById}
-              editingWorkoutId={editingWorkoutId}
-              onEdit={setEditingWorkoutId}
-              onStopEdit={() => setEditingWorkoutId(null)}
-              onAddSet={data.addSet}
-              onPatchSet={data.patchSet}
-              onStartRestTimer={handleStartRestTimer}
-              onOpenRestPicker={openRestPicker}
-              onDeleteWorkout={handleDeleteWorkout}
-            />
-          ) : null}
+              {tab === 'history' ? (
+                <HistoryScreen
+                  workouts={data.completedWorkouts}
+                  workoutExercises={data.workoutExercises}
+                  visibleSets={data.visibleSets}
+                  exerciseById={data.exerciseById}
+                  editingWorkoutId={editingWorkoutId}
+                  onEdit={setEditingWorkoutId}
+                  onStopEdit={() => setEditingWorkoutId(null)}
+                  onAddSet={data.addSet}
+                  onPatchSet={data.patchSet}
+                  onStartRestTimer={handleStartRestTimer}
+                  onOpenRestPicker={openRestPicker}
+                  onDeleteWorkout={handleDeleteWorkout}
+                  onSelectExercise={setSelectedExerciseId}
+                />
+              ) : null}
 
-          {tab === 'exercises' ? (
-            <ExerciseScreen
-              bodyParts={data.bodyParts}
-              exercises={data.exercises}
-              bodyPartById={data.bodyPartById}
-              newExerciseName={newExerciseName}
-              onChangeNewExerciseName={setNewExerciseName}
-              onAddCustomExercise={handleAddCustomExercise}
-              onOpenRestPicker={openRestPicker}
-            />
-          ) : null}
+              {tab === 'exercises' ? (
+                <ExerciseScreen
+                  bodyParts={data.bodyParts}
+                  exercises={data.exercises}
+                  bodyPartById={data.bodyPartById}
+                  newExerciseName={newExerciseName}
+                  onChangeNewExerciseName={setNewExerciseName}
+                  onAddCustomExercise={handleAddCustomExercise}
+                  onOpenRestPicker={openRestPicker}
+                  onSelectExercise={setSelectedExerciseId}
+                />
+              ) : null}
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 

@@ -24,11 +24,12 @@ import type {
   Exercise,
   SetPatch,
   TimerState,
+  WeeklyStats,
   Workout,
   WorkoutExercise,
   WorkoutSet,
 } from '../types/domain';
-import { formatDate } from '../utils/datetime';
+import { formatDate, startOfWeekIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 
 // SQLite の初期化・データ読み込み・全 CRUD 操作・派生状態を集約するフック。
@@ -83,12 +84,27 @@ export function useWorkoutData() {
     [workouts],
   );
 
-  const stats = useMemo(() => {
-    const completedSetCount = visibleSets.filter((set) => set.isCompleted).length;
-    const totalVolume = visibleSets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
-    const totalReps = visibleSets.reduce((sum, set) => sum + set.reps, 0);
-    return { completedSetCount, totalVolume, totalReps };
-  }, [visibleSets]);
+  // ホーム表示用の「今週（月曜はじまり）」の集計。
+  const stats = useMemo((): WeeklyStats => {
+    const weekStart = startOfWeekIso(new Date());
+    const weekWorkouts = workouts.filter((workout) => workout.performedAt >= weekStart);
+    const weekWorkoutIds = new Set(weekWorkouts.map((workout) => workout.id));
+    const weekExerciseIds = new Set(
+      workoutExercises.filter((item) => weekWorkoutIds.has(item.workoutId)).map((item) => item.id),
+    );
+    let setCount = 0;
+    let totalVolume = 0;
+    let totalReps = 0;
+    for (const set of visibleSets) {
+      if (!weekExerciseIds.has(set.workoutExerciseId)) {
+        continue;
+      }
+      setCount += 1;
+      totalVolume += set.weightKg * set.reps;
+      totalReps += set.reps;
+    }
+    return { workoutCount: weekWorkouts.length, setCount, totalVolume, totalReps };
+  }, [workouts, workoutExercises, visibleSets]);
 
   const reloadData = useCallback(async (database: SQLite.SQLiteDatabase) => {
     const data = await loadWorkoutData(database);

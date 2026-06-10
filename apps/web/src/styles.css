@@ -228,7 +228,24 @@ select,
   height: auto;
 }
 
-.chart-scale,
+.chart {
+  position: relative;
+}
+
+/* 縦軸の最大値（左上）・最小値（左下）をグラフに重ねて表示する。
+   inset は LineChart の PADDING_Y / PADDING_X とおおよそ対応。 */
+.chart-scale {
+  position: absolute;
+  inset: 4px 8px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
 .chart-axis {
   display: flex;
   justify-content: space-between;

@@ -1,9 +1,10 @@
 import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 
+import { CloudSyncSection } from '../components/CloudSyncSection';
 import { PlateCalculator } from '../components/PlateCalculator';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
-import type { BodyPart, Exercise, TimerSettings } from '../types/domain';
+import type { BodyPart, Exercise, SyncSettings, TimerSettings } from '../types/domain';
 import { formatTimer } from '../utils/format';
 
 export function ExerciseScreen({
@@ -18,6 +19,10 @@ export function ExerciseScreen({
   onSelectExercise,
   onUpdateTimerSettings,
   onExportCsv,
+  syncSettings,
+  onSaveSyncConnection,
+  onBackup,
+  onRestore,
 }: {
   bodyParts: BodyPart[];
   exercises: Exercise[];
@@ -30,6 +35,10 @@ export function ExerciseScreen({
   onSelectExercise: (exerciseId: string) => void;
   onUpdateTimerSettings: (settings: TimerSettings) => void;
   onExportCsv: () => void;
+  syncSettings: SyncSettings;
+  onSaveSyncConnection: (apiUrl: string, apiToken: string) => Promise<void>;
+  onBackup: () => Promise<void>;
+  onRestore: () => Promise<void>;
 }) {
   return (
     <View style={styles.stack}>
@@ -144,6 +153,13 @@ export function ExerciseScreen({
           </Text>
         </View>
       </View>
+
+      <CloudSyncSection
+        syncSettings={syncSettings}
+        onSaveConnection={onSaveSyncConnection}
+        onBackup={onBackup}
+        onRestore={onRestore}
+      />
     </View>
   );
 }

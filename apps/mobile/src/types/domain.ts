@@ -71,6 +71,13 @@ export type TimerSettings = {
   vibrationEnabled: boolean;
 };
 
+// クラウドバックアップの接続設定（app_settings に保存。端末ローカル・同期対象外）。
+export type SyncSettings = {
+  apiUrl: string;
+  apiToken: string;
+  lastBackupAt: string | null;
+};
+
 // 体重・体脂肪のボディログ（1日1件）。
 export type BodyLog = {
   id: string;

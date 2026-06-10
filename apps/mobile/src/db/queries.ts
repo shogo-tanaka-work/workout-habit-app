@@ -4,6 +4,7 @@ import type {
   BodyLog,
   BodyPart,
   Exercise,
+  SyncSettings,
   Template,
   TemplateExercise,
   TimerSettings,
@@ -44,11 +45,15 @@ export type WorkoutData = {
   templateExercises: TemplateExercise[];
   timerSettings: TimerSettings;
   bodyLogs: BodyLog[];
+  syncSettings: SyncSettings;
 };
 
-// app_settings のキー。値は '0' / '1' の文字列で持つ。
+// app_settings のキー。タイマー設定の値は '0' / '1' の文字列で持つ。
 const TIMER_SOUND_KEY = 'timer_sound_enabled';
 const TIMER_VIBRATION_KEY = 'timer_vibration_enabled';
+const SYNC_API_URL_KEY = 'sync_api_url';
+const SYNC_API_TOKEN_KEY = 'sync_api_token';
+const SYNC_LAST_BACKUP_AT_KEY = 'sync_last_backup_at';
 
 const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
@@ -56,6 +61,15 @@ const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   return {
     soundEnabled: valueByKey.get(TIMER_SOUND_KEY) !== '0',
     vibrationEnabled: valueByKey.get(TIMER_VIBRATION_KEY) !== '0',
+  };
+};
+
+const toSyncSettings = (rows: AppSettingRow[]): SyncSettings => {
+  const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
+  return {
+    apiUrl: valueByKey.get(SYNC_API_URL_KEY) ?? '',
+    apiToken: valueByKey.get(SYNC_API_TOKEN_KEY) ?? '',
+    lastBackupAt: valueByKey.get(SYNC_LAST_BACKUP_AT_KEY) ?? null,
   };
 };
 
@@ -102,7 +116,40 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
     templateExercises: templateExerciseRows.map(toTemplateExercise),
     timerSettings: toTimerSettings(appSettingRows),
     bodyLogs: bodyLogRows.map(toBodyLog),
+    syncSettings: toSyncSettings(appSettingRows),
   };
+};
+
+// app_settings へ1件保存する（既存キーは上書き）。
+const upsertAppSetting = async (
+  database: SQLite.SQLiteDatabase,
+  key: string,
+  value: string,
+): Promise<void> => {
+  await database.runAsync(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    key,
+    value,
+    nowIso(),
+  );
+};
+
+// クラウドバックアップの接続設定を保存する。
+export const upsertSyncConnection = async (
+  database: SQLite.SQLiteDatabase,
+  params: { apiUrl: string; apiToken: string },
+): Promise<void> => {
+  await upsertAppSetting(database, SYNC_API_URL_KEY, params.apiUrl);
+  await upsertAppSetting(database, SYNC_API_TOKEN_KEY, params.apiToken);
+};
+
+// 最終バックアップ日時を記録する。
+export const markLastBackupAt = async (
+  database: SQLite.SQLiteDatabase,
+  timestamp: string,
+): Promise<void> => {
+  await upsertAppSetting(database, SYNC_LAST_BACKUP_AT_KEY, timestamp);
 };
 
 // ボディログを保存する。同じ計測日があれば上書き（1日1件）。

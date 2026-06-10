@@ -16,18 +16,27 @@ import {
   insertWorkoutExercise,
   insertWorkoutSet,
   loadWorkoutData,
+  markLastBackupAt,
   setExerciseRest,
   setWorkoutStatus,
   touchWorkout,
   updateWorkoutSet,
   upsertBodyLog,
+  upsertSyncConnection,
   upsertTimerSettings,
 } from '../db/queries';
+import {
+  applyBackupPayload,
+  exportBackupPayload,
+  fetchBackupFromCloud,
+  pushBackupToCloud,
+} from '../db/sync';
 import type {
   BodyLog,
   BodyPart,
   Exercise,
   SetPatch,
+  SyncSettings,
   Template,
   TemplateExercise,
   TimerSettings,
@@ -39,7 +48,7 @@ import type {
 } from '../types/domain';
 import type { BodyPartSummary } from '../utils/aggregate';
 import { summarizeByBodyPart } from '../utils/aggregate';
-import { formatDate, startOfWeekIso } from '../utils/datetime';
+import { formatDate, nowIso, startOfWeekIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 
 // SQLite の初期化・データ読み込み・全 CRUD 操作・派生状態を集約するフック。
@@ -60,6 +69,11 @@ export function useWorkoutData() {
     vibrationEnabled: true,
   });
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
+  const [syncSettings, setSyncSettings] = useState<SyncSettings>({
+    apiUrl: '',
+    apiToken: '',
+    lastBackupAt: null,
+  });
 
   const activeWorkout = useMemo(
     () => workouts.find((workout) => workout.status === 'active') ?? null,
@@ -158,6 +172,7 @@ export function useWorkoutData() {
     setTemplateExercises(data.templateExercises);
     setTimerSettings(data.timerSettings);
     setBodyLogs(data.bodyLogs);
+    setSyncSettings(data.syncSettings);
   }, []);
 
   useEffect(() => {
@@ -401,6 +416,44 @@ export function useWorkoutData() {
     setTimerSettings(settings);
   };
 
+  // クラウドバックアップの接続設定（URL・トークン）を保存する。
+  const updateSyncConnection = async (apiUrl: string, apiToken: string) => {
+    const database = ensureDb();
+    await upsertSyncConnection(database, { apiUrl: apiUrl.trim(), apiToken: apiToken.trim() });
+    setSyncSettings((previous) => ({
+      ...previous,
+      apiUrl: apiUrl.trim(),
+      apiToken: apiToken.trim(),
+    }));
+  };
+
+  const ensureSyncConnection = (): SyncSettings => {
+    if (!syncSettings.apiUrl || !syncSettings.apiToken) {
+      throw new Error('API URLとトークンを設定してください');
+    }
+    return syncSettings;
+  };
+
+  // ローカル全データをクラウドへバックアップする（クラウド側は全置き換え）。
+  const backupToCloud = async () => {
+    const database = ensureDb();
+    const connection = ensureSyncConnection();
+    const payload = await exportBackupPayload(database);
+    await pushBackupToCloud(connection.apiUrl, connection.apiToken, payload);
+    const timestamp = nowIso();
+    await markLastBackupAt(database, timestamp);
+    setSyncSettings((previous) => ({ ...previous, lastBackupAt: timestamp }));
+  };
+
+  // クラウドのバックアップでローカルを置き換える（復元）。呼び出し側で確認ダイアログを出す。
+  const restoreFromCloud = async () => {
+    const database = ensureDb();
+    const connection = ensureSyncConnection();
+    const payload = await fetchBackupFromCloud(connection.apiUrl, connection.apiToken);
+    await applyBackupPayload(database, payload);
+    await reloadData(database);
+  };
+
   // 今日のボディログを保存する（同日があれば上書き）。体重 0 以下は無効として false。
   const saveBodyLog = async (
     bodyWeightKg: number,
@@ -446,6 +499,10 @@ export function useWorkoutData() {
     deleteTemplate,
     updateTimerSettings,
     saveBodyLog,
+    syncSettings,
+    updateSyncConnection,
+    backupToCloud,
+    restoreFromCloud,
     startWorkout,
     completeWorkout,
     pauseWorkout,

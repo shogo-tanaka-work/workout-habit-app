@@ -292,6 +292,10 @@ export default function App() {
                   onSelectExercise={setSelectedExerciseId}
                   onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
                   onExportCsv={() => void handleExportCsv()}
+                  syncSettings={data.syncSettings}
+                  onSaveSyncConnection={data.updateSyncConnection}
+                  onBackup={data.backupToCloud}
+                  onRestore={data.restoreFromCloud}
                 />
               ) : null}
             </>

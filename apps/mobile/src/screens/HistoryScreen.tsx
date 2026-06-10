@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
+import { MonthCalendar } from '../components/MonthCalendar';
 import { StatStrip } from '../components/StatStrip';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
 import { styles } from '../styles/appStyles';
@@ -36,6 +38,9 @@ export function HistoryScreen({
   onDeleteWorkout: (workoutId: string) => void;
   onSelectExercise: (exerciseId: string) => void;
 }) {
+  // カレンダーで選択中の日付。選択中はその日の記録だけを表示する。
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
   const confirmDelete = (workoutId: string, label: string) => {
     Alert.alert('記録を削除', `${label} の記録を削除します。元に戻せません。`, [
       { text: 'キャンセル', style: 'cancel' },
@@ -43,12 +48,40 @@ export function HistoryScreen({
     ]);
   };
 
+  const workoutCountByDate = new Map<string, number>();
+  for (const workout of workouts) {
+    workoutCountByDate.set(
+      workout.performedAt,
+      (workoutCountByDate.get(workout.performedAt) ?? 0) + 1,
+    );
+  }
+  const visibleWorkouts = selectedDate
+    ? workouts.filter((workout) => workout.performedAt === selectedDate)
+    : workouts;
+
   return (
     <View style={styles.stack}>
+      <View style={styles.section}>
+        <MonthCalendar
+          workoutCountByDate={workoutCountByDate}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+        />
+      </View>
+
+      {selectedDate ? (
+        <View style={styles.rowBetween}>
+          <Text style={styles.accentNote}>{formatJapaneseDate(selectedDate)} の記録</Text>
+          <Pressable style={styles.ghostButton} onPress={() => setSelectedDate(null)}>
+            <Text style={styles.ghostButtonText}>すべて表示</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {workouts.length === 0 ? (
         <Text style={styles.muted}>完了したワークアウトはまだありません。</Text>
       ) : null}
-      {workouts.map((workout) => {
+      {visibleWorkouts.map((workout) => {
         const items = workoutExercises
           .filter((item) => item.workoutId === workout.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);

@@ -1,4 +1,4 @@
-import type { Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import type { BodyPart, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { estimateOneRepMax } from './number';
 
 // セット集計とサマリ（日別履歴・種目詳細・前回実績で共用する純粋関数群）。
@@ -84,3 +84,42 @@ export const findPreviousSession = (
 // 「70kg×8 / 70kg×8」のようなセット内容の短い表記。
 export const formatSetsInline = (sets: WorkoutSet[]): string =>
   sets.map((set) => `${set.weightKg}kg×${set.reps}`).join(' / ');
+
+// 部位別の集計（週間部位別集計などに使う）。
+export type BodyPartSummary = {
+  bodyPartId: string;
+  name: string;
+  setCount: number;
+  totalVolume: number;
+};
+
+// 対象期間の workout_exercises と、それに属するセットから部位ごとの集計を作る。
+// ボリューム降順で返す。
+export const summarizeByBodyPart = (
+  workoutExercises: WorkoutExercise[],
+  sets: WorkoutSet[],
+  exerciseById: Map<string, Exercise>,
+  bodyPartById: Map<string, BodyPart>,
+): BodyPartSummary[] => {
+  const exerciseIdByWorkoutExerciseId = new Map(
+    workoutExercises.map((item) => [item.id, item.exerciseId]),
+  );
+  const summaryByBodyPartId = new Map<string, BodyPartSummary>();
+  for (const set of sets) {
+    const exerciseId = exerciseIdByWorkoutExerciseId.get(set.workoutExerciseId);
+    if (!exerciseId) {
+      continue;
+    }
+    const bodyPartId = exerciseById.get(exerciseId)?.primaryBodyPartId ?? 'unknown';
+    const entry = summaryByBodyPartId.get(bodyPartId) ?? {
+      bodyPartId,
+      name: bodyPartById.get(bodyPartId)?.name ?? '未分類',
+      setCount: 0,
+      totalVolume: 0,
+    };
+    entry.setCount += 1;
+    entry.totalVolume += set.weightKg * set.reps;
+    summaryByBodyPartId.set(bodyPartId, entry);
+  }
+  return [...summaryByBodyPartId.values()].sort((a, b) => b.totalVolume - a.totalVolume);
+};

@@ -28,6 +28,12 @@ export const formatMonthDay = (isoDate: string): string => {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 };
 
+// n か月前の同日（YYYY-MM-DD）。種目詳細の期間切り替えの起点に使う。
+export const isoDateMonthsAgo = (months: number, from: Date): string => {
+  const date = new Date(from.getFullYear(), from.getMonth() - months, from.getDate());
+  return formatDate(date);
+};
+
 // 月曜はじまりで「今週」の開始日（YYYY-MM-DD）を返す。ホームの週間統計に使う。
 export const startOfWeekIso = (date: Date): string => {
   const dayOfWeek = date.getDay();

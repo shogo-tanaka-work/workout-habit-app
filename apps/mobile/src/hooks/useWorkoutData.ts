@@ -29,6 +29,8 @@ import type {
   WorkoutExercise,
   WorkoutSet,
 } from '../types/domain';
+import type { BodyPartSummary } from '../utils/aggregate';
+import { summarizeByBodyPart } from '../utils/aggregate';
 import { formatDate, startOfWeekIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 
@@ -105,6 +107,30 @@ export function useWorkoutData() {
     }
     return { workoutCount: weekWorkouts.length, setCount, totalVolume, totalReps };
   }, [workouts, workoutExercises, visibleSets]);
+
+  // ホーム表示用の「今週の部位別」集計（ボリューム降順）。
+  const weeklyBodyPartSummary = useMemo((): BodyPartSummary[] => {
+    const weekStart = startOfWeekIso(new Date());
+    const weekWorkoutIds = new Set(
+      workouts.filter((workout) => workout.performedAt >= weekStart).map((workout) => workout.id),
+    );
+    const weekExercises = workoutExercises.filter((item) => weekWorkoutIds.has(item.workoutId));
+    const weekExerciseIds = new Set(weekExercises.map((item) => item.id));
+    const weekSets = visibleSets.filter((set) => weekExerciseIds.has(set.workoutExerciseId));
+    return summarizeByBodyPart(weekExercises, weekSets, exerciseById, bodyPartById);
+  }, [workouts, workoutExercises, visibleSets, exerciseById, bodyPartById]);
+
+  // 記録画面の種目追加用に、使用回数の多い順（同数は名前順）へ並べ替えた種目一覧。
+  const exercisesByUsage = useMemo(() => {
+    const usageCount = new Map<string, number>();
+    for (const item of workoutExercises) {
+      usageCount.set(item.exerciseId, (usageCount.get(item.exerciseId) ?? 0) + 1);
+    }
+    return [...exercises].sort((a, b) => {
+      const countDiff = (usageCount.get(b.id) ?? 0) - (usageCount.get(a.id) ?? 0);
+      return countDiff !== 0 ? countDiff : a.name.localeCompare(b.name, 'ja');
+    });
+  }, [exercises, workoutExercises]);
 
   const reloadData = useCallback(async (database: SQLite.SQLiteDatabase) => {
     const data = await loadWorkoutData(database);
@@ -314,6 +340,8 @@ export function useWorkoutData() {
     activeWorkoutExercises,
     completedWorkouts,
     stats,
+    weeklyBodyPartSummary,
+    exercisesByUsage,
     startWorkout,
     completeWorkout,
     pauseWorkout,

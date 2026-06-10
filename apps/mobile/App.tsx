@@ -205,6 +205,7 @@ export default function App() {
                   visibleSets={data.visibleSets}
                   exerciseById={data.exerciseById}
                   stats={data.stats}
+                  bodyPartSummaries={data.weeklyBodyPartSummary}
                   onStart={handleStart}
                   onResume={() => setTab('workout')}
                 />
@@ -215,7 +216,7 @@ export default function App() {
                   activeWorkout={data.activeWorkout}
                   workoutExercises={data.activeWorkoutExercises}
                   visibleSets={data.visibleSets}
-                  exercises={data.exercises}
+                  exercises={data.exercisesByUsage}
                   exerciseById={data.exerciseById}
                   bodyPartById={data.bodyPartById}
                   previousSessionByExerciseId={previousSessionByExerciseId}

@@ -680,4 +680,132 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: fontSize.md,
   },
+
+  // 期間切り替えセグメント（種目詳細）
+  segmentRow: {
+    flexDirection: 'row',
+    borderWidth: hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  segment: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: hairlineWidth,
+    borderRightColor: colors.hairlineStrong,
+  },
+  segmentLast: {
+    borderRightWidth: 0,
+  },
+  segmentActive: {
+    backgroundColor: colors.accentSurface,
+  },
+  segmentText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    color: colors.accentText,
+    fontWeight: '700',
+  },
+
+  // 月間カレンダー（履歴）
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  calendarNavButton: {
+    minWidth: 44,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarNavText: {
+    color: colors.accentText,
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+  },
+  calendarTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  calendarWeekdayRow: {
+    flexDirection: 'row',
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  calendarWeekdayText: {
+    flex: 1,
+    textAlign: 'center',
+    paddingVertical: spacing.xs + 2,
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+  },
+  calendarWeekRow: {
+    flexDirection: 'row',
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  calendarDayCell: {
+    flex: 1,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    borderRightWidth: hairlineWidth,
+    borderRightColor: colors.hairline,
+  },
+  calendarDayCellLast: {
+    borderRightWidth: 0,
+  },
+  calendarDaySelected: {
+    backgroundColor: colors.accentSurface,
+  },
+  calendarDayText: {
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+  },
+  calendarSaturdayText: {
+    color: colors.chartSecondary,
+  },
+  calendarSundayText: {
+    color: colors.danger,
+  },
+  calendarDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
+  calendarDotPlaceholder: {
+    width: 5,
+    height: 5,
+  },
+
+  // 部位別ボリュームバー（ホーム）
+  bodyPartRow: {
+    gap: spacing.xs + 2,
+  },
+  bodyPartBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.surfaceRaised,
+    overflow: 'hidden',
+  },
+  bodyPartBarFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
 });

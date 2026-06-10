@@ -9,7 +9,8 @@
 workout-habit-app/
   apps/
     mobile/     ← Expo (React Native) モバイルアプリ【現在の主開発対象】
-    web/        ← 分析ダッシュボード（将来追加予定。未作成）
+    api/        ← クラウドバックアップ API（Hono + Cloudflare Workers + D1）
+    web/        ← 分析ダッシュボード（Vite + React。api の static assets として配信）
 ```
 
 ## 開発規約の所在
@@ -17,6 +18,6 @@ workout-habit-app/
 各アプリの規約・設計指針は**そのアプリのディレクトリ内**に閉じる（重複は許容）。
 
 - **モバイルアプリ**: `apps/mobile/AGENTS.md`（概要・目標構成）と `apps/mobile/.claude/`（rules / agents / commands）を参照する。
-- **将来の web アプリ**: `apps/web/` 配下に独自の `.claude/` を持たせる。共通のコーディング規約は重複してよい。
+- **web アプリ**: `apps/web/AGENTS.md` を参照する。コーディング規約はモバイル側 rules に準じる。
 
 ルート直下のこのファイルは**案内のみ**。実作業は対象アプリのディレクトリに入って行う。

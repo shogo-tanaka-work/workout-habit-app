@@ -6,6 +6,13 @@
   "observability": {
     "enabled": true
   },
+  // apps/web（分析ダッシュボード）のビルド成果物を同一オリジンで配信する。
+  // API のパスだけ Worker を先に通し、それ以外は静的アセットを返す。
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/backup", "/health", "/analytics/*"]
+  },
   "d1_databases": [
     {
       "binding": "DB",

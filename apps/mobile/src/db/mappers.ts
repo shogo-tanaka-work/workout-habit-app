@@ -1,7 +1,17 @@
-import type { BodyPart, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import type {
+  BodyPart,
+  Exercise,
+  Template,
+  TemplateExercise,
+  Workout,
+  WorkoutExercise,
+  WorkoutSet,
+} from '../types/domain';
 import type {
   BodyPartRow,
   ExerciseRow,
+  TemplateExerciseRow,
+  TemplateRow,
   WorkoutRow,
   WorkoutExerciseRow,
   WorkoutSetRow,
@@ -42,6 +52,19 @@ export const toWorkoutExercise = (row: WorkoutExerciseRow): WorkoutExercise => (
   orderIndex: row.order_index,
   restSecondsOverride: row.rest_seconds_override,
   memo: row.memo,
+});
+
+export const toTemplate = (row: TemplateRow): Template => ({
+  id: row.id,
+  name: row.name,
+  createdAt: row.created_at,
+});
+
+export const toTemplateExercise = (row: TemplateExerciseRow): TemplateExercise => ({
+  id: row.id,
+  templateId: row.template_id,
+  exerciseId: row.exercise_id,
+  orderIndex: row.order_index,
 });
 
 export const toWorkoutSet = (row: WorkoutSetRow): WorkoutSet => ({

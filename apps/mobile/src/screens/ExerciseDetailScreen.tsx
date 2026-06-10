@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { LabeledNumber } from '../components/LabeledNumber';
 import { SetTable } from '../components/SetTable';
 import { StatStrip } from '../components/StatStrip';
 import { TrendChart } from '../components/TrendChart';
@@ -9,6 +10,7 @@ import { colors } from '../styles/theme';
 import type { Exercise } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { formatJapaneseDate, formatMonthDay, isoDateMonthsAgo } from '../utils/datetime';
+import { estimateOneRepMax, weightForReps } from '../utils/number';
 
 const RECENT_SESSION_COUNT = 5;
 // グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
@@ -45,12 +47,20 @@ export function ExerciseDetailScreen({
             <Text style={styles.muted}>この種目の記録はまだありません。</Text>
           </View>
         </View>
+        <RmCalculator initialWeightKg={exercise.defaultBarWeightKg} initialReps={8} />
       </View>
     );
   }
 
   const [latestSession, ...pastSessions] = sessions;
   const recentPastSessions = pastSessions.slice(0, RECENT_SESSION_COUNT);
+
+  // RM計算機の初期値に使う、直近セッションのベストセット（推定1RM最大）。
+  const bestRecentSet = latestSession.sets.reduce((best, set) =>
+    estimateOneRepMax(set.weightKg, set.reps) > estimateOneRepMax(best.weightKg, best.reps)
+      ? set
+      : best,
+  );
 
   const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[1];
   const cutoff = isoDateMonthsAgo(period.months, new Date());
@@ -148,6 +158,66 @@ export function ExerciseDetailScreen({
         points={buildPoints((session) => session.summary.maxReps)}
         color={colors.chartSecondary}
       />
+
+      <RmCalculator initialWeightKg={bestRecentSet.weightKg} initialReps={bestRecentSet.reps} />
+    </View>
+  );
+}
+
+const RM_TABLE_REPS = [1, 2, 3, 5, 8, 10] as const;
+
+// Epley 式ベースの RM 計算機。重量と回数から推定1RMと、レップ数別の目安重量を出す。
+function RmCalculator({
+  initialWeightKg,
+  initialReps,
+}: {
+  initialWeightKg: number;
+  initialReps: number;
+}) {
+  const [weightKg, setWeightKg] = useState(initialWeightKg);
+  const [reps, setReps] = useState(initialReps);
+  const oneRepMax = estimateOneRepMax(weightKg, reps);
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>RM計算機</Text>
+        <Text style={styles.accentNote}>推定1RM {oneRepMax} kg</Text>
+      </View>
+      <View style={styles.sectionBody}>
+        <View style={styles.inputGrid}>
+          <LabeledNumber label="重量" value={weightKg} suffix="kg" onChange={setWeightKg} />
+          <LabeledNumber
+            label="回数"
+            value={reps}
+            suffix="回"
+            onChange={(value) => setReps(Math.max(0, Math.round(value)))}
+          />
+        </View>
+        <View style={styles.setTable}>
+          <View style={styles.setTableRow}>
+            <View style={styles.setTableLabelCell}>
+              <Text style={styles.setTableLabelText}>レップ数</Text>
+            </View>
+            {RM_TABLE_REPS.map((tableReps) => (
+              <View key={`reps-${tableReps}`} style={styles.setTableCell}>
+                <Text style={styles.setTableCellText}>{tableReps}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={[styles.setTableRow, styles.setTableRowLast]}>
+            <View style={styles.setTableLabelCell}>
+              <Text style={styles.setTableLabelText}>目安重量</Text>
+            </View>
+            {RM_TABLE_REPS.map((tableReps) => (
+              <View key={`weight-${tableReps}`} style={styles.setTableCell}>
+                <Text style={styles.setTableCellText}>{weightForReps(oneRepMax, tableReps)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        <Text style={styles.faint}>Epley式（1RM = 重量 × (1 + 回数 ÷ 30)）による推定値です。</Text>
+      </View>
     </View>
   );
 }

@@ -1,8 +1,8 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
-import type { BodyPart, Exercise } from '../types/domain';
+import type { BodyPart, Exercise, TimerSettings } from '../types/domain';
 import { formatTimer } from '../utils/format';
 
 export function ExerciseScreen({
@@ -10,22 +10,54 @@ export function ExerciseScreen({
   exercises,
   bodyPartById,
   newExerciseName,
+  timerSettings,
   onChangeNewExerciseName,
   onAddCustomExercise,
   onOpenRestPicker,
   onSelectExercise,
+  onUpdateTimerSettings,
 }: {
   bodyParts: BodyPart[];
   exercises: Exercise[];
   bodyPartById: Map<string, BodyPart>;
   newExerciseName: string;
+  timerSettings: TimerSettings;
   onChangeNewExerciseName: (value: string) => void;
   onAddCustomExercise: () => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onSelectExercise: (exerciseId: string) => void;
+  onUpdateTimerSettings: (settings: TimerSettings) => void;
 }) {
   return (
     <View style={styles.stack}>
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>タイマー設定</Text>
+        </View>
+        <View style={styles.sectionBody}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.panelText}>終了時に音を鳴らす</Text>
+            <Switch
+              value={timerSettings.soundEnabled}
+              onValueChange={(soundEnabled) =>
+                onUpdateTimerSettings({ ...timerSettings, soundEnabled })
+              }
+              trackColor={{ true: colors.accent, false: colors.surfaceRaised }}
+            />
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.panelText}>終了時に振動する</Text>
+            <Switch
+              value={timerSettings.vibrationEnabled}
+              onValueChange={(vibrationEnabled) =>
+                onUpdateTimerSettings({ ...timerSettings, vibrationEnabled })
+              }
+              trackColor={{ true: colors.accent, false: colors.surfaceRaised }}
+            />
+          </View>
+        </View>
+      </View>
+
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>種目を追加</Text>

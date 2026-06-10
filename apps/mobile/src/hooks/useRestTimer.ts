@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Vibration } from 'react-native';
 
 import timerCompleteSound from '../../assets/timer-complete.wav';
-import type { TimerState } from '../types/domain';
+import type { TimerSettings, TimerState } from '../types/domain';
 
 // 休憩タイマーの状態とカウントダウン・完了通知（振動＋音）を管理するフック。
+// 音・振動の有効/無効は settings（種目タブのタイマー設定）に従う。
 // タイマーの「開始」に伴う DB 書き込みは useWorkoutData 側（beginRestTimer）が担う。
-export function useRestTimer() {
+export function useRestTimer(settings: TimerSettings) {
   const timerPlayer = useAudioPlayer(timerCompleteSound);
   const [timer, setTimer] = useState<TimerState | null>(null);
   // 現在の計測ですでに完了通知を鳴らしたか。新しい計測の開始・再開時に false へ戻す。
@@ -44,14 +45,18 @@ export function useRestTimer() {
       return;
     }
     hasNotifiedRef.current = true;
-    Vibration.vibrate([0, 280, 120, 280]);
-    void timerPlayer
-      .seekTo(0)
-      .then(() => timerPlayer.play())
-      .catch(() => {
-        // The visible timer-complete state remains useful even if audio playback fails.
-      });
-  }, [timer?.finished, timerPlayer]);
+    if (settings.vibrationEnabled) {
+      Vibration.vibrate([0, 280, 120, 280]);
+    }
+    if (settings.soundEnabled) {
+      void timerPlayer
+        .seekTo(0)
+        .then(() => timerPlayer.play())
+        .catch(() => {
+          // The visible timer-complete state remains useful even if audio playback fails.
+        });
+    }
+  }, [timer?.finished, timerPlayer, settings.soundEnabled, settings.vibrationEnabled]);
 
   return { timer, setTimer };
 }

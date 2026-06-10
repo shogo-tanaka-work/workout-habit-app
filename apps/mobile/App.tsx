@@ -26,7 +26,7 @@ import { buildExerciseSessions, findPreviousSession } from './src/utils/aggregat
 
 export default function App() {
   const data = useWorkoutData();
-  const { timer, setTimer } = useRestTimer();
+  const { timer, setTimer } = useRestTimer(data.timerSettings);
 
   // UI（ナビゲーション・入力・編集状態）はシェルである App が保持する。
   const [tab, setTab] = useState<Tab>('home');
@@ -220,7 +220,12 @@ export default function App() {
                   exerciseById={data.exerciseById}
                   bodyPartById={data.bodyPartById}
                   previousSessionByExerciseId={previousSessionByExerciseId}
+                  templates={data.templates}
+                  templateExercises={data.templateExercises}
                   onStart={handleStart}
+                  onStartFromTemplate={data.startWorkoutFromTemplate}
+                  onSaveTemplate={(name) => void data.saveActiveWorkoutAsTemplate(name)}
+                  onDeleteTemplate={data.deleteTemplate}
                   onComplete={handleComplete}
                   onPause={handlePause}
                   onAddExercise={data.addExerciseToWorkout}
@@ -255,10 +260,12 @@ export default function App() {
                   exercises={data.exercises}
                   bodyPartById={data.bodyPartById}
                   newExerciseName={newExerciseName}
+                  timerSettings={data.timerSettings}
                   onChangeNewExerciseName={setNewExerciseName}
                   onAddCustomExercise={handleAddCustomExercise}
                   onOpenRestPicker={openRestPicker}
                   onSelectExercise={setSelectedExerciseId}
+                  onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
                 />
               ) : null}
             </>

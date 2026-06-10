@@ -1,15 +1,35 @@
 import type * as SQLite from 'expo-sqlite';
 
-import type { BodyPart, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import type {
+  BodyPart,
+  Exercise,
+  Template,
+  TemplateExercise,
+  TimerSettings,
+  Workout,
+  WorkoutExercise,
+  WorkoutSet,
+} from '../types/domain';
+import type {
+  AppSettingRow,
   BodyPartRow,
   ExerciseRow,
+  TemplateExerciseRow,
+  TemplateRow,
   WorkoutRow,
   WorkoutExerciseRow,
   WorkoutSetRow,
 } from '../types/db';
 import { nowIso } from '../utils/datetime';
-import { toBodyPart, toExercise, toWorkout, toWorkoutExercise, toWorkoutSet } from './mappers';
+import {
+  toBodyPart,
+  toExercise,
+  toTemplate,
+  toTemplateExercise,
+  toWorkout,
+  toWorkoutExercise,
+  toWorkoutSet,
+} from './mappers';
 
 export type WorkoutData = {
   bodyParts: BodyPart[];
@@ -17,31 +37,138 @@ export type WorkoutData = {
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   workoutSets: WorkoutSet[];
+  templates: Template[];
+  templateExercises: TemplateExercise[];
+  timerSettings: TimerSettings;
+};
+
+// app_settings のキー。値は '0' / '1' の文字列で持つ。
+const TIMER_SOUND_KEY = 'timer_sound_enabled';
+const TIMER_VIBRATION_KEY = 'timer_vibration_enabled';
+
+const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
+  const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
+  // 未設定（初回起動）はどちらも有効を既定とする。
+  return {
+    soundEnabled: valueByKey.get(TIMER_SOUND_KEY) !== '0',
+    vibrationEnabled: valueByKey.get(TIMER_VIBRATION_KEY) !== '0',
+  };
 };
 
 // すべてのテーブルを読み込みドメイン型へ変換して返す。
 // NOTE: SELECT * は行型と一致している前提。data-persistence.md の方針では
 // 明示カラム指定が望ましく、将来的に列挙へ置き換える余地がある。
 export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<WorkoutData> => {
-  const [bodyPartRows, exerciseRows, workoutRows, workoutExerciseRows, workoutSetRows] =
-    await Promise.all([
-      database.getAllAsync<BodyPartRow>('SELECT * FROM body_parts ORDER BY order_index'),
-      database.getAllAsync<ExerciseRow>(
-        'SELECT * FROM exercises WHERE is_archived = 0 ORDER BY name',
-      ),
-      database.getAllAsync<WorkoutRow>('SELECT * FROM workouts ORDER BY created_at DESC'),
-      database.getAllAsync<WorkoutExerciseRow>(
-        'SELECT * FROM workout_exercises ORDER BY order_index',
-      ),
-      database.getAllAsync<WorkoutSetRow>('SELECT * FROM workout_sets ORDER BY order_index'),
-    ]);
+  const [
+    bodyPartRows,
+    exerciseRows,
+    workoutRows,
+    workoutExerciseRows,
+    workoutSetRows,
+    templateRows,
+    templateExerciseRows,
+    appSettingRows,
+  ] = await Promise.all([
+    database.getAllAsync<BodyPartRow>('SELECT * FROM body_parts ORDER BY order_index'),
+    database.getAllAsync<ExerciseRow>(
+      'SELECT * FROM exercises WHERE is_archived = 0 ORDER BY name',
+    ),
+    database.getAllAsync<WorkoutRow>('SELECT * FROM workouts ORDER BY created_at DESC'),
+    database.getAllAsync<WorkoutExerciseRow>(
+      'SELECT * FROM workout_exercises ORDER BY order_index',
+    ),
+    database.getAllAsync<WorkoutSetRow>('SELECT * FROM workout_sets ORDER BY order_index'),
+    database.getAllAsync<TemplateRow>('SELECT * FROM templates ORDER BY created_at DESC'),
+    database.getAllAsync<TemplateExerciseRow>(
+      'SELECT * FROM template_exercises ORDER BY order_index',
+    ),
+    database.getAllAsync<AppSettingRow>('SELECT key, value FROM app_settings'),
+  ]);
   return {
     bodyParts: bodyPartRows.map(toBodyPart),
     exercises: exerciseRows.map(toExercise),
     workouts: workoutRows.map(toWorkout),
     workoutExercises: workoutExerciseRows.map(toWorkoutExercise),
     workoutSets: workoutSetRows.map(toWorkoutSet),
+    templates: templateRows.map(toTemplate),
+    templateExercises: templateExerciseRows.map(toTemplateExercise),
+    timerSettings: toTimerSettings(appSettingRows),
   };
+};
+
+// テンプレートと種目の並びをまとめて保存する。
+export const insertTemplateDeep = async (
+  database: SQLite.SQLiteDatabase,
+  params: { id: string; name: string; exerciseEntries: { id: string; exerciseId: string }[] },
+): Promise<void> => {
+  const timestamp = nowIso();
+  try {
+    await database.withTransactionAsync(async () => {
+      await database.runAsync(
+        'INSERT INTO templates (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
+        params.id,
+        params.name,
+        timestamp,
+        timestamp,
+      );
+      for (const [index, entry] of params.exerciseEntries.entries()) {
+        await database.runAsync(
+          `INSERT INTO template_exercises
+            (id, template_id, exercise_id, order_index, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+          entry.id,
+          params.id,
+          entry.exerciseId,
+          index + 1,
+          timestamp,
+          timestamp,
+        );
+      }
+    });
+  } catch (error) {
+    throw new Error(
+      `insertTemplateDeep failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+};
+
+export const deleteTemplateDeep = async (
+  database: SQLite.SQLiteDatabase,
+  templateId: string,
+): Promise<void> => {
+  try {
+    await database.withTransactionAsync(async () => {
+      await database.runAsync('DELETE FROM template_exercises WHERE template_id = ?', templateId);
+      await database.runAsync('DELETE FROM templates WHERE id = ?', templateId);
+    });
+  } catch (error) {
+    throw new Error(
+      `deleteTemplateDeep failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+};
+
+// タイマー設定（音・振動）を app_settings に保存する。
+export const upsertTimerSettings = async (
+  database: SQLite.SQLiteDatabase,
+  settings: TimerSettings,
+): Promise<void> => {
+  const timestamp = nowIso();
+  const entries: [string, boolean][] = [
+    [TIMER_SOUND_KEY, settings.soundEnabled],
+    [TIMER_VIBRATION_KEY, settings.vibrationEnabled],
+  ];
+  for (const [key, enabled] of entries) {
+    await database.runAsync(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      key,
+      enabled ? '1' : '0',
+      timestamp,
+    );
+  }
 };
 
 // ワークアウトの最終保存時刻を更新する（記録の都度保存）。

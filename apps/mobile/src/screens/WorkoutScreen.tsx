@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { StatStrip } from '../components/StatStrip';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
@@ -7,6 +7,8 @@ import type {
   BodyPart,
   Exercise,
   SetPatch,
+  Template,
+  TemplateExercise,
   Workout,
   WorkoutExercise,
   WorkoutSet,
@@ -23,7 +25,12 @@ export function WorkoutScreen({
   exerciseById,
   bodyPartById,
   previousSessionByExerciseId,
+  templates,
+  templateExercises,
   onStart,
+  onStartFromTemplate,
+  onSaveTemplate,
+  onDeleteTemplate,
   onComplete,
   onPause,
   onAddExercise,
@@ -39,7 +46,12 @@ export function WorkoutScreen({
   exerciseById: Map<string, Exercise>;
   bodyPartById: Map<string, BodyPart>;
   previousSessionByExerciseId: Map<string, ExerciseSession | null>;
+  templates: Template[];
+  templateExercises: TemplateExercise[];
   onStart: () => void;
+  onStartFromTemplate: (template: Template) => void;
+  onSaveTemplate: (name: string) => void;
+  onDeleteTemplate: (templateId: string) => void;
   onComplete: () => void;
   onPause: () => void;
   onAddExercise: (exercise: Exercise) => void;
@@ -48,16 +60,75 @@ export function WorkoutScreen({
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
+  const confirmDeleteTemplate = (template: Template) => {
+    Alert.alert('テンプレートを削除', `「${template.name}」を削除します。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: () => onDeleteTemplate(template.id) },
+    ]);
+  };
+
+  // iOS 専用の Alert.prompt で名前を入力させる（このアプリは iOS を主対象とする）。
+  const promptSaveTemplate = () => {
+    Alert.prompt('テンプレートとして保存', '今日の種目の並びを保存します。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '保存',
+        onPress: (name?: string) => {
+          if (name?.trim()) {
+            onSaveTemplate(name);
+          }
+        },
+      },
+    ]);
+  };
+
   if (!activeWorkout) {
     return (
-      <View style={styles.section}>
-        <View style={styles.sectionBody}>
-          <Text style={styles.sectionTitle}>記録中のワークアウトはありません</Text>
-          <Text style={styles.muted}>まず今日のワークアウトを開始しましょう。</Text>
-          <Pressable style={styles.primaryButton} onPress={onStart}>
-            <Text style={styles.primaryButtonText}>ワークアウト開始</Text>
-          </Pressable>
+      <View style={styles.stack}>
+        <View style={styles.section}>
+          <View style={styles.sectionBody}>
+            <Text style={styles.sectionTitle}>記録中のワークアウトはありません</Text>
+            <Text style={styles.muted}>まず今日のワークアウトを開始しましょう。</Text>
+            <Pressable style={styles.primaryButton} onPress={onStart}>
+              <Text style={styles.primaryButtonText}>ワークアウト開始</Text>
+            </Pressable>
+          </View>
         </View>
+
+        {templates.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>テンプレートから開始</Text>
+            </View>
+            {templates.map((template) => {
+              const exerciseNames = templateExercises
+                .filter((item) => item.templateId === template.id)
+                .sort((a, b) => a.orderIndex - b.orderIndex)
+                .map((item) => exerciseById.get(item.exerciseId)?.name ?? '種目');
+              return (
+                <View key={template.id} style={styles.exerciseRow}>
+                  <Pressable
+                    style={styles.exerciseRowHeader}
+                    onPress={() => onStartFromTemplate(template)}
+                  >
+                    <View style={styles.exerciseDot} />
+                    <View style={styles.flex}>
+                      <Text style={styles.exerciseRowName}>{template.name}</Text>
+                      <Text style={styles.faint}>{exerciseNames.join(' ・ ')}</Text>
+                    </View>
+                    <Pressable
+                      style={styles.deleteButton}
+                      onPress={() => confirmDeleteTemplate(template)}
+                    >
+                      <Text style={styles.deleteButtonText}>削除</Text>
+                    </Pressable>
+                    <Text style={styles.chevron}>›</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -139,6 +210,12 @@ export function WorkoutScreen({
           </View>
         </View>
       </View>
+
+      {workoutExercises.length > 0 ? (
+        <Pressable style={styles.ghostButton} onPress={promptSaveTemplate}>
+          <Text style={styles.ghostButtonText}>今日の種目構成をテンプレートとして保存</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

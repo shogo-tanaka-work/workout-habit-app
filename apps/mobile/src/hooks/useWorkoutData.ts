@@ -6,9 +6,11 @@ import { Alert } from 'react-native';
 import { SCHEMA_SQL } from '../db/schema';
 import { seedMasters } from '../db/seed';
 import {
+  deleteTemplateDeep,
   deleteWorkoutDeep,
   findActiveWorkoutRow,
   insertExercise,
+  insertTemplateDeep,
   insertTimerEvent,
   insertWorkout,
   insertWorkoutExercise,
@@ -18,11 +20,15 @@ import {
   setWorkoutStatus,
   touchWorkout,
   updateWorkoutSet,
+  upsertTimerSettings,
 } from '../db/queries';
 import type {
   BodyPart,
   Exercise,
   SetPatch,
+  Template,
+  TemplateExercise,
+  TimerSettings,
   TimerState,
   WeeklyStats,
   Workout,
@@ -45,6 +51,12 @@ export function useWorkoutData() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [workoutExercises, setWorkoutExercises] = useState<WorkoutExercise[]>([]);
   const [workoutSets, setWorkoutSets] = useState<WorkoutSet[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateExercises, setTemplateExercises] = useState<TemplateExercise[]>([]);
+  const [timerSettings, setTimerSettings] = useState<TimerSettings>({
+    soundEnabled: true,
+    vibrationEnabled: true,
+  });
 
   const activeWorkout = useMemo(
     () => workouts.find((workout) => workout.status === 'active') ?? null,
@@ -139,6 +151,9 @@ export function useWorkoutData() {
     setWorkouts(data.workouts);
     setWorkoutExercises(data.workoutExercises);
     setWorkoutSets(data.workoutSets);
+    setTemplates(data.templates);
+    setTemplateExercises(data.templateExercises);
+    setTimerSettings(data.timerSettings);
   }, []);
 
   useEffect(() => {
@@ -325,6 +340,63 @@ export function useWorkoutData() {
     await reloadData(database);
   };
 
+  // 記録中のワークアウトの種目並びをテンプレートとして保存する。
+  // 名前が空・種目ゼロなら何もせず false を返す。
+  const saveActiveWorkoutAsTemplate = async (rawName: string): Promise<boolean> => {
+    const name = rawName.trim();
+    if (!name || activeWorkoutExercises.length === 0) {
+      return false;
+    }
+    const database = ensureDb();
+    await insertTemplateDeep(database, {
+      id: newId('template'),
+      name,
+      exerciseEntries: activeWorkoutExercises.map((item) => ({
+        id: newId('template-exercise'),
+        exerciseId: item.exerciseId,
+      })),
+    });
+    await reloadData(database);
+    return true;
+  };
+
+  // テンプレートからワークアウトを開始する（種目をまとめて追加）。
+  const startWorkoutFromTemplate = async (template: Template) => {
+    const database = ensureDb();
+    const existingActive = await findActiveWorkoutRow(database);
+    if (existingActive) {
+      Alert.alert('記録中のワークアウトがあります', '先に完了するか、再開してください。');
+      await reloadData(database);
+      return;
+    }
+    const workoutId = newId('workout');
+    await insertWorkout(database, { id: workoutId, performedAt: formatDate(new Date()) });
+    const entries = templateExercises
+      .filter((item) => item.templateId === template.id)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+    for (const [index, entry] of entries.entries()) {
+      await insertWorkoutExercise(database, {
+        id: newId('workout-exercise'),
+        workoutId,
+        exerciseId: entry.exerciseId,
+        orderIndex: index + 1,
+      });
+    }
+    await reloadData(database);
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    const database = ensureDb();
+    await deleteTemplateDeep(database, templateId);
+    await reloadData(database);
+  };
+
+  // タイマー設定（音・振動）を保存し、即座に state へ反映する。
+  const updateTimerSettings = async (settings: TimerSettings) => {
+    await upsertTimerSettings(ensureDb(), settings);
+    setTimerSettings(settings);
+  };
+
   return {
     isReady,
     errorMessage,
@@ -342,6 +414,13 @@ export function useWorkoutData() {
     stats,
     weeklyBodyPartSummary,
     exercisesByUsage,
+    templates,
+    templateExercises,
+    timerSettings,
+    saveActiveWorkoutAsTemplate,
+    startWorkoutFromTemplate,
+    deleteTemplate,
+    updateTimerSettings,
     startWorkout,
     completeWorkout,
     pauseWorkout,

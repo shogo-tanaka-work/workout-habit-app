@@ -48,3 +48,21 @@ export type WorkoutSetRow = {
   rest_seconds: number;
   deleted_at: string | null;
 };
+
+export type TemplateRow = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type TemplateExerciseRow = {
+  id: string;
+  template_id: string;
+  exercise_id: string;
+  order_index: number;
+};
+
+export type AppSettingRow = {
+  key: string;
+  value: string;
+};

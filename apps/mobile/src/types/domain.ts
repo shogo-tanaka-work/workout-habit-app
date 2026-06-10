@@ -51,6 +51,26 @@ export type WorkoutSet = {
   deletedAt: string | null;
 };
 
+// ワークアウトテンプレート（種目の並びだけを持つ）。
+export type Template = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
+export type TemplateExercise = {
+  id: string;
+  templateId: string;
+  exerciseId: string;
+  orderIndex: number;
+};
+
+// 休憩タイマー終了時の通知方法の設定。
+export type TimerSettings = {
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+};
+
 export type TimerState = {
   workoutSetId: string;
   exerciseName: string;

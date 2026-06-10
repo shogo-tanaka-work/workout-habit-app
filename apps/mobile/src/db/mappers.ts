@@ -1,4 +1,5 @@
 import type {
+  BodyLog,
   BodyPart,
   Exercise,
   Template,
@@ -8,6 +9,7 @@ import type {
   WorkoutSet,
 } from '../types/domain';
 import type {
+  BodyLogRow,
   BodyPartRow,
   ExerciseRow,
   TemplateExerciseRow,
@@ -51,6 +53,14 @@ export const toWorkoutExercise = (row: WorkoutExerciseRow): WorkoutExercise => (
   exerciseId: row.exercise_id,
   orderIndex: row.order_index,
   restSecondsOverride: row.rest_seconds_override,
+  memo: row.memo,
+});
+
+export const toBodyLog = (row: BodyLogRow): BodyLog => ({
+  id: row.id,
+  measuredAt: row.measured_at,
+  bodyWeightKg: row.body_weight_kg,
+  bodyFatPercentage: row.body_fat_percentage,
   memo: row.memo,
 });
 

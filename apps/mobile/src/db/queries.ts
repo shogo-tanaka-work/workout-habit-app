@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
 import type {
+  BodyLog,
   BodyPart,
   Exercise,
   Template,
@@ -12,6 +13,7 @@ import type {
 } from '../types/domain';
 import type {
   AppSettingRow,
+  BodyLogRow,
   BodyPartRow,
   ExerciseRow,
   TemplateExerciseRow,
@@ -22,6 +24,7 @@ import type {
 } from '../types/db';
 import { nowIso } from '../utils/datetime';
 import {
+  toBodyLog,
   toBodyPart,
   toExercise,
   toTemplate,
@@ -40,6 +43,7 @@ export type WorkoutData = {
   templates: Template[];
   templateExercises: TemplateExercise[];
   timerSettings: TimerSettings;
+  bodyLogs: BodyLog[];
 };
 
 // app_settings のキー。値は '0' / '1' の文字列で持つ。
@@ -68,6 +72,7 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
     templateRows,
     templateExerciseRows,
     appSettingRows,
+    bodyLogRows,
   ] = await Promise.all([
     database.getAllAsync<BodyPartRow>('SELECT * FROM body_parts ORDER BY order_index'),
     database.getAllAsync<ExerciseRow>(
@@ -83,6 +88,9 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
       'SELECT * FROM template_exercises ORDER BY order_index',
     ),
     database.getAllAsync<AppSettingRow>('SELECT key, value FROM app_settings'),
+    database.getAllAsync<BodyLogRow>(
+      'SELECT id, measured_at, body_weight_kg, body_fat_percentage, memo FROM body_logs ORDER BY measured_at DESC',
+    ),
   ]);
   return {
     bodyParts: bodyPartRows.map(toBodyPart),
@@ -93,7 +101,36 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
     templates: templateRows.map(toTemplate),
     templateExercises: templateExerciseRows.map(toTemplateExercise),
     timerSettings: toTimerSettings(appSettingRows),
+    bodyLogs: bodyLogRows.map(toBodyLog),
   };
+};
+
+// ボディログを保存する。同じ計測日があれば上書き（1日1件）。
+export const upsertBodyLog = async (
+  database: SQLite.SQLiteDatabase,
+  params: {
+    id: string;
+    measuredAt: string;
+    bodyWeightKg: number;
+    bodyFatPercentage: number | null;
+  },
+): Promise<void> => {
+  const timestamp = nowIso();
+  await database.runAsync(
+    `INSERT INTO body_logs
+      (id, measured_at, body_weight_kg, body_fat_percentage, estimated_calories_burned, memo, created_at, updated_at)
+      VALUES (?, ?, ?, ?, NULL, '', ?, ?)
+     ON CONFLICT(measured_at) DO UPDATE SET
+       body_weight_kg = excluded.body_weight_kg,
+       body_fat_percentage = excluded.body_fat_percentage,
+       updated_at = excluded.updated_at`,
+    params.id,
+    params.measuredAt,
+    params.bodyWeightKg,
+    params.bodyFatPercentage,
+    timestamp,
+    timestamp,
+  );
 };
 
 // テンプレートと種目の並びをまとめて保存する。

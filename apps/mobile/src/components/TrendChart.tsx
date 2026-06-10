@@ -30,18 +30,24 @@ const niceCeil = (value: number): number => {
 
 const formatAxisValue = (value: number): string => Math.round(value).toLocaleString();
 
+// 値域に対する上下の余白比率（非ゼロ基準スケール時）。
+const RANGE_PADDING_RATIO = 0.15;
+
 // 外部チャートライブラリを使わず、View の絶対配置で折れ線を描く簡易推移グラフ。
 // points は古い→新しい順で渡す。
+// scaleFromZero を false にすると最小値付近を基準にスケールする（体重など変化幅が小さい系列向け）。
 export function TrendChart({
   title,
   unit,
   points,
   color,
+  scaleFromZero = true,
 }: {
   title: string;
   unit: string;
   points: TrendPoint[];
   color: string;
+  scaleFromZero?: boolean;
 }) {
   const [canvasWidth, setCanvasWidth] = useState(0);
 
@@ -51,13 +57,26 @@ export function TrendChart({
 
   const plotWidth = Math.max(0, canvasWidth - Y_LABEL_WIDTH);
   const plotHeight = CHART_HEIGHT - PLOT_TOP - PLOT_BOTTOM;
-  const maxValue = niceCeil(points.reduce((max, point) => Math.max(max, point.value), 0));
+
+  const rawMax = points.reduce((max, point) => Math.max(max, point.value), 0);
+  const rawMin = points.reduce((min, point) => Math.min(min, point.value), rawMax);
+  let maxValue: number;
+  let minValue: number;
+  if (scaleFromZero) {
+    maxValue = niceCeil(rawMax);
+    minValue = 0;
+  } else {
+    const padding = Math.max((rawMax - rawMin) * RANGE_PADDING_RATIO, 0.5);
+    maxValue = rawMax + padding;
+    minValue = Math.max(0, rawMin - padding);
+  }
+  const valueRange = maxValue - minValue || 1;
 
   const positions = points.map((point, index) => {
     const ratio = points.length === 1 ? 0.5 : index / (points.length - 1);
     return {
       x: Y_LABEL_WIDTH + ratio * plotWidth,
-      y: PLOT_TOP + (1 - point.value / maxValue) * plotHeight,
+      y: PLOT_TOP + (1 - (point.value - minValue) / valueRange) * plotHeight,
     };
   });
 
@@ -98,7 +117,7 @@ export function TrendChart({
                   <Text
                     style={[styles.chartGridLabel, { top: PLOT_TOP + fraction * plotHeight - 7 }]}
                   >
-                    {formatAxisValue(maxValue * (1 - fraction))}
+                    {formatAxisValue(maxValue - fraction * valueRange)}
                   </Text>
                 </View>
               ))}

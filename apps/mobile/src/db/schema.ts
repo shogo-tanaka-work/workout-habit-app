@@ -87,4 +87,14 @@ export const SCHEMA_SQL = `
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS body_logs (
+    id TEXT PRIMARY KEY NOT NULL,
+    measured_at TEXT NOT NULL UNIQUE,
+    body_weight_kg REAL NOT NULL,
+    body_fat_percentage REAL,
+    estimated_calories_burned REAL,
+    memo TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `;

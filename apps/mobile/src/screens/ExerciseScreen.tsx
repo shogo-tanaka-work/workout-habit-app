@@ -1,5 +1,6 @@
 import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 
+import { PlateCalculator } from '../components/PlateCalculator';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import type { BodyPart, Exercise, TimerSettings } from '../types/domain';
@@ -16,6 +17,7 @@ export function ExerciseScreen({
   onOpenRestPicker,
   onSelectExercise,
   onUpdateTimerSettings,
+  onExportCsv,
 }: {
   bodyParts: BodyPart[];
   exercises: Exercise[];
@@ -27,6 +29,7 @@ export function ExerciseScreen({
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onSelectExercise: (exerciseId: string) => void;
   onUpdateTimerSettings: (settings: TimerSettings) => void;
+  onExportCsv: () => void;
 }) {
   return (
     <View style={styles.stack}>
@@ -124,6 +127,22 @@ export function ExerciseScreen({
             </View>
           );
         })}
+      </View>
+
+      <PlateCalculator />
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>データ</Text>
+        </View>
+        <View style={styles.sectionBody}>
+          <Pressable style={styles.ghostButton} onPress={onExportCsv}>
+            <Text style={styles.ghostButtonText}>ワークアウト記録をCSVで書き出す</Text>
+          </Pressable>
+          <Text style={styles.faint}>
+            完了済みの全記録を共有シートからファイル・AirDrop・メールなどへ出力できます。
+          </Text>
+        </View>
       </View>
     </View>
   );

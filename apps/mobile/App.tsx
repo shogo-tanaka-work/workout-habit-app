@@ -1,11 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
+  Share,
   Text,
   View,
 } from 'react-native';
@@ -23,6 +25,7 @@ import { styles } from './src/styles/appStyles';
 import type { Tab, WorkoutExercise, WorkoutSet } from './src/types/domain';
 import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions, findPreviousSession } from './src/utils/aggregate';
+import { buildWorkoutCsv } from './src/utils/csv';
 
 export default function App() {
   const data = useWorkoutData();
@@ -113,6 +116,24 @@ export default function App() {
 
   const openRestPicker = (exerciseId: string, seconds: number) => {
     setRestPicker({ exerciseId, seconds });
+  };
+
+  // 完了済みの全記録をCSVにして共有シートへ渡す（ファイル保存・AirDrop・メール等）。
+  const handleExportCsv = async () => {
+    try {
+      const csv = buildWorkoutCsv(
+        data.completedWorkouts,
+        data.workoutExercises,
+        data.visibleSets,
+        data.exerciseById,
+      );
+      await Share.share({ message: csv });
+    } catch (error: unknown) {
+      Alert.alert(
+        'エクスポートに失敗しました',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   };
 
   const confirmRestPicker = async (seconds: number) => {
@@ -206,8 +227,12 @@ export default function App() {
                   exerciseById={data.exerciseById}
                   stats={data.stats}
                   bodyPartSummaries={data.weeklyBodyPartSummary}
+                  bodyLogs={data.bodyLogs}
                   onStart={handleStart}
                   onResume={() => setTab('workout')}
+                  onSaveBodyLog={(weightKg, fatPercentage) =>
+                    void data.saveBodyLog(weightKg, fatPercentage)
+                  }
                 />
               ) : null}
 
@@ -266,6 +291,7 @@ export default function App() {
                   onOpenRestPicker={openRestPicker}
                   onSelectExercise={setSelectedExerciseId}
                   onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
+                  onExportCsv={() => void handleExportCsv()}
                 />
               ) : null}
             </>

@@ -20,9 +20,11 @@ import {
   setWorkoutStatus,
   touchWorkout,
   updateWorkoutSet,
+  upsertBodyLog,
   upsertTimerSettings,
 } from '../db/queries';
 import type {
+  BodyLog,
   BodyPart,
   Exercise,
   SetPatch,
@@ -57,6 +59,7 @@ export function useWorkoutData() {
     soundEnabled: true,
     vibrationEnabled: true,
   });
+  const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
 
   const activeWorkout = useMemo(
     () => workouts.find((workout) => workout.status === 'active') ?? null,
@@ -154,6 +157,7 @@ export function useWorkoutData() {
     setTemplates(data.templates);
     setTemplateExercises(data.templateExercises);
     setTimerSettings(data.timerSettings);
+    setBodyLogs(data.bodyLogs);
   }, []);
 
   useEffect(() => {
@@ -397,6 +401,25 @@ export function useWorkoutData() {
     setTimerSettings(settings);
   };
 
+  // 今日のボディログを保存する（同日があれば上書き）。体重 0 以下は無効として false。
+  const saveBodyLog = async (
+    bodyWeightKg: number,
+    bodyFatPercentage: number | null,
+  ): Promise<boolean> => {
+    if (bodyWeightKg <= 0) {
+      return false;
+    }
+    const database = ensureDb();
+    await upsertBodyLog(database, {
+      id: newId('body-log'),
+      measuredAt: formatDate(new Date()),
+      bodyWeightKg,
+      bodyFatPercentage: bodyFatPercentage && bodyFatPercentage > 0 ? bodyFatPercentage : null,
+    });
+    await reloadData(database);
+    return true;
+  };
+
   return {
     isReady,
     errorMessage,
@@ -417,10 +440,12 @@ export function useWorkoutData() {
     templates,
     templateExercises,
     timerSettings,
+    bodyLogs,
     saveActiveWorkoutAsTemplate,
     startWorkoutFromTemplate,
     deleteTemplate,
     updateTimerSettings,
+    saveBodyLog,
     startWorkout,
     completeWorkout,
     pauseWorkout,

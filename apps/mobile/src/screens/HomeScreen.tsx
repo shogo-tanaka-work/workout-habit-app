@@ -1,8 +1,16 @@
 import { Pressable, Text, View } from 'react-native';
 
+import { BodyLogSection } from '../components/BodyLogSection';
 import { StatStrip } from '../components/StatStrip';
 import { styles } from '../styles/appStyles';
-import type { Exercise, Workout, WeeklyStats, WorkoutExercise, WorkoutSet } from '../types/domain';
+import type {
+  BodyLog,
+  Exercise,
+  Workout,
+  WeeklyStats,
+  WorkoutExercise,
+  WorkoutSet,
+} from '../types/domain';
 import type { BodyPartSummary } from '../utils/aggregate';
 import { formatSetsInline } from '../utils/aggregate';
 import { formatJapaneseDate } from '../utils/datetime';
@@ -15,8 +23,10 @@ export function HomeScreen({
   exerciseById,
   stats,
   bodyPartSummaries,
+  bodyLogs,
   onStart,
   onResume,
+  onSaveBodyLog,
 }: {
   activeWorkout: Workout | null;
   completedWorkouts: Workout[];
@@ -25,8 +35,10 @@ export function HomeScreen({
   exerciseById: Map<string, Exercise>;
   stats: WeeklyStats;
   bodyPartSummaries: BodyPartSummary[];
+  bodyLogs: BodyLog[];
   onStart: () => void;
   onResume: () => void;
+  onSaveBodyLog: (bodyWeightKg: number, bodyFatPercentage: number | null) => void;
 }) {
   const maxBodyPartVolume = bodyPartSummaries.reduce(
     (max, summary) => Math.max(max, summary.totalVolume),
@@ -135,6 +147,8 @@ export function HomeScreen({
           </View>
         )}
       </View>
+
+      <BodyLogSection bodyLogs={bodyLogs} onSave={onSaveBodyLog} />
     </View>
   );
 }

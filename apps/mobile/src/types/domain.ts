@@ -71,6 +71,15 @@ export type TimerSettings = {
   vibrationEnabled: boolean;
 };
 
+// 体重・体脂肪のボディログ（1日1件）。
+export type BodyLog = {
+  id: string;
+  measuredAt: string;
+  bodyWeightKg: number;
+  bodyFatPercentage: number | null;
+  memo: string;
+};
+
 export type TimerState = {
   workoutSetId: string;
   exerciseName: string;

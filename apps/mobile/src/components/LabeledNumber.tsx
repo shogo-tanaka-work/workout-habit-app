@@ -9,11 +9,14 @@ export function LabeledNumber({
   value,
   suffix,
   onChange,
+  step,
 }: {
   label: string;
   value: number;
   suffix: string;
   onChange: (value: number) => void;
+  // ステッパーの刻み幅。省略時は kg なら 2.5、それ以外は 1。
+  step?: number;
 }) {
   const [draft, setDraft] = useState(String(value));
   const [lastValue, setLastValue] = useState(value);
@@ -29,9 +32,9 @@ export function LabeledNumber({
     onChange(parseNumber(draft, value));
   };
 
-  const step = suffix === 'kg' ? 2.5 : 1;
+  const stepAmount = step ?? (suffix === 'kg' ? 2.5 : 1);
   const updateByStep = (delta: number) => {
-    const next = Math.max(0, value + delta);
+    const next = Math.max(0, Math.round((value + delta) * 100) / 100);
     setDraft(String(next));
     onChange(next);
   };
@@ -40,7 +43,7 @@ export function LabeledNumber({
     <View style={styles.numberField}>
       <Text style={styles.inputLabel}>{label}</Text>
       <View style={styles.numberRow}>
-        <Pressable style={styles.stepButton} onPress={() => updateByStep(-step)}>
+        <Pressable style={styles.stepButton} onPress={() => updateByStep(-stepAmount)}>
           <Text style={styles.stepButtonText}>-</Text>
         </Pressable>
         <TextInput
@@ -52,7 +55,7 @@ export function LabeledNumber({
           style={styles.numberInput}
         />
         {suffix ? <Text style={styles.suffix}>{suffix}</Text> : null}
-        <Pressable style={styles.stepButton} onPress={() => updateByStep(step)}>
+        <Pressable style={styles.stepButton} onPress={() => updateByStep(stepAmount)}>
           <Text style={styles.stepButtonText}>+</Text>
         </Pressable>
       </View>

@@ -66,3 +66,11 @@ export type AppSettingRow = {
   key: string;
   value: string;
 };
+
+export type BodyLogRow = {
+  id: string;
+  measured_at: string;
+  body_weight_kg: number;
+  body_fat_percentage: number | null;
+  memo: string;
+};

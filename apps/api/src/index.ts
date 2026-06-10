@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import { analytics } from './analytics';
 import type { BackupPayload } from './tables';
 import { SYNC_TABLES } from './tables';
 
@@ -8,6 +9,7 @@ import { SYNC_TABLES } from './tables';
 // - GET  /health  … 死活確認（認証不要）
 // - GET  /backup  … D1 に保存された全テーブルを返す（復元用）
 // - POST /backup  … 送られた全テーブルで D1 を置き換える（バックアップ）
+// - GET  /analytics/* … 読み取り専用の分析API（src/analytics.ts）
 
 type Bindings = Env & { API_TOKEN: string };
 
@@ -96,5 +98,7 @@ app.post('/backup', async (context) => {
 
   return context.json({ ok: true, savedAt: new Date().toISOString(), counts });
 });
+
+app.route('/analytics', analytics);
 
 export default app;

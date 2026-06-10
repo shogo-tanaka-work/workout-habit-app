@@ -1,6 +1,4 @@
-import type { BackupPayload } from './types/db';
-
-// API アクセスとトークン保存。配信元の Worker（workout-habit-api）と同一オリジン前提。
+// API アクセスとローカル設定の保存。配信元の Worker（workout-habit-api）と同一オリジン前提。
 
 const TOKEN_STORAGE_KEY = 'workout-habit-web/api-token';
 const WEEKLY_GOAL_STORAGE_KEY = 'workout-habit-web/weekly-goal';
@@ -32,8 +30,9 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export const fetchBackup = async (token: string): Promise<BackupPayload> => {
-  const response = await fetch('/backup', {
+// /analytics 配下の GET。レスポンス型の保証は呼び出し側の型引数（API と同repoの型定義）に委ねる。
+export const apiGet = async <Response>(path: string, token: string): Promise<Response> => {
+  const response = await fetch(path, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (response.status === 401) {
@@ -42,13 +41,5 @@ export const fetchBackup = async (token: string): Promise<BackupPayload> => {
   if (!response.ok) {
     throw new Error(`データ取得に失敗しました（HTTP ${response.status}）`);
   }
-  const payload: unknown = await response.json();
-  if (
-    typeof payload !== 'object' ||
-    payload === null ||
-    typeof (payload as { tables?: unknown }).tables !== 'object'
-  ) {
-    throw new Error('データ取得に失敗しました（想定外のレスポンス形式）');
-  }
-  return payload as BackupPayload;
+  return (await response.json()) as Response;
 };

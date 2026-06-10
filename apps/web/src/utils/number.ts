@@ -1,10 +1,4 @@
-// 数値計算・表示の純粋関数。
-
-// Epley 式: 1RM = weight * (1 + reps / 30)
-const EPLEY_DIVISOR = 30;
-
-export const estimateOneRepMax = (weightKg: number, reps: number): number =>
-  reps <= 1 ? weightKg : weightKg * (1 + reps / EPLEY_DIVISOR);
+// 数値表示の純粋関数。集計（1RM計算など）は /analytics API 側で行う。
 
 export const safeDivide = (numerator: number, denominator: number, fallback = 0): number =>
   denominator > 0 ? numerator / denominator : fallback;

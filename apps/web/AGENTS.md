@@ -1,7 +1,8 @@
 # workout-habit web — 開発ガイド
 
 筋トレ記録の **読み取り専用・分析ダッシュボード**（Phase 4）。データ入力はモバイルアプリが担い、
-本アプリはクラウドバックアップ（`GET /backup`）のスナップショットを取得してブラウザ内で集計・描画する。
+本アプリは Phase 3 の分析API（`GET /analytics/*`）から集計済みデータを取得して描画する。
+集計ロジックは API 側に一元化し、クライアントは表示整形（空週の穴埋め・フォーマット）のみ行う。
 書き込み系の機能は持たない。
 
 ## 技術スタック
@@ -11,7 +12,7 @@
 | ビルド | Vite 7 | |
 | UI | React 19 / TypeScript（strict） | |
 | グラフ | 自作 SVG コンポーネント | 外部チャートライブラリは未導入（モバイルの TrendChart と同方針） |
-| データ取得 | `GET /backup`（apps/api） | Bearer トークンは localStorage に保存 |
+| データ取得 | `GET /analytics/*`（apps/api） | Bearer トークンは localStorage に保存 |
 | 配信 | apps/api Worker の static assets | 同一オリジンのため CORS 不要 |
 
 外部ライブラリの新規導入は方針判断が必要なため、勝手に追加しない。
@@ -20,13 +21,13 @@
 
 ```
 src/
-  types/        db.ts（バックアップ生データ）と domain.ts（ドメイン型）
-  data/         transform.ts（行→ドメイン変換の集約）, analytics.ts（集計の純粋関数）
-  utils/        datetime / number（純粋関数のみ）
-  components/   LineChart / BarChart / CalendarHeatmap / Section
-  sections/     ダッシュボードの各区画（1区画=1ファイル）
-  api.ts        fetch とトークン・設定の localStorage 管理
-  App.tsx       トークン設定 → 取得 → セクション描画の薄いシェル
+  types/        api.ts（/analytics レスポンス型。apps/api 側の JSON と対応）
+  hooks/        useApiData（トークンContext＋パス単位の取得フック）
+  utils/        datetime / number（表示整形の純粋関数のみ。集計はAPI側）
+  components/   LineChart / BarChart / CalendarHeatmap / Section / Loadable
+  sections/     ダッシュボードの各区画（1区画=1ファイル。各自が /analytics を取得）
+  api.ts        apiGet とトークン・設定の localStorage 管理
+  App.tsx       トークン設定 → ApiContext 提供 → セクション描画の薄いシェル
 ```
 
 コーディング規約はモバイル側 `apps/mobile/.claude/rules/` の code-design / typescript に準じる

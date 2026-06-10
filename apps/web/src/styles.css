@@ -390,6 +390,13 @@ select,
   font-size: 14px;
 }
 
+.section-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+
 /* 種目セレクト */
 .exercise-select {
   max-width: 240px;

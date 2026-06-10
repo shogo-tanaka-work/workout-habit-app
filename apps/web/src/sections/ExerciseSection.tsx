@@ -1,17 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
-import { exerciseOptions, exerciseSeries } from '../data/analytics';
-import type { Dataset } from '../types/domain';
 import { LineChart, type LinePoint } from '../components/LineChart';
+import { Loadable } from '../components/Loadable';
 import { Section } from '../components/Section';
-import { formatShortDate } from '../utils/datetime';
+import { useApiData } from '../hooks/useApiData';
+import type { ExerciseDetailResponse, ExercisesResponse } from '../types/api';
+import { formatDateKey, formatShortDate } from '../utils/datetime';
 import { formatVolume, formatWeight } from '../utils/number';
 
-// 種目別グラフ: 種目を選び、トップ重量・推定1RM・セッションボリュームの推移を表示する。
-
-type ExerciseSectionProps = {
-  dataset: Dataset;
-};
+// 種目別グラフ: /analytics/exercises で種目を選び、
+// /analytics/exercises/:id のセッション推移を表示する。
 
 type SeriesMode = 'topWeight' | 'oneRepMax' | 'volume';
 
@@ -21,48 +19,38 @@ const SERIES_LABELS: Record<SeriesMode, string> = {
   volume: 'ボリューム',
 };
 
-export const ExerciseSection = ({ dataset }: ExerciseSectionProps) => {
-  const options = useMemo(() => exerciseOptions(dataset), [dataset]);
-  const [selectedExerciseId, setSelectedExerciseId] = useState(options[0]?.exerciseId ?? '');
+const DETAIL_MONTHS = 12;
+
+export const ExerciseSection = () => {
+  const [selectedExerciseId, setSelectedExerciseId] = useState('');
   const [seriesMode, setSeriesMode] = useState<SeriesMode>('topWeight');
+  const todayKey = formatDateKey(new Date());
 
-  const series = useMemo(
-    () => exerciseSeries(dataset.sessions, selectedExerciseId),
-    [dataset, selectedExerciseId],
+  const listState = useApiData<ExercisesResponse>('/analytics/exercises');
+  const options = (listState.data?.exercises ?? []).filter(
+    (exercise) => exercise.sessionCount > 0,
   );
-
-  const points: LinePoint[] = series.map((point) => ({
-    label: formatShortDate(point.dateKey),
-    value:
-      seriesMode === 'topWeight'
-        ? point.topWeightKg
-        : seriesMode === 'oneRepMax'
-          ? point.bestOneRepMax
-          : point.totalVolume,
-  }));
-  const formatValue = seriesMode === 'volume' ? formatVolume : formatWeight;
-
-  if (options.length === 0) {
-    return (
-      <Section title="種目別グラフ" subtitle="種目ごとの推移">
-        <p className="chart-empty">記録のある種目がありません</p>
-      </Section>
-    );
-  }
+  // 未選択時は実施回数最多の種目（API がソート済み）を初期表示にする。
+  const effectiveExerciseId = selectedExerciseId || options[0]?.id || '';
+  const detailState = useApiData<ExerciseDetailResponse>(
+    effectiveExerciseId
+      ? `/analytics/exercises/${effectiveExerciseId}?months=${DETAIL_MONTHS}&today=${todayKey}`
+      : null,
+  );
 
   return (
     <Section
       title="種目別グラフ"
-      subtitle="トップ重量と推定1RMはウォームアップを除いて計算"
+      subtitle={`直近${DETAIL_MONTHS}か月のセッション推移（推定1RMはEpley式）`}
       actions={
         <div className="toggle-group-row">
           <select
             className="exercise-select"
-            value={selectedExerciseId}
+            value={effectiveExerciseId}
             onChange={(event) => setSelectedExerciseId(event.target.value)}
           >
             {options.map((option) => (
-              <option key={option.exerciseId} value={option.exerciseId}>
+              <option key={option.id} value={option.id}>
                 {option.name}（{option.sessionCount}回）
               </option>
             ))}
@@ -82,7 +70,29 @@ export const ExerciseSection = ({ dataset }: ExerciseSectionProps) => {
         </div>
       }
     >
-      <LineChart points={points} formatValue={formatValue} />
+      <Loadable state={listState}>
+        {() =>
+          options.length === 0 ? (
+            <p className="chart-empty">記録のある種目がありません</p>
+          ) : (
+            <Loadable state={detailState}>
+              {(detail) => {
+                const points: LinePoint[] = detail.sessions.map((session) => ({
+                  label: formatShortDate(session.date),
+                  value:
+                    seriesMode === 'topWeight'
+                      ? session.topWeightKg
+                      : seriesMode === 'oneRepMax'
+                        ? session.bestOneRepMax
+                        : session.totalVolume,
+                }));
+                const formatValue = seriesMode === 'volume' ? formatVolume : formatWeight;
+                return <LineChart points={points} formatValue={formatValue} />;
+              }}
+            </Loadable>
+          )
+        }
+      </Loadable>
     </Section>
   );
 };

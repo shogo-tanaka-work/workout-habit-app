@@ -211,6 +211,70 @@ analytics.get('/body-parts', async (context) => {
   return context.json({ today, since, weeks: series });
 });
 
+// 日別サマリ: 直近 N 週の日ごとの記録回数・セット数・ボリューム（ヒートマップ用）と全期間の累計回数。
+analytics.get('/daily', async (context) => {
+  const weeks = clampInt(context.req.query('weeks'), 16, 1, 53);
+  const today = resolveToday(context.req.query('today'));
+  const since = weekStartIso(daysAgoIso(today, (weeks - 1) * DAYS_PER_WEEK));
+
+  type DailyRow = {
+    date: string;
+    workouts: number;
+    sets: number;
+    volume: number | null;
+  };
+  const result = await context.env.DB.prepare(
+    `SELECT w.performed_at AS date,
+            COUNT(DISTINCT w.id) AS workouts,
+            COUNT(s.id) AS sets,
+            SUM(s.weight_kg * s.reps) AS volume
+     FROM workouts w
+     JOIN workout_exercises we ON we.workout_id = w.id
+     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
+     WHERE w.status = 'completed' AND w.performed_at >= ?
+     GROUP BY w.performed_at
+     ORDER BY w.performed_at`,
+  )
+    .bind(since)
+    .all<DailyRow>();
+  const total = await context.env.DB.prepare(
+    "SELECT COUNT(*) AS workouts FROM workouts WHERE status = 'completed'",
+  ).first<{ workouts: number }>();
+
+  return context.json({
+    today,
+    since,
+    totalWorkouts: total?.workouts ?? 0,
+    days: result.results.map((row) => ({
+      date: row.date,
+      workoutCount: row.workouts,
+      setCount: row.sets,
+      totalVolume: round1(row.volume ?? 0),
+    })),
+  });
+});
+
+// ボディログ: 体重・体脂肪率の推移（測定日昇順）。
+analytics.get('/body-logs', async (context) => {
+  type BodyLogRow = {
+    measured_at: string;
+    body_weight_kg: number | null;
+    body_fat_percentage: number | null;
+  };
+  const result = await context.env.DB.prepare(
+    `SELECT measured_at, body_weight_kg, body_fat_percentage
+     FROM body_logs
+     ORDER BY measured_at`,
+  ).all<BodyLogRow>();
+  return context.json({
+    bodyLogs: result.results.map((row) => ({
+      date: row.measured_at.slice(0, 10),
+      bodyWeightKg: row.body_weight_kg,
+      bodyFatPercentage: row.body_fat_percentage,
+    })),
+  });
+});
+
 // 種目一覧: 種目ごとの実施回数・最終実施日・ベスト推定1RM（Epley式）。
 analytics.get('/exercises', async (context) => {
   type ExerciseListRow = {
@@ -272,6 +336,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
     volume: number | null;
     total_reps: number | null;
     max_reps: number | null;
+    top_weight: number | null;
     best_one_rep_max: number | null;
   };
   const result = await context.env.DB.prepare(
@@ -280,6 +345,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
             SUM(s.weight_kg * s.reps) AS volume,
             SUM(s.reps) AS total_reps,
             MAX(s.reps) AS max_reps,
+            MAX(s.weight_kg) AS top_weight,
             ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${EPLEY_DIVISOR}.0)), 1) AS best_one_rep_max
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id AND we.exercise_id = ?
@@ -297,6 +363,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
     totalVolume: round1(row.volume ?? 0),
     totalReps: row.total_reps ?? 0,
     maxReps: row.max_reps ?? 0,
+    topWeightKg: row.top_weight ?? 0,
     bestOneRepMax: row.best_one_rep_max ?? 0,
   }));
   const summary = {

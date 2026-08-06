@@ -6,7 +6,7 @@ import type { ExerciseSession } from '../utils/aggregate';
 import { formatSetsInline } from '../utils/aggregate';
 import { formatMonthDay } from '../utils/datetime';
 import { formatTimer } from '../utils/format';
-import { estimateOneRepMax } from '../utils/number';
+import { estimateOneRepMax, formatVolume, formatWeight } from '../utils/number';
 import { SetEditor } from './SetEditor';
 
 export function WorkoutExerciseList({
@@ -52,8 +52,8 @@ export function WorkoutExerciseList({
               <View style={styles.flex}>
                 <Text style={styles.exerciseTitle}>{exercise?.name ?? '種目'}</Text>
                 <Text style={styles.faint}>
-                  {sets.length} セット ・ {Math.round(volume).toLocaleString()} kg ・ 推定1RM{' '}
-                  {bestOneRepMax} kg
+                  {sets.length} セット ・ {formatVolume(volume)} ・ 推定1RM{' '}
+                  {formatWeight(bestOneRepMax)}
                 </Text>
               </View>
               <Pressable style={styles.smallButton} onPress={() => onAddSet(workoutExercise)}>
@@ -66,10 +66,12 @@ export function WorkoutExerciseList({
                   <Text style={styles.muted}>
                     前回 {formatMonthDay(previousSession.workout.performedAt)} ・{' '}
                     {formatSetsInline(previousSession.sets)} ・ ベスト1RM{' '}
-                    {previousSession.summary.bestOneRepMax} kg
+                    {formatWeight(previousSession.summary.bestOneRepMax)}
                   </Text>
                 ) : (
-                  <Text style={styles.faint}>この種目の前回記録はありません。</Text>
+                  <Text style={styles.faint}>
+                    この種目は初めてです。今日の記録が次回の目安になります。
+                  </Text>
                 )
               ) : null}
               {showTimer ? (

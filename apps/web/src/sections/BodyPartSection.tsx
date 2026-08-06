@@ -71,7 +71,7 @@ export const BodyPartSection = () => {
           const totals = sumByBodyPart(response);
           const maxVolume = totals[0]?.totalVolume ?? 0;
           if (totals.length === 0) {
-            return <p className="chart-empty">期間内の記録がありません</p>;
+            return <p className="chart-empty">この期間の記録がありません。期間を広げるか、アプリで記録を追加してください</p>;
           }
           return (
             <ul className="hbar-list">

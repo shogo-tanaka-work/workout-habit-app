@@ -3,6 +3,15 @@ export const parseNumber = (value: string, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+// 桁区切りを付けた整数表記。単位を別の Text として描画するときに使う。
+export const formatCount = (value: number): string => Math.round(value).toLocaleString('ja-JP');
+
+// 12,340kg のような桁区切り付きボリューム表記。apps/web の utils/number.ts と同じ表記に揃える。
+export const formatVolume = (volumeKg: number): string => `${formatCount(volumeKg)}kg`;
+
+// 重量は小数1桁まで（80 / 72.5 のように末尾ゼロは省く）。
+export const formatWeight = (weightKg: number): string => `${Number(weightKg.toFixed(1))}kg`;
+
 // Epley 式の係数。1RM = weight * (1 + reps / EPLEY_DIVISOR)。
 const EPLEY_DIVISOR = 30;
 

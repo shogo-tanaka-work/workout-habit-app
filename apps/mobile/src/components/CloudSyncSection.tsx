@@ -4,6 +4,7 @@ import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import type { SyncSettings } from '../types/domain';
+import { formatDateTime } from '../utils/datetime';
 
 // クラウドバックアップ（apps/api）との接続設定とバックアップ/復元の操作UI。
 // 種目タブに置く。設定は app_settings に保存され同期対象外。
@@ -46,13 +47,8 @@ export function CloudSyncSection({
   };
 
   const lastBackupLabel = syncSettings.lastBackupAt
-    ? new Date(syncSettings.lastBackupAt).toLocaleString('ja-JP', {
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : 'なし';
+    ? formatDateTime(syncSettings.lastBackupAt)
+    : '—';
 
   return (
     <View style={styles.section}>

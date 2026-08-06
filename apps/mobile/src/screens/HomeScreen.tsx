@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { BodyLogSection } from '../components/BodyLogSection';
-import { StatStrip } from '../components/StatStrip';
+import { StatSummary } from '../components/StatSummary';
 import { styles } from '../styles/appStyles';
 import type {
   BodyLog,
@@ -14,6 +14,7 @@ import type {
 import type { BodyPartSummary } from '../utils/aggregate';
 import { formatSetsInline } from '../utils/aggregate';
 import { formatJapaneseDate } from '../utils/datetime';
+import { formatCount, formatVolume } from '../utils/number';
 
 export function HomeScreen({
   activeWorkout,
@@ -75,15 +76,12 @@ export function HomeScreen({
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>今週のトレーニング</Text>
         </View>
-        <StatStrip
+        <StatSummary
+          primary={{ label: '総ボリューム', value: formatCount(stats.totalVolume), unit: 'kg' }}
           items={[
-            { label: '記録回数', value: `${stats.workoutCount} 回` },
-            { label: 'セット数', value: `${stats.setCount} セット` },
-            {
-              label: 'ボリューム',
-              value: `${Math.round(stats.totalVolume).toLocaleString()} kg`,
-            },
-            { label: '総レップ数', value: `${stats.totalReps} 回` },
+            { label: '記録', value: formatCount(stats.workoutCount), unit: '回' },
+            { label: 'セット', value: formatCount(stats.setCount) },
+            { label: 'レップ', value: formatCount(stats.totalReps) },
           ]}
         />
       </View>
@@ -101,8 +99,7 @@ export function HomeScreen({
                   <View style={styles.rowBetween}>
                     <Text style={styles.panelText}>{summary.name}</Text>
                     <Text style={styles.muted}>
-                      {summary.setCount} セット ・{' '}
-                      {Math.round(summary.totalVolume).toLocaleString()} kg
+                      {summary.setCount} セット ・ {formatVolume(summary.totalVolume)}
                     </Text>
                   </View>
                   <View style={styles.bodyPartBarTrack}>
@@ -143,7 +140,9 @@ export function HomeScreen({
           })
         ) : (
           <View style={styles.sectionBody}>
-            <Text style={styles.muted}>まだ完了したワークアウトはありません。</Text>
+            <Text style={styles.muted}>
+              完了した記録はまだありません。上の「ワークアウト開始」から最初の1回を記録しましょう。
+            </Text>
           </View>
         )}
       </View>

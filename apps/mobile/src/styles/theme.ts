@@ -15,6 +15,9 @@ export const colors = {
   accent: '#df8a3d',
   accentText: '#f0b375',
   accentSurface: '#332617',
+  accentSurfaceStrong: '#6b4a25',
+  // アクセント色で塗った面の上に載せる文字色。
+  onAccent: '#1f1408',
   danger: '#e0705f',
   dangerSurface: '#2e1b18',
   chartPrimary: '#df8a3d',
@@ -22,11 +25,14 @@ export const colors = {
 };
 
 export const spacing = {
+  // ラベルと値のような、密着させたい組み合わせにだけ使う最小の間隔。
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
   xl: 24,
+  xxl: 48,
 };
 
 export const fontSize = {
@@ -35,6 +41,8 @@ export const fontSize = {
   md: 15,
   lg: 18,
   xl: 22,
+  // 画面で1つだけ使う主役の数値（レストタイマー・区画の主指標）。
+  display: 26,
 };
 
 // 表組み・区切り線に使う極細線。

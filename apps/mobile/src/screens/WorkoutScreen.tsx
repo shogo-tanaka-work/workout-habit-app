@@ -1,6 +1,6 @@
 import { Alert, Pressable, Text, View } from 'react-native';
 
-import { StatStrip } from '../components/StatStrip';
+import { StatSummary } from '../components/StatSummary';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
 import { styles } from '../styles/appStyles';
 import type {
@@ -15,7 +15,9 @@ import type {
 } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { summarizeSets } from '../utils/aggregate';
+import { formatClockTime } from '../utils/datetime';
 import { formatTimer } from '../utils/format';
+import { formatCount } from '../utils/number';
 
 export function WorkoutScreen({
   activeWorkout,
@@ -144,13 +146,7 @@ export function WorkoutScreen({
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionHeaderText}>今日のワークアウト</Text>
-            <Text style={styles.faint}>
-              最終保存{' '}
-              {new Date(activeWorkout.lastSavedAt).toLocaleTimeString('ja-JP', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
+            <Text style={styles.faint}>最終保存 {formatClockTime(activeWorkout.lastSavedAt)}</Text>
           </View>
           <View style={styles.headerActions}>
             <Pressable style={styles.ghostButton} onPress={onPause}>
@@ -161,15 +157,12 @@ export function WorkoutScreen({
             </Pressable>
           </View>
         </View>
-        <StatStrip
+        <StatSummary
+          primary={{ label: '総ボリューム', value: formatCount(summary.totalVolume), unit: 'kg' }}
           items={[
-            { label: '種目', value: `${workoutExercises.length}` },
-            { label: 'セット', value: `${summary.setCount}` },
-            {
-              label: 'ボリューム',
-              value: `${Math.round(summary.totalVolume).toLocaleString()} kg`,
-            },
-            { label: '総レップ数', value: `${summary.totalReps} 回` },
+            { label: '種目', value: formatCount(workoutExercises.length) },
+            { label: 'セット', value: formatCount(summary.setCount) },
+            { label: 'レップ', value: formatCount(summary.totalReps) },
           ]}
         />
       </View>

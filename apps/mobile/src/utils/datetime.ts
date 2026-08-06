@@ -28,6 +28,20 @@ export const formatMonthDay = (isoDate: string): string => {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 };
 
+// 「14:32」表記。記録中ワークアウトの最終保存時刻に使う。
+export const formatClockTime = (isoDateTime: string): string => {
+  const date = new Date(isoDateTime);
+  const hours = `${date.getHours()}`.padStart(2, '0');
+  const minutes = `${date.getMinutes()}`.padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
+// 「5/27 14:32」表記。クラウドバックアップの最終実行日時に使う。
+export const formatDateTime = (isoDateTime: string): string => {
+  const date = new Date(isoDateTime);
+  return `${date.getMonth() + 1}/${date.getDate()} ${formatClockTime(isoDateTime)}`;
+};
+
 // n か月前の同日（YYYY-MM-DD）。種目詳細の期間切り替えの起点に使う。
 export const isoDateMonthsAgo = (months: number, from: Date): string => {
   const date = new Date(from.getFullYear(), from.getMonth() - months, from.getDate());

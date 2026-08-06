@@ -3,14 +3,14 @@ import { Pressable, Text, View } from 'react-native';
 
 import { LabeledNumber } from '../components/LabeledNumber';
 import { SetTable } from '../components/SetTable';
-import { StatStrip } from '../components/StatStrip';
+import { StatSummary } from '../components/StatSummary';
 import { TrendChart } from '../components/TrendChart';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import type { Exercise } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { formatJapaneseDate, formatMonthDay, isoDateMonthsAgo } from '../utils/datetime';
-import { estimateOneRepMax, weightForReps } from '../utils/number';
+import { estimateOneRepMax, formatCount, formatWeight, weightForReps } from '../utils/number';
 
 const RECENT_SESSION_COUNT = 5;
 // グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
@@ -44,7 +44,9 @@ export function ExerciseDetailScreen({
             <Text style={styles.sectionHeaderText}>{exercise.name}</Text>
           </View>
           <View style={styles.sectionBody}>
-            <Text style={styles.muted}>この種目の記録はまだありません。</Text>
+            <Text style={styles.muted}>
+              この種目の記録はまだありません。ワークアウトで種目に追加すると、推移が見られます。
+            </Text>
           </View>
         </View>
         <RmCalculator initialWeightKg={exercise.defaultBarWeightKg} initialReps={8} />
@@ -125,11 +127,11 @@ export function ExerciseDetailScreen({
       </View>
 
       <View style={styles.section}>
-        <StatStrip
+        <StatSummary
+          primary={{ label: '総ボリューム', value: formatCount(periodVolume), unit: 'kg' }}
           items={[
-            { label: '総ボリューム', value: `${Math.round(periodVolume).toLocaleString()} kg` },
-            { label: '総セット', value: `${periodSetCount} セット` },
-            { label: 'トレーニング回数', value: `${periodSessions.length} 回` },
+            { label: 'セット', value: formatCount(periodSetCount) },
+            { label: '実施', value: formatCount(periodSessions.length), unit: '回' },
           ]}
         />
       </View>
@@ -231,15 +233,16 @@ function SessionSection({ title, session }: { title: string; session: ExerciseSe
       <View style={styles.sectionBody}>
         <SetTable sets={session.sets} />
       </View>
-      <StatStrip
+      <StatSummary
+        primary={{
+          label: 'ボリューム',
+          value: formatCount(session.summary.totalVolume),
+          unit: 'kg',
+        }}
         items={[
-          {
-            label: 'ボリューム',
-            value: `${Math.round(session.summary.totalVolume).toLocaleString()} kg`,
-          },
-          { label: '推定1RM', value: `${session.summary.bestOneRepMax} kg` },
-          { label: '総レップ数', value: `${session.summary.totalReps} 回` },
-          { label: '最大レップ数', value: `${session.summary.maxReps} 回` },
+          { label: '推定1RM', value: formatWeight(session.summary.bestOneRepMax) },
+          { label: 'レップ', value: formatCount(session.summary.totalReps) },
+          { label: '最大レップ', value: formatCount(session.summary.maxReps) },
         ]}
       />
     </View>

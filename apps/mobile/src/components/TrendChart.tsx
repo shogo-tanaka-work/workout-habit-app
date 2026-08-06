@@ -3,6 +3,7 @@ import type { LayoutChangeEvent } from 'react-native';
 import { Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
+import { formatCount } from '../utils/number';
 
 export type TrendPoint = {
   label: string;
@@ -28,7 +29,7 @@ const niceCeil = (value: number): number => {
   return niceNormalized * magnitude;
 };
 
-const formatAxisValue = (value: number): string => Math.round(value).toLocaleString();
+const formatAxisValue = (value: number): string => formatCount(value);
 
 // 値域に対する上下の余白比率（非ゼロ基準スケール時）。
 const RANGE_PADDING_RATIO = 0.15;

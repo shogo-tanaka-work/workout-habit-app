@@ -2,6 +2,7 @@
    角丸カードの多用を避け、ヘアライン罫線とフラットな区画で構成する。 */
 
 :root {
+  /* 色。apps/mobile/src/styles/theme.ts の colors と同じ値を保つ。片方だけ変えない。 */
   --background: #171411;
   --surface: #1e1a16;
   --surface-raised: #27221c;
@@ -14,8 +15,33 @@
   --accent-text: #f0b375;
   --accent-surface: #332617;
   --accent-surface-strong: #6b4a25;
+  --accent-mid: #b06f2e;
+  --on-accent: #1f1408;
+  --chart-primary: #df8a3d;
   --chart-secondary: #6f9fd8;
   --danger: #e0705f;
+  --danger-surface: #2e1b18;
+
+  /* 余白。5段階＋最小値。中間値を作らない。 */
+  --space-xxs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 48px;
+
+  /* 文字サイズ。display は1画面で1つだけ使う主役の数値に限る。 */
+  --font-xs: 11px;
+  --font-sm: 13px;
+  --font-md: 15px;
+  --font-lg: 18px;
+  --font-xl: 22px;
+  --font-display: 26px;
+
+  /* 角丸は操作要素だけに使う。 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
 }
 
 * {
@@ -28,14 +54,14 @@ body {
   color: var(--text-primary);
   font-family:
     'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
-  font-size: 15px;
+  font-size: var(--font-md);
   line-height: 1.6;
 }
 
 .app {
   max-width: 880px;
   margin: 0 auto;
-  padding: 0 16px 48px;
+  padding: 0 var(--space-lg) var(--space-xxl);
 }
 
 .app-header {
@@ -43,14 +69,14 @@ body {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 16px 0;
+  gap: var(--space-sm);
+  padding: var(--space-lg) 0;
   border-bottom: 1px solid var(--hairline);
 }
 
 .app-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--font-lg);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--accent-text);
@@ -59,23 +85,23 @@ body {
 .app-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .app-meta {
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--font-xs);
 }
 
 .app-footer {
-  margin-top: 24px;
+  margin-top: var(--space-xl);
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--font-xs);
 }
 
 /* セクション */
 .section {
-  padding: 20px 0;
+  padding: var(--space-lg) 0;
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -84,20 +110,20 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 
 .section-title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-md);
   font-weight: 700;
 }
 
 .section-subtitle {
-  margin: 2px 0 0;
+  margin: var(--space-xxs) 0 0;
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--font-xs);
 }
 
 /* メトリクス */
@@ -107,31 +133,31 @@ body {
   gap: 1px;
   background: var(--hairline);
   border: 1px solid var(--hairline);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-lg);
 }
 
 .metric {
   background: var(--surface);
-  padding: 12px;
+  padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-xxs);
 }
 
 .metric-value {
-  font-size: 22px;
+  font-size: var(--font-xl);
   font-weight: 700;
   color: var(--accent-text);
 }
 
 .metric-unit {
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
-  margin-left: 2px;
+  margin-left: var(--space-xxs);
 }
 
 .metric-label {
-  font-size: 12px;
+  font-size: var(--font-xs);
   color: var(--text-secondary);
 }
 
@@ -140,7 +166,7 @@ body {
   height: 6px;
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-lg);
 }
 
 .goal-bar-fill {
@@ -152,8 +178,8 @@ body {
 .goal-select {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--space-sm);
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
@@ -163,22 +189,22 @@ select,
   background: var(--surface-raised);
   color: var(--text-primary);
   border: 1px solid var(--hairline-strong);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-md);
 }
 
 .toggle-group-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-sm);
   align-items: center;
 }
 
 .toggle-group {
   display: inline-flex;
   border: 1px solid var(--hairline-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -186,8 +212,8 @@ select,
   background: var(--surface);
   color: var(--text-secondary);
   border: none;
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-sm);
   cursor: pointer;
 }
 
@@ -203,11 +229,11 @@ select,
 
 .button-primary {
   background: var(--accent);
-  color: #1c1408;
+  color: var(--on-accent);
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--font-md);
   font-weight: 700;
   cursor: pointer;
 }
@@ -216,8 +242,8 @@ select,
   background: transparent;
   color: var(--accent-text);
   border: none;
-  padding: 4px;
-  font-size: 13px;
+  padding: var(--space-xs);
+  font-size: var(--font-sm);
   cursor: pointer;
 }
 
@@ -243,14 +269,14 @@ select,
   align-items: flex-start;
   pointer-events: none;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--font-xs);
 }
 
 .chart-axis {
   display: flex;
   justify-content: space-between;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--font-xs);
 }
 
 .chart-last-value {
@@ -261,14 +287,14 @@ select,
 .chart-empty,
 .status-text {
   color: var(--text-faint);
-  font-size: 13px;
-  padding: 24px 0;
+  font-size: var(--font-sm);
+  padding: var(--space-xl) 0;
   text-align: center;
 }
 
 .chart-text {
   fill: var(--accent-text);
-  font-size: 11px;
+  font-size: var(--font-xs);
   font-weight: 700;
 }
 
@@ -284,18 +310,18 @@ select,
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-md);
 }
 
 .hbar-item {
   display: grid;
   grid-template-columns: 72px 1fr 150px;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-md);
 }
 
 .hbar-name {
-  font-size: 13px;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
@@ -310,14 +336,14 @@ select,
 }
 
 .hbar-value {
-  font-size: 13px;
+  font-size: var(--font-sm);
   font-weight: 700;
   text-align: right;
 }
 
 .hbar-sets {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-xs);
   font-weight: 400;
   color: var(--text-faint);
 }
@@ -325,20 +351,20 @@ select,
 /* ヒートマップ */
 .heatmap {
   display: flex;
-  gap: 6px;
+  gap: var(--space-xs);
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: var(--space-xs);
 }
 
 .heatmap-weekdays {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-xxs);
 }
 
 .heatmap-weekday {
   height: 14px;
-  font-size: 10px;
+  font-size: var(--font-xs);
   line-height: 14px;
   color: var(--text-faint);
   width: 14px;
@@ -346,13 +372,13 @@ select,
 
 .heatmap-grid {
   display: flex;
-  gap: 3px;
+  gap: var(--space-xxs);
 }
 
 .heatmap-week {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-xxs);
 }
 
 .heatmap-cell {
@@ -366,7 +392,7 @@ select,
 }
 
 .heatmap-level-2 {
-  background: #b06f2e;
+  background: var(--accent-mid);
 }
 
 .heatmap-level-3 {
@@ -381,10 +407,10 @@ select,
 /* セットアップ画面 */
 .setup {
   max-width: 480px;
-  margin: 48px auto;
+  margin: var(--space-xxl) auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-lg);
 }
 
 .setup-text {
@@ -394,7 +420,7 @@ select,
 
 .setup-form {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .setup-input {
@@ -404,14 +430,14 @@ select,
 .error-text {
   color: var(--danger);
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 .section-status {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 0;
+  gap: var(--space-md);
+  padding: var(--space-lg) 0;
 }
 
 /* 種目セレクト */

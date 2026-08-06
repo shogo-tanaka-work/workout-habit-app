@@ -76,7 +76,7 @@ export const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: spacing.md,
-    paddingBottom: 40,
+    paddingBottom: spacing.xxl,
   },
   stack: {
     gap: spacing.lg,
@@ -190,33 +190,59 @@ export const styles = StyleSheet.create({
     fontWeight: '400',
   },
 
-  // 統計ストリップ（縦罫線区切りのラベル＋値）
-  statStrip: {
-    flexDirection: 'row',
+  // 指標表示（主役の数値を1つ大きく＋従属指標を1行に）
+  statSummary: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderTopWidth: hairlineWidth,
     borderTopColor: colors.hairline,
+    gap: spacing.xxs,
   },
-  statCell: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: hairlineWidth,
-    borderRightColor: colors.hairline,
-    gap: 2,
+  statPrimaryValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xxs,
   },
-  statCellLast: {
-    borderRightWidth: 0,
+  statPrimaryValue: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xl,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
-  statLabel: {
+  statPrimaryUnit: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  statPrimaryLabel: {
     color: colors.textFaint,
     fontSize: fontSize.xs,
   },
-  statValue: {
-    color: colors.textPrimary,
+  statItemRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    marginTop: spacing.xs,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
+  },
+  statSeparator: {
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  statItemLabel: {
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
+  },
+  statItemValue: {
+    color: colors.textSecondary,
     fontSize: fontSize.sm,
     fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 
   // セット表（セット / 重量 / レップ数）
@@ -333,7 +359,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   primaryButtonText: {
-    color: '#1f1408',
+    color: colors.onAccent,
     fontWeight: '800',
     fontSize: fontSize.md,
   },
@@ -424,7 +450,7 @@ export const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm + 2,
     justifyContent: 'center',
-    gap: 2,
+    gap: spacing.xxs,
   },
   exerciseChipText: {
     color: colors.textPrimary,
@@ -605,11 +631,11 @@ export const styles = StyleSheet.create({
   timerTitle: {
     color: colors.textPrimary,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: spacing.xxs,
   },
   timerTime: {
     color: colors.textPrimary,
-    fontSize: 26,
+    fontSize: fontSize.display,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
@@ -762,7 +788,7 @@ export const styles = StyleSheet.create({
     minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: spacing.xxs,
     borderRightWidth: hairlineWidth,
     borderRightColor: colors.hairline,
   },

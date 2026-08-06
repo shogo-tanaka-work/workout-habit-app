@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { MonthCalendar } from '../components/MonthCalendar';
-import { StatStrip } from '../components/StatStrip';
+import { StatSummary } from '../components/StatSummary';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
 import { styles } from '../styles/appStyles';
 import type { Exercise, SetPatch, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { summarizeSets } from '../utils/aggregate';
 import { formatJapaneseDate } from '../utils/datetime';
+import { formatCount, formatVolume, formatWeight } from '../utils/number';
 
 export function HistoryScreen({
   workouts,
@@ -79,7 +80,9 @@ export function HistoryScreen({
       ) : null}
 
       {workouts.length === 0 ? (
-        <Text style={styles.muted}>完了したワークアウトはまだありません。</Text>
+        <Text style={styles.muted}>
+          完了した記録はまだありません。ワークアウトを完了すると、ここに履歴が並びます。
+        </Text>
       ) : null}
       {visibleWorkouts.map((workout) => {
         const items = workoutExercises
@@ -98,7 +101,7 @@ export function HistoryScreen({
                   {formatJapaneseDate(workout.performedAt)}
                 </Text>
                 <Text style={styles.faint}>
-                  総ボリューム {Math.round(workoutSummary.totalVolume).toLocaleString()} kg ・{' '}
+                  総ボリューム {formatVolume(workoutSummary.totalVolume)} ・{' '}
                   {workoutSummary.setCount} セット
                 </Text>
               </View>
@@ -147,16 +150,16 @@ export function HistoryScreen({
                       <Text style={styles.exerciseRowName}>{exercise?.name ?? '種目'}</Text>
                       <Text style={styles.chevron}>›</Text>
                     </View>
-                    <StatStrip
+                    <StatSummary
+                      primary={{
+                        label: 'ボリューム',
+                        value: formatCount(itemSummary.totalVolume),
+                        unit: 'kg',
+                      }}
                       items={[
-                        { label: 'セット', value: `${itemSummary.setCount} セット` },
-                        {
-                          label: 'ボリューム',
-                          value: `${Math.round(itemSummary.totalVolume).toLocaleString()} kg`,
-                        },
-                        { label: '推定1RM', value: `${itemSummary.bestOneRepMax} kg` },
-                        { label: '総レップ数', value: `${itemSummary.totalReps} 回` },
-                        { label: '最大レップ', value: `${itemSummary.maxReps} 回` },
+                        { label: 'セット', value: formatCount(itemSummary.setCount) },
+                        { label: '推定1RM', value: formatWeight(itemSummary.bestOneRepMax) },
+                        { label: 'レップ', value: formatCount(itemSummary.totalReps) },
                       ]}
                     />
                   </Pressable>

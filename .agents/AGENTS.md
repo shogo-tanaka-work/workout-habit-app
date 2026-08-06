@@ -31,6 +31,8 @@
 - `memory/roadmap.md` — 大きな実行計画と決定済み方針。作業の位置づけを確認する
 - `memory/cloudflare.md` — Worker / D1 / 静的配信の構成と、公開リポジトリに書いてよい値の線引き
 - `memory/auth-model.md` — 認証のゴール像と未確定事項
+- `memory/claude-code-integration.md` — Claude Code 連携（Step 5）の構想。
+  **現行の全置換同期と衝突するため、データモデルや同期を触る前に読む**
 
 データモデルや API を変更する前に、対応する仕様書を読む。実装を変えたら同じ変更セットで更新する。
 `docs/` は非公開のためリポジトリには含まれない（ローカルにのみ存在する）。

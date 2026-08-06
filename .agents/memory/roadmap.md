@@ -54,6 +54,40 @@ web は `box-shadow` が 0 件、`border-radius` が 3 箇所（すべて操作�
 - 公開前チェック: 秘密値、個人情報、他社アプリのスクリーンショットが tracked に混ざっていないか
 - CI（typecheck + build）は任意
 
+## 残タスク: インデックスと外部キー（Step 4 のテーブル再構築とまとめて行う）
+
+**着手を保留している。単独でやると同じ作業を2回することになるため。**
+
+SQLite には `ALTER TABLE ADD CONSTRAINT` が無く、外部キーを足すには
+「新テーブル作成 → データ複製 → 旧テーブル削除 → リネーム」の再構築が要る。
+Step 4 の `user_id` 追加でも同じ再構築が必要なので、**1回の移行にまとめる。**
+
+再構築のときに一緒に入れるもの。
+
+- 外部キー制約（`FOREIGN KEY ... REFERENCES`）。想定する関係は
+  `DB仕様書.md` の ER 図のとおり。削除時の挙動（CASCADE / RESTRICT）は要検討
+- インデックス
+  - `workout_exercises(workout_id)` / `workout_exercises(exercise_id)`
+  - `workout_sets(workout_exercise_id)`
+  - `workouts(performed_at)` / `workouts(status)`
+  - `user_id` 追加後は各テーブルの `(user_id, ...)` 複合インデックス
+- `body_logs.measured_at` の UNIQUE を `(user_id, measured_at)` の複合ユニークへ張り替え
+  （現状のままだと、ユーザーをまたいで同じ測定日が衝突する）
+
+前提となる移行機構は導入済み。
+
+- モバイル: `apps/mobile/src/db/migrations.ts`（`PRAGMA user_version` 管理）
+- D1: `apps/api/migrations/`（`wrangler d1 migrations apply` で適用）
+
+`PRAGMA foreign_keys = ON` は接続時に有効化済み。制約を定義すれば即座に効く。
+
+## 未使用の実装（Step 4 で扱いを決める）
+
+- `timer_events` — 書き込み専用で読み出す実装が無い。分析 API も参照しない。
+  バックアップ対象のため行数だけ増える。用途を決めるか、同期対象から外す
+- `workout_sets.is_warmup` — 集計で区別しておらず、ウォームアップもボリュームに算入される
+- `workout_sets.rpe`、`body_logs.estimated_calories_burned` — 列だけあって未使用
+
 ## Step 4: 認証・マルチユーザー
 
 現行 API は「単一 Bearer トークン」「`/backup` で全テーブルを DELETE → INSERT 全置換」で動いており、

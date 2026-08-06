@@ -55,7 +55,7 @@ D1 データベースを作成し、`apps/api/wrangler.jsonc` の `database_id` 
 ```bash
 cd apps/api
 npx wrangler d1 create workout-habit-db
-npx wrangler d1 execute workout-habit-db --remote --file=./schema.sql
+npx wrangler d1 migrations apply workout-habit-db --remote
 npx wrangler secret put API_TOKEN     # モバイル / 管理画面から使う任意のトークン
 npm run deploy                        # apps/web をビルドしてから Worker をデプロイ
 ```

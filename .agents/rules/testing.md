@@ -46,7 +46,7 @@ cd apps/api && npx wrangler deploy --dry-run
 スキーマ・同期対象・API レスポンス形状の変更は3アプリに波及する。
 以下を同じ変更セットで直し、3つとも検証する。
 
-- `apps/mobile/src/db/schema.ts` ⇔ `apps/api/schema.sql`
+- `apps/mobile/src/db/schema.ts` と `migrations.ts` ⇔ `apps/api/migrations/`
 - `apps/mobile/src/db/sync.ts` の `SYNC_TABLES` ⇔ `apps/api/src/tables.ts` の `SYNC_TABLES`
 - `apps/api/src/analytics.ts` のレスポンス ⇔ `apps/web/src/types/api.ts`
 

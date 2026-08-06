@@ -37,7 +37,7 @@ src/
   index.ts      Hono アプリ本体・認証ミドルウェア・/health・/backup
   analytics.ts  /analytics/* の集計エンドポイント
   tables.ts     同期対象テーブルとカラム定義（apps/mobile/src/db/sync.ts と対になる）
-schema.sql      D1 のテーブル定義（apps/mobile/src/db/schema.ts と対になる）
+migrations/     D1 のマイグレーション。0001 が初期スキーマ
 wrangler.jsonc  Worker 設定（D1 binding・静的アセット）
 worker-configuration.d.ts  wrangler types の生成型
 ```

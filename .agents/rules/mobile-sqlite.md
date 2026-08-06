@@ -28,15 +28,19 @@ paths: "apps/mobile/src/db/**/*.ts"
 - N+1 を避ける。関連データは JOIN か `IN (...)` でまとめて取得する
 
 ## マイグレーション
-現状は冪等 DDL のみで、バージョン管理された移行機構を持たない。
+`db/migrations.ts` の `MIGRATIONS` と `PRAGMA user_version` で管理する。
+起動時に `runMigrations(database)` が未適用分を version 昇順で当てる。
 
-- 新規テーブル・新規カラムの追加は、`SCHEMA_SQL` への追記に加えて
-  **既存端末に対する `ALTER TABLE` の適用経路**を用意する。`CREATE TABLE IF NOT EXISTS` の追記だけでは
-  既にテーブルが存在する端末へカラムが増えない
-- 破壊的変更（カラム削除・型変更）は追加 → 切替 → 削除の段階適用にする
+- 変更は `MIGRATIONS` の末尾へ version を1つ進めたエントリを足す。**既存エントリを書き換えない**
+  （適用済み端末には二度と実行されないため）
+- `statements` には `ALTER TABLE` / `CREATE INDEX` など「既存DBへ差分を当てる」SQL を書く
+- 新規インストールにも同じ結果になるよう、テーブル定義の変更は `schema.ts` にも反映する
+- 破壊的変更（カラム削除・型変更・制約追加）は、SQLite に `ALTER TABLE ADD CONSTRAINT` が無いため
+  「新テーブル作成 → 複製 → 削除 → リネーム」の再構築になる。段階適用にし、複数の変更を1回にまとめる
 - **既存データを壊さないこと**（このアプリのデータはユーザーのトレーニング記録＝代替不能）
-- スキーマを変えたら `apps/api/schema.sql` と `apps/api/src/tables.ts`、`db/sync.ts` の
+- スキーマを変えたら `apps/api/migrations/` と `apps/api/src/tables.ts`、`db/sync.ts` の
   `SYNC_TABLES` も同じ変更セットで直す
+- `PRAGMA foreign_keys = ON` は接続時に有効化している。外部キーを定義すれば即座に効く
 
 ## シードの冪等化
 - マスタ（部位・種目）の初期投入は `db/seed.ts` に置き、

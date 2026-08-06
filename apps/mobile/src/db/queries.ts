@@ -48,6 +48,19 @@ export type WorkoutData = {
   syncSettings: SyncSettings;
 };
 
+// 取得カラム。types/db.ts の行型と1対1で対応させる。
+// SELECT * を使うと、テーブルへ列を足したときに行型と静かにずれる。
+const BODY_PART_COLUMNS = 'id, name, order_index';
+const EXERCISE_COLUMNS =
+  'id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived';
+const WORKOUT_COLUMNS = 'id, performed_at, status, memo, last_saved_at, created_at';
+const WORKOUT_EXERCISE_COLUMNS =
+  'id, workout_id, exercise_id, order_index, rest_seconds_override, memo';
+const WORKOUT_SET_COLUMNS =
+  'id, workout_exercise_id, order_index, weight_kg, reps, rpe, is_warmup, is_completed, memo, rest_seconds, deleted_at';
+const TEMPLATE_COLUMNS = 'id, name, created_at';
+const TEMPLATE_EXERCISE_COLUMNS = 'id, template_id, exercise_id, order_index';
+
 // app_settings のキー。タイマー設定の値は '0' / '1' の文字列で持つ。
 const TIMER_SOUND_KEY = 'timer_sound_enabled';
 const TIMER_VIBRATION_KEY = 'timer_vibration_enabled';
@@ -74,8 +87,7 @@ const toSyncSettings = (rows: AppSettingRow[]): SyncSettings => {
 };
 
 // すべてのテーブルを読み込みドメイン型へ変換して返す。
-// NOTE: SELECT * は行型と一致している前提。data-persistence.md の方針では
-// 明示カラム指定が望ましく、将来的に列挙へ置き換える余地がある。
+// カラムは types/db.ts の行型と対応させて明示する（SELECT * を使わない）。
 export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<WorkoutData> => {
   const [
     bodyPartRows,
@@ -88,18 +100,26 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
     appSettingRows,
     bodyLogRows,
   ] = await Promise.all([
-    database.getAllAsync<BodyPartRow>('SELECT * FROM body_parts ORDER BY order_index'),
+    database.getAllAsync<BodyPartRow>(
+      `SELECT ${BODY_PART_COLUMNS} FROM body_parts ORDER BY order_index`,
+    ),
     database.getAllAsync<ExerciseRow>(
-      'SELECT * FROM exercises WHERE is_archived = 0 ORDER BY name',
+      `SELECT ${EXERCISE_COLUMNS} FROM exercises WHERE is_archived = 0 ORDER BY name`,
     ),
-    database.getAllAsync<WorkoutRow>('SELECT * FROM workouts ORDER BY created_at DESC'),
+    database.getAllAsync<WorkoutRow>(
+      `SELECT ${WORKOUT_COLUMNS} FROM workouts ORDER BY created_at DESC`,
+    ),
     database.getAllAsync<WorkoutExerciseRow>(
-      'SELECT * FROM workout_exercises ORDER BY order_index',
+      `SELECT ${WORKOUT_EXERCISE_COLUMNS} FROM workout_exercises ORDER BY order_index`,
     ),
-    database.getAllAsync<WorkoutSetRow>('SELECT * FROM workout_sets ORDER BY order_index'),
-    database.getAllAsync<TemplateRow>('SELECT * FROM templates ORDER BY created_at DESC'),
+    database.getAllAsync<WorkoutSetRow>(
+      `SELECT ${WORKOUT_SET_COLUMNS} FROM workout_sets ORDER BY order_index`,
+    ),
+    database.getAllAsync<TemplateRow>(
+      `SELECT ${TEMPLATE_COLUMNS} FROM templates ORDER BY created_at DESC`,
+    ),
     database.getAllAsync<TemplateExerciseRow>(
-      'SELECT * FROM template_exercises ORDER BY order_index',
+      `SELECT ${TEMPLATE_EXERCISE_COLUMNS} FROM template_exercises ORDER BY order_index`,
     ),
     database.getAllAsync<AppSettingRow>('SELECT key, value FROM app_settings'),
     database.getAllAsync<BodyLogRow>(
@@ -270,7 +290,7 @@ export const touchWorkout = async (
 
 export const findActiveWorkoutRow = (database: SQLite.SQLiteDatabase): Promise<WorkoutRow | null> =>
   database.getFirstAsync<WorkoutRow>(
-    "SELECT * FROM workouts WHERE status = 'active' ORDER BY created_at DESC LIMIT 1",
+    `SELECT ${WORKOUT_COLUMNS} FROM workouts WHERE status = 'active' ORDER BY created_at DESC LIMIT 1`,
   );
 
 export const insertWorkout = async (

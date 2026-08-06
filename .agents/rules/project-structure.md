@@ -58,7 +58,7 @@ src/
   index.ts      Hono アプリ本体・認証ミドルウェア・/health・/backup
   analytics.ts  /analytics/* の集計エンドポイント
   tables.ts     同期対象テーブルとカラム定義
-schema.sql      D1 のテーブル定義
+migrations/     D1 のマイグレーション（wrangler d1 migrations apply で適用）
 wrangler.jsonc  Worker 設定（D1 binding・静的アセット）
 ```
 

@@ -3,7 +3,7 @@ import * as SQLite from 'expo-sqlite';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
-import { SCHEMA_SQL } from '../db/schema';
+import { runMigrations } from '../db/migrations';
 import { seedMasters } from '../db/seed';
 import {
   deleteTemplateDeep,
@@ -181,7 +181,9 @@ export function useWorkoutData() {
       try {
         await setAudioModeAsync({ playsInSilentMode: true });
         const database = await SQLite.openDatabaseAsync('workout-habit.db');
-        await database.execAsync(SCHEMA_SQL);
+        // 参照整合性を効かせるため、接続ごとに有効化する（既定は OFF）。
+        await database.execAsync('PRAGMA foreign_keys = ON');
+        await runMigrations(database);
         await seedMasters(database);
 
         if (mounted) {

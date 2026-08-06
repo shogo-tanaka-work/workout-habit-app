@@ -6,9 +6,6 @@ paths: "**/*.ts,**/*.tsx"
 設計上の悪手を集約したルール。新規実装・リファクタ時に必ず参照する。
 **OK例 / NG例** を併記しているので、判断に迷ったら照合する。
 
-> 本アプリの `App.tsx`（約1,900行）は、ここで挙げる「神ファイル」「責務混在」の典型的な反例。
-> 分割の到達点は [project-structure.md](project-structure.md) を参照。
-
 ## 1. 神ファイル・神関数を作らない
 
 | ルール | 閾値 |
@@ -18,8 +15,8 @@ paths: "**/*.ts,**/*.tsx"
 | 1コンポーネント | 描画 / 状態 / 副作用 / スタイル定義 が同居したら分離 |
 | 1関数・1コンポーネントの責務 | 「データ取得」「整形」「描画」を混在させない |
 
-`App.tsx` のように型・DB・状態・CRUD・UI・StyleSheet を全部入れるのは禁止。
-責務ごとに `types/` `db/` `hooks/` `utils/` `components/` `screens/` `styles/` へ分ける。
+型・DB・状態・CRUD・UI・StyleSheet を1ファイルへ全部入れるのは禁止。
+責務ごとのディレクトリへ分ける（[project-structure.md](project-structure.md)）。
 
 ## 2. 判定関数・述語の重複を作らない（DRY）
 
@@ -106,7 +103,7 @@ const workout = workouts.find((candidate) => candidate.id === id);
 
 ## 7. エラーは必ず文脈を付けて投げる
 
-SQLite 等の外部エラーをそのまま再throwすると、どの操作が失敗したか上位で分からない。
+SQLite や D1 のエラーをそのまま再throwすると、どの操作が失敗したか上位で分からない。
 
 ### NG
 ```ts
@@ -152,11 +149,18 @@ try {
 ```ts
 // NG
 const avgVolume = setCount > 0 ? totalVolume / setCount : 0;
-// OK（utils/math.ts）
+// OK（utils/number.ts）
 export const safeDivide = (numerator: number, denominator: number, fallback = 0): number =>
   denominator > 0 ? numerator / denominator : fallback;
 const avgVolume = safeDivide(totalVolume, setCount);
 ```
+
+## 10. アプリ間の重複は許容し、境界は越えない
+
+`apps/mobile/src/db/sync.ts` と `apps/api/src/tables.ts` のように、
+同期対象テーブル定義がモバイルと API に重複する。これは**意図的に許容**する（共有パッケージを作らない）。
+
+ただし片方だけ変えないこと。同期対象・カラム・レスポンス形状を変えたら、対になるファイルも同じ変更セットで直す。
 
 ---
 
@@ -169,3 +173,4 @@ const avgVolume = safeDivide(totalVolume, setCount);
 - [ ] 1文字省略変数を使っていないか（慣用例外を除く）
 - [ ] `as` と `!` を同じ式で併用していないか
 - [ ] 外部エラーを文脈なしで再throw、または無言で握りつぶしていないか
+- [ ] アプリ間で対になる定義を片方だけ変えていないか

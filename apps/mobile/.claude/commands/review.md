@@ -1,5 +1,5 @@
 ---
-description: 現在の変更を .claude/rules に照らしてレビューする
+description: 現在の変更をリポジトリルートの .agents/rules に照らしてレビューする
 ---
 
 ## 変更ファイル一覧
@@ -12,7 +12,7 @@ description: 現在の変更を .claude/rules に照らしてレビューする
 
 ## レビュー観点
 
-上記の変更を `.claude/rules/` の規約に照らしてレビューしてください。観点:
+上記の変更を `.agents/rules/` の規約に照らしてレビューしてください。観点:
 
 ### 1. 構造・設計（`code-design.md` / `project-structure.md`）
 - 神ファイル/神関数の再発（1ファイル300行・1関数50行超、コンポーネントへの責務同居）
@@ -24,12 +24,12 @@ description: 現在の変更を .claude/rules に照らしてレビューする
 - DB行型とドメイン型の混同（変換関数を通しているか）
 - 1〜2文字の省略変数名
 
-### 3. React Native（`react-native.md`）
+### 3. React Native（`mobile-react-native.md`）
 - `useEffect` のクリーンアップ漏れ（タイマー・audio・購読）
 - 依存配列の漏れ、リスト key への index 使用
 - インライン style でのレイアウト定義
 
-### 4. expo-sqlite（`data-persistence.md`）
+### 4. expo-sqlite（`mobile-sqlite.md`）
 - パラメータの `?` バインド、`SELECT *` の濫用
 - DB エラーの握りつぶし・文脈なし再throw
 - シードの冪等性

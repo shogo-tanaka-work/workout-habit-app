@@ -3,7 +3,7 @@ description: App.tsx から指定した画面/責務を目標構成へ安全に�
 argument-hint: "[抽出対象。例: HistoryScreen / useTimer / styles]"
 ---
 
-App.tsx から **$ARGUMENTS** を `.claude/rules/project-structure.md` の目標構成へ抽出します。
+App.tsx から **$ARGUMENTS** を `.agents/rules/project-structure.md` の目標構成へ抽出します。
 
 ## 抽出対象の現状
 
@@ -18,7 +18,7 @@ App.tsx から **$ARGUMENTS** を `.claude/rules/project-structure.md` の目標
 2. **下位を先に移設**: 対象が使う型 → `src/types/`、純粋関数 → `src/utils/`、StyleSheet → `src/styles/`、
    SQL/変換 → `src/db/` の順で、まだ移っていないものを移す。
 3. **本体を移設**: 対象（コンポーネント or フック）を `src/screens/` or `src/hooks/` or `src/components/` に新規ファイルとして作る。
-   - コンポーネントは props 型を同ファイルに `interface` 定義（`react-native.md`）
+   - コンポーネントは props 型を同ファイルに `interface` 定義（`mobile-react-native.md`）
    - フックは state・副作用・公開API を明示
 4. **import を整理**: `App.tsx` 側は抽出先から import する。バレルエクスポートは作らない（直接 import）。
 5. **検証**: `npm run typecheck` を実行し緑を確認。続いて `npm run lint`。

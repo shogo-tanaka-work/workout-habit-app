@@ -22,7 +22,8 @@
 | UI | React 19 / TypeScript（strict） | |
 | グラフ | 自作 SVG コンポーネント | 外部チャートライブラリは未導入（モバイルの TrendChart と同方針） |
 | データ取得 | `GET /analytics/*`（apps/api） | Bearer トークンは localStorage に保存（Step 4 で Cloudflare Access へ移行予定） |
-| 配信 | apps/api Worker の static assets | 同一オリジンのため CORS 不要 |
+| 配信 | `workout-habit-admin` Worker（静的アセットのみ） | Step 4 で Cloudflare Access をホストまるごとに適用する |
+| API 接続先 | ビルド時の `VITE_API_ORIGIN` | **別オリジン**。API 側の CORS 許可が必要 |
 
 外部ライブラリの新規導入は方針判断が必要なため、勝手に追加しない。
 
@@ -38,18 +39,24 @@ src/
   api.ts        apiGet とトークン・設定の localStorage 管理
   App.tsx       トークン設定 → ApiContext 提供 → セクション描画の薄いシェル
   styles.css    CSS カスタムプロパティとクラス定義
+  vite-env.d.ts import.meta.env の型定義
+wrangler.jsonc  workout-habit-admin Worker の設定（静的アセットのみ）
+env.example     VITE_API_ORIGIN のテンプレート
 ```
 
 ## 開発コマンド
 
 ```bash
-npm run dev        # vite dev（API パスを VITE_API_ORIGIN へプロキシ）
+npm run dev        # vite dev
 npm run typecheck  # tsc --noEmit
 npm run build      # typecheck + vite build → dist/
+npm run deploy     # build → wrangler deploy（workout-habit-admin）
 ```
 
-`npm run dev` で分析データを表示するには、`env.example` を `.env.local` へコピーして
-`VITE_API_ORIGIN` にデプロイ済み Worker のオリジンを設定する。未設定ならプロキシは無効になり、
-起動時に警告が出る。`.env.local` はコミットしない。
+`env.example` を `.env.local` へコピーし、`VITE_API_ORIGIN` に API Worker のオリジンを設定する。
+**開発でも本番ビルドでも同じ値が使われる**（プロキシは使わず、常に絶対 URL + CORS を通る）。
+未設定のままビルドすると、画面が設定漏れのメッセージを表示する。`.env.local` はコミットしない。
 
-デプロイは apps/api 側の `npm run deploy`（web のビルド → wrangler deploy）で行う。
+**API トークンを `.env.local` や `env.example` へ書かない。** Vite は `VITE_` で始まる変数を
+ビルド成果物へ埋め込むため、書けば配信される JS から読めてしまう。
+ブラウザ用トークンは画面の入力欄から設定し、localStorage に保持する。

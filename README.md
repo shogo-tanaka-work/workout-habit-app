@@ -9,10 +9,16 @@
 | ディレクトリ | 役割 | 技術 |
 |---|---|---|
 | `apps/mobile/` | 記録の入力。オフライン優先で、端末内 SQLite が正データ | Expo SDK 56 / React Native 0.85 / React 19 |
-| `apps/api/` | D1 の所有者・認証境界・集計ロジックの正本・管理画面の配信元 | Hono / Cloudflare Workers / D1 |
+| `apps/api/` | D1 の所有者・認証境界・集計ロジックの正本 | Hono / Cloudflare Workers / D1 |
 | `apps/web/` | 読み取り専用の分析ダッシュボード | Vite / React 19 |
 
-`apps/web` は独立してデプロイせず、`apps/api` の Worker から静的アセットとして同一オリジン配信します。
+Cloudflare Worker は役割ごとに2つに分かれています。
+
+- `workout-habit-api` — API 専用（`apps/api`）。静的アセットを持ちません
+- `workout-habit-admin` — 管理画面専用（`apps/web`）。Worker スクリプトを持たない静的配信のみ
+
+別オリジンになるため、API 側で CORS の許可オリジンを設定します。
+分離しているのは、管理画面のホストへ Cloudflare Access をまるごと適用できるようにするためです。
 
 ## 主な機能
 
@@ -48,7 +54,7 @@ npm --prefix apps/mobile run ios     # 実機 / シミュレータで起動
 npm --prefix apps/mobile run start   # Metro のみ起動
 ```
 
-### API（Cloudflare Workers）
+### API Worker（workout-habit-api）
 
 D1 データベースを作成し、`apps/api/wrangler.jsonc` の `database_id` を自分のものに差し替えます。
 
@@ -56,18 +62,27 @@ D1 データベースを作成し、`apps/api/wrangler.jsonc` の `database_id` 
 cd apps/api
 npx wrangler d1 create workout-habit-db
 npx wrangler d1 migrations apply workout-habit-db --remote
-npx wrangler secret put API_TOKEN     # モバイル / 管理画面から使う任意のトークン
-npm run deploy                        # apps/web をビルドしてから Worker をデプロイ
+npx wrangler secret put API_TOKEN        # モバイル / 管理画面から使う任意のトークン
+npx wrangler secret put ALLOWED_ORIGINS  # 管理画面のオリジン（カンマ区切りで複数可）
+npm run deploy
 ```
 
-### 管理画面（ローカル開発）
+`ALLOWED_ORIGINS` が未設定だと CORS ヘッダを返さないため、管理画面からの取得はブラウザ側で失敗します。
 
-`apps/web/env.example` を `.env.local` へコピーし、デプロイ済み Worker のオリジンを設定します。
+### 管理画面 Worker（workout-habit-admin）
+
+`env.example` を `.env.local` へコピーし、API Worker のオリジンを設定します。
+この値はビルド時に埋め込まれるため、**デプロイ前に設定が必要**です。
 
 ```bash
 cp apps/web/env.example apps/web/.env.local
-npm --prefix apps/web run dev
+# .env.local の VITE_API_ORIGIN を編集
+npm --prefix apps/web run dev      # ローカル開発
+npm --prefix apps/web run deploy   # ビルド → デプロイ
 ```
+
+API トークンをこのファイルへ書かないでください。Vite は `VITE_` で始まる変数を
+ビルド成果物へ埋め込むため、配信される JS から読めてしまいます。
 
 ## 開発
 

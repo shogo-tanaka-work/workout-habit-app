@@ -2,6 +2,9 @@
 
 Step 4 で実装する。現時点では **未実装**であり、以下はゴール像と論点の記録。
 
+設計の詳細（認証・認可・スコープの分離、`users` テーブル、登録ポリシー、
+守れること・守れないこと）は `docs/10_プロダクト設計/認証認可の設計.md` にある。実装前に読む。
+
 ## 現状（実装済み）
 
 - `apps/api/src/index.ts` の唯一のミドルウェアが、`/health` 以外の全リクエストに対して
@@ -20,11 +23,16 @@ Step 4 で実装する。現時点では **未実装**であり、以下はゴ�
   -> email からユーザーとロールを解決
 
 モバイルアプリ
-  -> expo-auth-session で Google ログイン
+  -> @react-native-google-signin/google-signin で Google ログイン
   -> Google ID トークンを取得（expo-secure-store へ保存）
   -> Worker が Google の JWKS で署名・aud・iss を検証
   -> sub / email からユーザーとロールを解決
 ```
+
+モバイル側は当初 `expo-auth-session` を想定していたが、SDK 53 以降の iOS で
+リダイレクトから戻れない不具合が報告されており、ネイティブ向けの現行推奨は
+`@react-native-google-signin/google-signin`。development build 運用のため導入自体は可能だが、
+外部ライブラリの新規導入にあたるため `apps/mobile/AGENTS.md` の方針に従って正式に判断する。
 
 Cloudflare Access はクッキーとブラウザリダイレクトを前提とするため、ネイティブアプリには使えない。
 そのため二経路にする。どちらの経路でも、認証後に得るのは同じ「ユーザー ID + ロール」であり、

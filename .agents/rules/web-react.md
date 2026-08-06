@@ -15,7 +15,7 @@ paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts"
 
 ## データ取得
 - 取得は `api.ts` の `apiGet` と `hooks/useApiData` を通す。`sections/` から直接 `fetch` しない
-- API は同一オリジン（Worker の静的アセットとして配信）。絶対 URL を書かない
+- API は別オリジン。接続先は `import.meta.env.VITE_API_ORIGIN` から取り、URL を直書きしない
 - レスポンス型は `types/api.ts` に定義し、`apps/api` の返す JSON と対応させる。
   API 側のレスポンス形状を変えたらこのファイルも同じ変更セットで直す
 - 読み込み中・エラー・空データの3状態を必ず扱う。`components/Loadable.tsx` を使う

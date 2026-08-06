@@ -1,17 +1,29 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 import { analytics } from './analytics';
 import type { BackupPayload } from './tables';
 import { SYNC_TABLES } from './tables';
 
 // workout-habit のクラウドバックアップ API（個人利用・単一ユーザー）。
+// この Worker は API 専用で、静的アセットを持たない。
+// 管理画面は別オリジン（workout-habit-admin Worker）が配信するため CORS が要る。
 // 認証は Bearer トークン（API_TOKEN シークレット）1本で行う。
 // - GET  /health  … 死活確認（認証不要）
 // - GET  /backup  … D1 に保存された全テーブルを返す（復元用）
 // - POST /backup  … 送られた全テーブルで D1 を置き換える（バックアップ）
 // - GET  /analytics/* … 読み取り専用の分析API（src/analytics.ts）
 
-type Bindings = Env & { API_TOKEN: string };
+// ALLOWED_ORIGINS は管理画面のオリジンをカンマ区切りで持つシークレット。
+// 値自体は秘密ではないが、workers.dev のサブドメインをリポジトリへ書かないため
+// vars ではなく Secret に置く。未設定なら CORS ヘッダを出さず、ブラウザ側で弾かれる。
+type Bindings = Env & { API_TOKEN: string; ALLOWED_ORIGINS?: string };
+
+const parseAllowedOrigins = (value: string | undefined): string[] =>
+  (value ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 
 // D1 の 1 クエリあたりのバインド変数上限（100）を超えないための行チャンクサイズ算出。
 const MAX_BOUND_PARAMS = 90;
@@ -20,7 +32,24 @@ const MAX_STATEMENTS_PER_BATCH = 80;
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+// CORS は認証より先に置く。プリフライト（OPTIONS）は Authorization を持たないため、
+// 認証ミドルウェアより後ろに置くと 401 になってブラウザ側で失敗する。
+app.use('*', (context, next) =>
+  cors({
+    origin: (requestOrigin) => {
+      const allowed = parseAllowedOrigins(context.env.ALLOWED_ORIGINS);
+      return allowed.includes(requestOrigin) ? requestOrigin : undefined;
+    },
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Authorization', 'Content-Type'],
+    maxAge: 86400,
+  })(context, next),
+);
+
 app.use('*', async (context, next) => {
+  if (context.req.method === 'OPTIONS') {
+    return next();
+  }
   if (context.req.path === '/health') {
     return next();
   }

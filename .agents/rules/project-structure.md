@@ -59,7 +59,7 @@ src/
   analytics.ts  /analytics/* の集計エンドポイント
   tables.ts     同期対象テーブルとカラム定義
 migrations/     D1 のマイグレーション（wrangler d1 migrations apply で適用）
-wrangler.jsonc  Worker 設定（D1 binding・静的アセット）
+wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。静的アセットは持たない
 ```
 
 現状は3ファイルだが、`index.ts` が 300 行を超えたら次の層へ分割する。
@@ -83,6 +83,8 @@ src/
   api.ts        apiGet とトークン・設定の localStorage 管理
   App.tsx       トークン設定 → ApiContext 提供 → セクション描画の薄いシェル
   styles.css    CSS カスタムプロパティとクラス定義
+wrangler.jsonc  workout-habit-admin Worker の設定（静的アセットのみ）
+env.example     VITE_API_ORIGIN のテンプレート。.env.local へコピーして使う
 ```
 
 `sections/` に集計ロジックを書かない。集計は API 側に一元化する。

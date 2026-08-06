@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { clearToken, loadToken, saveToken } from './api';
+import { clearToken, hasApiOrigin, loadToken, saveToken } from './api';
 import { ApiContext } from './hooks/useApiData';
 import { BodyLogSection } from './sections/BodyLogSection';
 import { BodyPartSection } from './sections/BodyPartSection';
@@ -40,6 +40,25 @@ const App = () => {
     setToken('');
     setAuthMessage(null);
   };
+
+  // ビルド時に API の接続先が入っていないと、何を設定しても失敗する。先に知らせる。
+  if (!hasApiOrigin()) {
+    return (
+      <main className="app">
+        <header className="app-header">
+          <h1 className="app-title">WORKOUT HABIT</h1>
+        </header>
+        <div className="setup">
+          <p className="error-text">API の接続先が設定されていません。</p>
+          <p className="setup-text">
+            ビルド時に <code>VITE_API_ORIGIN</code> が必要です。
+            <code>apps/web/env.example</code> を <code>.env.local</code> へコピーして
+            API Worker のオリジンを設定し、ビルドし直してください。
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (!token) {
     return (

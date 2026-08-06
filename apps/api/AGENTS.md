@@ -1,12 +1,14 @@
 # workout-habit api — 開発ガイド
 
-Cloudflare Workers 上の Hono API。**D1 の所有者・認証境界・管理画面の配信元**を兼ねる。
+Cloudflare Workers 上の Hono API。**D1 の所有者であり、認証境界**。
 
-役割は3つ。
+役割は2つ。
 
 1. モバイルアプリのクラウドバックアップ（`/backup` の GET / POST）
 2. 読み取り専用の分析 API（`/analytics/*`）— 集計ロジックの正本
-3. `apps/web` のビルド成果物を静的アセットとして同一オリジン配信
+
+**静的アセットは持たない。** 管理画面は別 Worker（`workout-habit-admin` / `apps/web`）が
+配信するため、この Worker は純粋な API として動く。別オリジンになるので CORS を設定している。
 
 ## 開発ルール
 
@@ -27,7 +29,7 @@ Cloudflare Workers 上の Hono API。**D1 の所有者・認証境界・管理�
 | ランタイム | Cloudflare Workers | `compatibility_date: 2026-06-01`、Observability 有効 |
 | フレームワーク | Hono 4 | |
 | DB | Cloudflare D1（binding: `DB`） | データベース名 `workout-habit-db` |
-| 静的配信 | Workers Static Assets | `../web/dist` を SPA モードで配信 |
+| CORS | hono/cors | 許可オリジンは `ALLOWED_ORIGINS` シークレット |
 | 認証 | Bearer トークン（`API_TOKEN` シークレット）1本 | マルチユーザー化は Step 4 |
 
 ## ディレクトリ構成
@@ -38,7 +40,7 @@ src/
   analytics.ts  /analytics/* の集計エンドポイント
   tables.ts     同期対象テーブルとカラム定義（apps/mobile/src/db/sync.ts と対になる）
 migrations/     D1 のマイグレーション。0001 が初期スキーマ
-wrangler.jsonc  Worker 設定（D1 binding・静的アセット）
+wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
 ```
 
@@ -53,8 +55,7 @@ worker-configuration.d.ts  wrangler types の生成型
 | `POST /backup` | 必要 | 送られた全テーブルで D1 を置き換える（**破壊的**） |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/analytics.ts` |
 
-エンドポイントを追加したら `wrangler.jsonc` の `assets.run_worker_first` にパスを足す。
-**忘れると Worker を通らず `index.html` が返る。**
+静的アセットを持たないため、パスの振り分け設定は不要。追加したら認証要否を明示的に判断する。
 
 ## 開発コマンド
 
@@ -62,7 +63,7 @@ worker-configuration.d.ts  wrangler types の生成型
 npm run dev        # wrangler dev（ローカル Worker）
 npm run typecheck  # tsc --noEmit
 npm run types      # wrangler types（Binding 変更後）
-npm run deploy     # apps/web のビルド → wrangler deploy
+npm run deploy     # wrangler deploy（apps/web は別デプロイ）
 npx wrangler deploy --dry-run   # 設定変更後の検証
 ```
 

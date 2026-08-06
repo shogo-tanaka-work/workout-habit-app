@@ -9,6 +9,7 @@
 | 1 | `.agents` 整備 | `.agents/**`、各アプリの `AGENTS.md` を入口として整理 | 完了 |
 | 2 | デザイン刷新 | `DESIGN.md` 準拠への監査と修正（mobile / web） | 完了 |
 | 3 | GitHub 公開整備 | README / LICENSE / `docs/` 除外 / 公開前チェック | 完了（CI は見送り） |
+| 3.5 | API と管理画面の分離 | Worker を役割ごとに2つへ分割・CORS 導入 | 進行中 |
 | 4 | 認証・マルチユーザー | 要件定義 → データモデル移行 → Access + Google 実装 | 未着手 |
 
 上から1ステップずつ進める。前のステップが終わるまで次に手を出さない。
@@ -53,6 +54,19 @@ web は `box-shadow` が 0 件、`border-radius` が 3 箇所（すべて操作�
 - LICENSE を追加する
 - 公開前チェック: 秘密値、個人情報、他社アプリのスクリーンショットが tracked に混ざっていないか
 - CI（typecheck + build）は任意
+
+## Step 3.5: API と管理画面の分離
+
+単一 Worker が API と静的配信を兼ねていたため、次の問題があった。
+
+- Worker 名が `workout-habit-api` なのにルートを開くと管理画面が出る
+- API がルート直下（`/backup` 等）にあり、管理画面と名前空間を共有していた
+- ルートに Cloudflare Access を掛けるとモバイルの `/backup` も巻き込む
+
+役割ごとに Worker を分けて解決する。構成は `cloudflare.md`。
+
+データ層は Workers + D1 を継続する（検討の経緯と乗り換えの分岐点は
+`docs/10_プロダクト設計/データ層の技術選定.md`）。
 
 ## 残タスク: インデックスと外部キー（Step 4 のテーブル再構築とまとめて行う）
 

@@ -9,8 +9,9 @@ paths: "apps/api/src/**/*.ts"
 - URL パラメータと JSON body を未検証のまま処理へ渡さない
 - 検証は route 層で行い、その先は検証済みの型付き入力だけを受け取る
 - Hono のサブ Router をドメイン単位で構成する（`/analytics` は `src/analytics.ts`）
-- CORS は設定しない。web は Worker の静的アセットとして同一オリジンで配信される。
-  CORS が必要になった時点で、なぜ同一オリジンで足りないのかを先に検討する
+- CORS の許可オリジンは `ALLOWED_ORIGINS` シークレットから読む。ワイルドカードを使わない
+- CORS ミドルウェアは**認証より前**に置く。プリフライト（OPTIONS）は `Authorization` を
+  持たないため、認証を先に通すと 401 になってブラウザ側で失敗する
 
 ## 集計エンドポイント（/analytics/*）
 
@@ -32,7 +33,8 @@ paths: "apps/api/src/**/*.ts"
 ## エンドポイント追加時の手順
 
 1. `src/` に route を追加する
-2. `wrangler.jsonc` の `assets.run_worker_first` にパスを追加する。
-   **これを忘れると Worker を通らず静的アセットが返る**
-3. 認証が必要かを明示的に判断する（`/health` 以外は認証必須が既定）
-4. `apps/web` から使うなら `apps/web/src/types/api.ts` に型を追加する
+2. 認証が必要かを明示的に判断する（`/health` 以外は認証必須が既定）
+3. `apps/web` から使うなら `apps/web/src/types/api.ts` に型を追加する
+
+この Worker は静的アセットを持たないため、パスの振り分け設定は不要。
+管理画面は別 Worker（`workout-habit-admin`）が配信する。

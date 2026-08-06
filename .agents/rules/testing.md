@@ -39,7 +39,8 @@ cd apps/api && npx wrangler deploy --dry-run
 
 エンドポイントを追加・変更したら、ローカル Worker（`npm --prefix apps/api run dev`）へ
 実際にリクエストを投げてレスポンス形状を確認する。
-`assets.run_worker_first` への追加漏れは、404 ではなく HTML が返ることで表面化する。
+管理画面から使うエンドポイントは、`ALLOWED_ORIGINS` の許可漏れがないかも確認する
+（ブラウザのコンソールに CORS エラーが出る）。
 
 ## 変更が複数アプリにまたがる場合
 

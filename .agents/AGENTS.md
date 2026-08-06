@@ -21,7 +21,7 @@
 - モバイル: Expo SDK 56 / React Native 0.85 / React 19 / expo-sqlite
 - API: Hono on Cloudflare Workers
 - DB: Cloudflare D1（SQLite）
-- 管理画面: Vite + React 19（Workers Static Assets として同一オリジン配信）
+- 管理画面: Vite + React 19（workout-habit-admin Worker が静的配信。API とは別オリジン）
 - 言語: TypeScript（全アプリ `strict: true`）
 
 ## 構成の把握

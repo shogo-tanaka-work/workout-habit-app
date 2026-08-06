@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // 管理画面（分析ダッシュボード）専用の Worker。
+  // Worker スクリプトを持たず、vite のビルド成果物を配信するだけ。
+  // API は別オリジンの workout-habit-api が担当する。
+  //
+  // Step 4 では、この Worker のホストへ Cloudflare Access をまるごと適用して
+  // 許可メール以外を入口で止める。
+  "name": "workout-habit-admin",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "./dist",
+    // クライアントルーティングを持たない SPA だが、
+    // 未知のパスで 404 を出さないためフォールバックさせる。
+    "not_found_handling": "single-page-application"
+  }
+}

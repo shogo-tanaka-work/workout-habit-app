@@ -20,7 +20,7 @@ Cloudflare Workers 上の Hono API。**D1 の所有者であり、認証境界**
 - `.agents/rules/cloudflare-workers.md` — Bindings、静的アセットとの共存、デプロイ反映
 - `.agents/rules/auth.md`、`secrets.md` — 認証と秘密値
 - `.agents/memory/cloudflare.md` — リソース構成と、public リポジトリに書いてよい値
-- `.agents/memory/auth-model.md` — 認証のゴール像（現状は単一 Bearer トークン）
+- `.agents/memory/auth-model.md` — 3経路の認証・必要な Secret・実装状況
 
 ## 技術スタック
 
@@ -30,16 +30,22 @@ Cloudflare Workers 上の Hono API。**D1 の所有者であり、認証境界**
 | フレームワーク | Hono 4 | |
 | DB | Cloudflare D1（binding: `DB`） | データベース名 `workout-habit-db` |
 | CORS | hono/cors | 許可オリジンは `ALLOWED_ORIGINS` シークレット |
-| 認証 | Bearer トークン（`API_TOKEN` シークレット）1本 | マルチユーザー化は Step 4 |
+| 認証 | Access JWT / Google ID トークン / CLI トークンの3経路 | 検証は Web Crypto で自前実装（`src/auth/`） |
 
 ## ディレクトリ構成
 
 ```
 src/
-  index.ts      Hono アプリ本体・認証ミドルウェア・/health・/backup
+  index.ts      Hono アプリ本体（CORS・認証ミドルウェア・/health・route のマウント）
+  env.ts        Bindings と Hono の型引数
   analytics.ts  /analytics/* の集計エンドポイント
+  backup.ts     /backup の読み出しと置換（本人スコープ）
   tables.ts     同期対象テーブルとカラム定義（apps/mobile/src/db/sync.ts と対になる）
-migrations/     D1 のマイグレーション。0001 が初期スキーマ
+  auth/         認証と認可。types / jwt / access / google / apiToken / users
+  middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
+  db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
+  routes/       ドメイン単位の route（apiTokens）
+migrations/     D1 のマイグレーション。0001 が初期スキーマ、0002 がマルチユーザー化
 wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
 ```
@@ -51,9 +57,10 @@ worker-configuration.d.ts  wrangler types の生成型
 | パス | 認証 | 内容 |
 |---|---|---|
 | `GET /health` | 不要 | 死活確認 |
-| `GET /backup` | 必要 | D1 の全同期対象テーブルを返す（復元用） |
-| `POST /backup` | 必要 | 送られた全テーブルで D1 を置き換える（**破壊的**） |
+| `GET /backup` | 必要 | 本人の同期対象テーブルを返す（復元用） |
+| `POST /backup` | 必要 | 本人の行だけを置き換える（**破壊的**） |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/analytics.ts` |
+| `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
 
 静的アセットを持たないため、パスの振り分け設定は不要。追加したら認証要否を明示的に判断する。
 

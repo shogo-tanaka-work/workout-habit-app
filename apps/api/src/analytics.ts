@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 
+import type { AuthenticatedUser } from './auth/types';
+import { scopeForExercise, scopeForUser } from './db/scope';
+import type { AppEnv } from './env';
+
 // Phase 3 分析API。D1 のワークアウト記録を読み取り専用で集計する。
-// 認証は親アプリ（src/index.ts）の Bearer トークンミドルウェアが担う。
+// 認証は親アプリ（src/index.ts）のミドルウェアが担い、ここでは行スコープだけを適用する。
+// member は自分の記録のみ、admin は全件（src/db/scope.ts）。
 // 日付はモバイル側が端末ローカル日付（YYYY-MM-DD）で保存しているため、
 // 基準日をクライアントから `?today=YYYY-MM-DD` で渡せるようにする（省略時はUTC今日）。
 
@@ -81,7 +86,9 @@ const emptyPeriodSummary = (): PeriodSummary => ({
 const loadWorkoutAggregates = async (
   database: D1Database,
   since: string,
+  user: AuthenticatedUser,
 ): Promise<WorkoutAggregateRow[]> => {
+  const scope = scopeForUser(user, 'w.user_id');
   const result = await database
     .prepare(
       `SELECT w.performed_at AS date,
@@ -91,11 +98,11 @@ const loadWorkoutAggregates = async (
        FROM workouts w
        JOIN workout_exercises we ON we.workout_id = w.id
        JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
-       WHERE w.status = 'completed' AND w.performed_at >= ?
+       WHERE w.status = 'completed' AND w.performed_at >= ? AND ${scope.condition}
        GROUP BY w.id
        ORDER BY w.performed_at`,
     )
-    .bind(since)
+    .bind(since, ...scope.params)
     .all<WorkoutAggregateRow>();
   return result.results;
 };
@@ -118,14 +125,14 @@ const summarizeByPeriod = (
   return byPeriod;
 };
 
-export const analytics = new Hono<{ Bindings: Env }>();
+export const analytics = new Hono<AppEnv>();
 
 // 週次サマリ: 直近 N 週（月曜はじまり）の記録回数・セット数・ボリューム・レップ数。
 analytics.get('/weekly', async (context) => {
   const weeks = clampInt(context.req.query('weeks'), 12, 1, 53);
   const today = resolveToday(context.req.query('today'));
   const since = weekStartIso(daysAgoIso(today, (weeks - 1) * DAYS_PER_WEEK));
-  const rows = await loadWorkoutAggregates(context.env.DB, since);
+  const rows = await loadWorkoutAggregates(context.env.DB, since, context.get('user'));
   const byWeek = summarizeByPeriod(rows, weekStartIso);
   const series = [...byWeek.entries()]
     .map(([weekStart, summary]) => ({ weekStart, ...summary }))
@@ -138,7 +145,7 @@ analytics.get('/monthly', async (context) => {
   const months = clampInt(context.req.query('months'), 12, 1, 36);
   const today = resolveToday(context.req.query('today'));
   const since = firstDayOfMonthsAgo(today, months - 1);
-  const rows = await loadWorkoutAggregates(context.env.DB, since);
+  const rows = await loadWorkoutAggregates(context.env.DB, since, context.get('user'));
   const byMonth = summarizeByPeriod(rows, monthOf);
   const series = [...byMonth.entries()]
     .map(([month, summary]) => ({ month, ...summary }))
@@ -159,6 +166,7 @@ analytics.get('/body-parts', async (context) => {
     volume: number | null;
     reps: number | null;
   };
+  const scope = scopeForUser(context.get('user'), 'w.user_id');
   const result = await context.env.DB.prepare(
     `SELECT w.performed_at AS date,
             COALESCE(bp.id, 'unknown') AS body_part_id,
@@ -172,10 +180,11 @@ analytics.get('/body-parts', async (context) => {
      JOIN exercises e ON we.exercise_id = e.id
      LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
      WHERE w.status = 'completed' AND s.deleted_at IS NULL AND w.performed_at >= ?
+       AND ${scope.condition}
      GROUP BY w.performed_at, bp.id
      ORDER BY w.performed_at`,
   )
-    .bind(since)
+    .bind(since, ...scope.params)
     .all<BodyPartRow>();
 
   type BodyPartSummary = {
@@ -223,6 +232,7 @@ analytics.get('/daily', async (context) => {
     sets: number;
     volume: number | null;
   };
+  const scope = scopeForUser(context.get('user'), 'w.user_id');
   const result = await context.env.DB.prepare(
     `SELECT w.performed_at AS date,
             COUNT(DISTINCT w.id) AS workouts,
@@ -231,15 +241,19 @@ analytics.get('/daily', async (context) => {
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id
      JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
-     WHERE w.status = 'completed' AND w.performed_at >= ?
+     WHERE w.status = 'completed' AND w.performed_at >= ? AND ${scope.condition}
      GROUP BY w.performed_at
      ORDER BY w.performed_at`,
   )
-    .bind(since)
+    .bind(since, ...scope.params)
     .all<DailyRow>();
+  const totalScope = scopeForUser(context.get('user'), 'user_id');
   const total = await context.env.DB.prepare(
-    "SELECT COUNT(*) AS workouts FROM workouts WHERE status = 'completed'",
-  ).first<{ workouts: number }>();
+    `SELECT COUNT(*) AS workouts FROM workouts
+     WHERE status = 'completed' AND ${totalScope.condition}`,
+  )
+    .bind(...totalScope.params)
+    .first<{ workouts: number }>();
 
   return context.json({
     today,
@@ -261,11 +275,15 @@ analytics.get('/body-logs', async (context) => {
     body_weight_kg: number | null;
     body_fat_percentage: number | null;
   };
+  const scope = scopeForUser(context.get('user'), 'user_id');
   const result = await context.env.DB.prepare(
     `SELECT measured_at, body_weight_kg, body_fat_percentage
      FROM body_logs
+     WHERE ${scope.condition}
      ORDER BY measured_at`,
-  ).all<BodyLogRow>();
+  )
+    .bind(...scope.params)
+    .all<BodyLogRow>();
   return context.json({
     bodyLogs: result.results.map((row) => ({
       date: row.measured_at.slice(0, 10),
@@ -285,6 +303,9 @@ analytics.get('/exercises', async (context) => {
     last_performed_at: string | null;
     best_one_rep_max: number | null;
   };
+  const user = context.get('user');
+  const workoutScope = scopeForUser(user, 'w.user_id');
+  const exerciseScope = scopeForExercise(user, 'e.owner_user_id');
   const result = await context.env.DB.prepare(
     `SELECT e.id,
             e.name,
@@ -295,13 +316,16 @@ analytics.get('/exercises', async (context) => {
      FROM exercises e
      LEFT JOIN body_parts bp ON bp.id = e.primary_body_part_id
      LEFT JOIN workout_exercises we ON we.exercise_id = e.id
-     LEFT JOIN workouts w ON w.id = we.workout_id AND w.status = 'completed'
+     LEFT JOIN workouts w
+       ON w.id = we.workout_id AND w.status = 'completed' AND ${workoutScope.condition}
      LEFT JOIN workout_sets s
        ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND w.id IS NOT NULL
-     WHERE e.is_archived = 0
+     WHERE e.is_archived = 0 AND ${exerciseScope.condition}
      GROUP BY e.id
      ORDER BY session_count DESC, e.name`,
-  ).all<ExerciseListRow>();
+  )
+    .bind(...workoutScope.params, ...exerciseScope.params)
+    .all<ExerciseListRow>();
   return context.json({
     exercises: result.results.map((row) => ({
       id: row.id,
@@ -321,10 +345,12 @@ analytics.get('/exercises/:exerciseId', async (context) => {
   const today = resolveToday(context.req.query('today'));
   const since = firstDayOfMonthsAgo(today, months - 1);
 
+  const user = context.get('user');
+  const exerciseScope = scopeForExercise(user, 'owner_user_id');
   const exercise = await context.env.DB.prepare(
-    'SELECT id, name FROM exercises WHERE id = ?',
+    `SELECT id, name FROM exercises WHERE id = ? AND ${exerciseScope.condition}`,
   )
-    .bind(exerciseId)
+    .bind(exerciseId, ...exerciseScope.params)
     .first<{ id: string; name: string }>();
   if (!exercise) {
     return context.json({ error: 'exercise not found' }, 404);
@@ -339,6 +365,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
     top_weight: number | null;
     best_one_rep_max: number | null;
   };
+  const workoutScope = scopeForUser(user, 'w.user_id');
   const result = await context.env.DB.prepare(
     `SELECT w.performed_at AS date,
             COUNT(s.id) AS sets,
@@ -350,11 +377,11 @@ analytics.get('/exercises/:exerciseId', async (context) => {
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id AND we.exercise_id = ?
      JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
-     WHERE w.status = 'completed' AND w.performed_at >= ?
+     WHERE w.status = 'completed' AND w.performed_at >= ? AND ${workoutScope.condition}
      GROUP BY w.id
      ORDER BY w.performed_at`,
   )
-    .bind(exerciseId, since)
+    .bind(exerciseId, since, ...workoutScope.params)
     .all<SessionRow>();
 
   const sessions = result.results.map((row) => ({
@@ -382,17 +409,21 @@ analytics.get('/habit', async (context) => {
   const currentWeekStart = weekStartIso(today);
   const since = weekStartIso(daysAgoIso(today, (weeks - 1) * DAYS_PER_WEEK));
 
+  const scope = scopeForUser(context.get('user'), 'user_id');
   const result = await context.env.DB.prepare(
     `SELECT performed_at AS date, COUNT(*) AS workouts
      FROM workouts
-     WHERE status = 'completed' AND performed_at >= ?
+     WHERE status = 'completed' AND performed_at >= ? AND ${scope.condition}
      GROUP BY performed_at`,
   )
-    .bind(since)
+    .bind(since, ...scope.params)
     .all<{ date: string; workouts: number }>();
   const lastWorkout = await context.env.DB.prepare(
-    "SELECT MAX(performed_at) AS last_date FROM workouts WHERE status = 'completed'",
-  ).first<{ last_date: string | null }>();
+    `SELECT MAX(performed_at) AS last_date FROM workouts
+     WHERE status = 'completed' AND ${scope.condition}`,
+  )
+    .bind(...scope.params)
+    .first<{ last_date: string | null }>();
 
   const countByWeek = new Map<string, number>();
   for (const row of result.results) {

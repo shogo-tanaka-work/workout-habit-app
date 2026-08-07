@@ -307,7 +307,11 @@ export default function App() {
                   onExportCsv={() => void handleExportCsv()}
                   syncSettings={data.syncSettings}
                   pendingSyncCount={data.pendingSyncCount}
+                  account={data.account}
+                  isGoogleSignInAvailable={data.isGoogleSignInAvailable}
                   onSaveSyncConnection={data.updateSyncConnection}
+                  onSignIn={data.signInToGoogle}
+                  onSignOut={data.signOutOfGoogle}
                   onSyncNow={data.syncNow}
                   onRestore={data.restoreFromCloud}
                 />

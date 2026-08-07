@@ -25,6 +25,14 @@ import {
   upsertSyncConnection,
   upsertTimerSettings,
 } from '../db/queries';
+import type { GoogleAccount } from '../auth/googleAuth';
+import {
+  getIdToken,
+  isGoogleSignInConfigured,
+  restoreAccount,
+  signIn as signInWithGoogle,
+  signOut as signOutFromGoogle,
+} from '../auth/googleAuth';
 import { countPendingOperations } from '../db/outbox';
 import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
 import { pushPendingOperations } from '../sync/pusher';
@@ -68,9 +76,10 @@ export function useWorkoutData() {
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
     apiUrl: '',
-    apiToken: '',
     lastBackupAt: null,
   });
+  // ログイン中の Google アカウント。トークンは保持せず、必要になった時点で取り直す。
+  const [account, setAccount] = useState<GoogleAccount | null>(null);
   // 送信待ちの操作数。ヘッダの控えめな表示に使う（機内モードのような概念は見せない）。
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
@@ -186,8 +195,13 @@ export function useWorkoutData() {
         await runMigrations(database);
         await seedMasters(database);
 
+        // ログイン状態はネイティブ SDK が保持している。復元できなければ未ログインのまま進む
+        // （記録・閲覧・タイマーはログイン不要で動く）。
+        const restored = await restoreAccount();
+
         if (mounted) {
           setDb(database);
+          setAccount(restored);
           await reloadData(database);
           setIsReady(true);
         }
@@ -431,22 +445,37 @@ export function useWorkoutData() {
     setTimerSettings(settings);
   };
 
-  // クラウドバックアップの接続設定（URL・トークン）を保存する。
-  const updateSyncConnection = async (apiUrl: string, apiToken: string) => {
+  // サーバの接続先を保存する。認証情報は端末に置かない。
+  const updateSyncConnection = async (apiUrl: string) => {
     const database = ensureDb();
-    await upsertSyncConnection(database, { apiUrl: apiUrl.trim(), apiToken: apiToken.trim() });
-    setSyncSettings((previous) => ({
-      ...previous,
-      apiUrl: apiUrl.trim(),
-      apiToken: apiToken.trim(),
-    }));
+    await upsertSyncConnection(database, { apiUrl: apiUrl.trim() });
+    setSyncSettings((previous) => ({ ...previous, apiUrl: apiUrl.trim() }));
   };
 
   const ensureSyncConnection = (): SyncSettings => {
-    if (!syncSettings.apiUrl || !syncSettings.apiToken) {
-      throw new Error('API URLとトークンを設定してください');
+    if (!syncSettings.apiUrl) {
+      throw new Error('API URLを設定してください');
+    }
+    if (!account) {
+      throw new Error('Google アカウントでログインしてください');
     }
     return syncSettings;
+  };
+
+  // Google サインイン。成功したらアカウントを保持し、溜まった操作を送る。
+  const signInToGoogle = async (): Promise<void> => {
+    const signedIn = await signInWithGoogle();
+    if (!signedIn) {
+      return;
+    }
+    setAccount(signedIn);
+    // ログイン前に溜まっていた操作をここで送る（オンライン復帰と同じ扱い）。
+    void syncInBackground();
+  };
+
+  const signOutOfGoogle = async (): Promise<void> => {
+    await signOutFromGoogle();
+    setAccount(null);
   };
 
   // 送信待ちの操作をサーバへ送る。手動の「今すぐ同期」から呼ぶ。
@@ -455,7 +484,7 @@ export function useWorkoutData() {
     const connection = ensureSyncConnection();
     const result = await pushPendingOperations(database, {
       apiUrl: connection.apiUrl,
-      apiToken: connection.apiToken,
+      getIdToken,
     });
     setPendingSyncCount(result.pending);
     if (result.settled > 0) {
@@ -471,26 +500,26 @@ export function useWorkoutData() {
   // 自動送信。契機（種目の全セット完了・ワークアウト完了・バックグラウンド遷移）から呼ぶ。
   // 失敗しても画面は止めない。積まれたまま次の契機で再送する。
   const syncInBackground = useCallback(async () => {
-    if (!db || !syncSettings.apiUrl || !syncSettings.apiToken) {
+    if (!db || !syncSettings.apiUrl || !account) {
       return;
     }
     try {
       const result = await pushPendingOperations(db, {
         apiUrl: syncSettings.apiUrl,
-        apiToken: syncSettings.apiToken,
+        getIdToken,
       });
       setPendingSyncCount(result.pending);
     } catch (error: unknown) {
       console.warn('[sync] 自動送信に失敗', error instanceof Error ? error.message : String(error));
       setPendingSyncCount(await countPendingOperations(db));
     }
-  }, [db, syncSettings.apiUrl, syncSettings.apiToken]);
+  }, [db, syncSettings.apiUrl, account]);
 
   // クラウドのバックアップでローカルを置き換える（復元）。呼び出し側で確認ダイアログを出す。
   const restoreFromCloud = async () => {
     const database = ensureDb();
     const connection = ensureSyncConnection();
-    const payload = await fetchBackupFromCloud(connection.apiUrl, connection.apiToken);
+    const payload = await fetchBackupFromCloud(connection.apiUrl, await getIdToken());
     await applyBackupPayload(database, payload);
     await reloadData(database);
     setPendingSyncCount(0);
@@ -543,6 +572,10 @@ export function useWorkoutData() {
     saveBodyLog,
     syncSettings,
     pendingSyncCount,
+    account,
+    isGoogleSignInAvailable: isGoogleSignInConfigured(),
+    signInToGoogle,
+    signOutOfGoogle,
     updateSyncConnection,
     syncNow,
     syncInBackground,

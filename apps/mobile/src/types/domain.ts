@@ -72,9 +72,10 @@ export type TimerSettings = {
 };
 
 // クラウドバックアップの接続設定（app_settings に保存。端末ローカル・同期対象外）。
+// サーバとの接続設定。認証は Google サインイン（src/auth/googleAuth.ts）が担うため、
+// トークンは端末に保存しない。
 export type SyncSettings = {
   apiUrl: string;
-  apiToken: string;
   lastBackupAt: string | null;
 };
 

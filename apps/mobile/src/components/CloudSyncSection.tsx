@@ -1,31 +1,39 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
+import type { GoogleAccount } from '../auth/googleAuth';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import type { SyncSettings } from '../types/domain';
 import { formatDateTime } from '../utils/datetime';
 
-// サーバ（apps/api）との接続設定と、手動同期／取り込みの操作UI。
-// 種目タブに置く。設定は app_settings に保存され同期対象外。
+// サーバ（apps/api）との接続設定・ログイン・手動同期の操作UI。
+// 種目タブに置く。接続先は app_settings に保存され同期対象外。
 //
 // 記録は操作キューへ積まれ、種目の完了などの契機で自動送信される。
-// ここにあるのは「自動を待たずに送る」「サーバの内容で作り直す」の2つだけ。
+// ここにあるのは「ログイン」「自動を待たずに送る」「サーバの内容で作り直す」だけ。
 export function CloudSyncSection({
   syncSettings,
   pendingCount,
+  account,
+  isGoogleSignInAvailable,
   onSaveConnection,
+  onSignIn,
+  onSignOut,
   onSyncNow,
   onRestore,
 }: {
   syncSettings: SyncSettings;
   pendingCount: number;
-  onSaveConnection: (apiUrl: string, apiToken: string) => Promise<void>;
+  account: GoogleAccount | null;
+  isGoogleSignInAvailable: boolean;
+  onSaveConnection: (apiUrl: string) => Promise<void>;
+  onSignIn: () => Promise<void>;
+  onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   const [apiUrl, setApiUrl] = useState(syncSettings.apiUrl);
-  const [apiToken, setApiToken] = useState(syncSettings.apiToken);
   const [isBusy, setIsBusy] = useState(false);
 
   const run = async (label: string, action: () => Promise<void>) => {
@@ -64,6 +72,30 @@ export function CloudSyncSection({
         </Text>
       </View>
       <View style={styles.sectionBody}>
+        <Text style={styles.inputLabel}>アカウント</Text>
+        {isGoogleSignInAvailable ? (
+          <>
+            <Text style={styles.faint}>{account ? account.email : 'ログインしていません'}</Text>
+            <Pressable
+              style={styles.ghostButton}
+              disabled={isBusy}
+              onPress={() =>
+                account
+                  ? void run('ログアウト', onSignOut)
+                  : void run('ログイン', onSignIn)
+              }
+            >
+              <Text style={styles.ghostButtonText}>
+                {account ? 'ログアウト' : 'Google でログイン'}
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.faint}>
+            この端末ではGoogleサインインを設定していません（クライアントIDが未設定）。
+          </Text>
+        )}
+
         <Text style={styles.inputLabel}>API URL</Text>
         <TextInput
           value={apiUrl}
@@ -75,23 +107,12 @@ export function CloudSyncSection({
           keyboardType="url"
           style={styles.textInput}
         />
-        <Text style={styles.inputLabel}>APIトークン</Text>
-        <TextInput
-          value={apiToken}
-          onChangeText={setApiToken}
-          placeholder="トークン"
-          placeholderTextColor={colors.textFaint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          style={styles.textInput}
-        />
         <Pressable
           style={styles.ghostButton}
           disabled={isBusy}
-          onPress={() => void run('接続設定の保存', () => onSaveConnection(apiUrl, apiToken))}
+          onPress={() => void run('接続先の保存', () => onSaveConnection(apiUrl))}
         >
-          <Text style={styles.ghostButtonText}>接続設定を保存</Text>
+          <Text style={styles.ghostButtonText}>接続先を保存</Text>
         </Pressable>
         <View style={styles.headerActions}>
           <Pressable

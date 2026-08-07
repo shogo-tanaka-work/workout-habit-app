@@ -45,6 +45,11 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS idx_sync_outbox_occurred_at ON sync_outbox(occurred_at)',
     ],
   },
+  {
+    version: 3,
+    description: '平文で保存していた同期トークンを削除（認証は Google サインインへ移行）',
+    statements: ["DELETE FROM app_settings WHERE key = 'sync_api_token'"],
+  },
 ];
 
 /** 適用済みの user_version。 */

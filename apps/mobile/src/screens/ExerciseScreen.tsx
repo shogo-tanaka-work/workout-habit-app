@@ -1,5 +1,6 @@
 import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 
+import type { GoogleAccount } from '../auth/googleAuth';
 import { CloudSyncSection } from '../components/CloudSyncSection';
 import { PlateCalculator } from '../components/PlateCalculator';
 import { styles } from '../styles/appStyles';
@@ -21,7 +22,11 @@ export function ExerciseScreen({
   onExportCsv,
   syncSettings,
   pendingSyncCount,
+  account,
+  isGoogleSignInAvailable,
   onSaveSyncConnection,
+  onSignIn,
+  onSignOut,
   onSyncNow,
   onRestore,
 }: {
@@ -38,7 +43,11 @@ export function ExerciseScreen({
   onExportCsv: () => void;
   syncSettings: SyncSettings;
   pendingSyncCount: number;
-  onSaveSyncConnection: (apiUrl: string, apiToken: string) => Promise<void>;
+  account: GoogleAccount | null;
+  isGoogleSignInAvailable: boolean;
+  onSaveSyncConnection: (apiUrl: string) => Promise<void>;
+  onSignIn: () => Promise<void>;
+  onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
@@ -159,7 +168,11 @@ export function ExerciseScreen({
       <CloudSyncSection
         syncSettings={syncSettings}
         pendingCount={pendingSyncCount}
+        account={account}
+        isGoogleSignInAvailable={isGoogleSignInAvailable}
         onSaveConnection={onSaveSyncConnection}
+        onSignIn={onSignIn}
+        onSignOut={onSignOut}
         onSyncNow={onSyncNow}
         onRestore={onRestore}
       />

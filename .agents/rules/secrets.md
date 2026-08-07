@@ -23,11 +23,13 @@ paths: "apps/api/**/*,apps/mobile/src/db/sync.ts,apps/web/src/api.ts"
 | サーバ側の秘密値（API トークン、OAuth Client Secret） | Cloudflare Workers Secrets |
 | 公開可能な実行設定 | `wrangler.jsonc` の `vars` |
 | トレーニング記録 | D1（サーバ） / 端末内 SQLite（モバイル） |
-| 端末側の同期トークン | 現状は `app_settings` テーブル。**expo-secure-store へ移すべき**（Step 4） |
+| 端末側の認証情報 | **保存しない。** Google の ID トークンは有効期限1時間で、必要な時点で silent sign-in から取り直す（`src/auth/googleAuth.ts`）。ログイン状態はネイティブ SDK が保持する |
+| Google OAuth のクライアント ID（モバイル） | `apps/mobile/.env.local`（gitignore 済み）。`app.config.js` が読む |
 | 管理画面のトークン | 現状は `localStorage`。Cloudflare Access 導入後は不要になる（Step 4） |
 
 D1 と `localStorage` へ平文の秘密情報を長期保存しない。
-現状の同期トークンの保存方法は暫定であり、認証実装（`.agents/memory/auth-model.md`）で解消する。
+端末に平文で置いていた同期トークンは Google サインインへの移行時に削除した
+（`apps/mobile/src/db/migrations.ts` の version 3）。
 
 ## 公開前チェック
 

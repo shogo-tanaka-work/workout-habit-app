@@ -16,7 +16,9 @@ import {
 /** 何度送っても拒否される操作を諦める回数。壊れた操作でキューが詰まるのを防ぐ。 */
 const MAX_ATTEMPTS = 5;
 
-export type SyncConnection = { apiUrl: string; apiToken: string };
+// 認証は Google ID トークン。期限が1時間と短いため、送信のたびに調達する
+// （src/auth/googleAuth.ts の getIdToken が必要なら silent sign-in で取り直す）。
+export type SyncConnection = { apiUrl: string; getIdToken: () => Promise<string> };
 
 export type PushResult = {
   /** 送信した操作数。 */
@@ -79,10 +81,11 @@ export const pushPendingOperations = async (
     return { sent: 0, settled: 0, failed: 0, pending: await countPendingOperations(database) };
   }
 
+  const idToken = await connection.getIdToken();
   const response = await fetch(`${normalizeBaseUrl(connection.apiUrl)}/sync/operations`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${connection.apiToken.trim()}`,
+      Authorization: `Bearer ${idToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ operations: sendable.map(toRequestOperation) }),

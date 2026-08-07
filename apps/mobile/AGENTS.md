@@ -36,6 +36,7 @@
 | ローカルDB | expo-sqlite | 10テーブル。マスタ（部位・種目）＋記録（workout/sets）＋設定・ボディログ |
 | 音声 | expo-audio | タイマー完了音（timer-complete.wav） |
 | ピッカー | @react-native-picker/picker | レスト時間選択 |
+| 認証 | @react-native-google-signin/google-signin | Google サインイン。ID トークンは保存せず都度取得 |
 | ナビゲーション | **自前の state 方式**（タブ4画面） | React Navigation / Expo Router は未導入 |
 | 状態管理 | React 標準（useState / useMemo） | Zustand 等の外部ライブラリは未導入 |
 | スタイル | StyleSheet | NativeWind 等は未導入 |
@@ -57,6 +58,7 @@
 apps/mobile/
   src/
     types/        domain.ts（ドメイン型）/ db.ts（SQLite 行型）
+    auth/         googleAuth.ts（Google サインインと ID トークンの調達）
     db/           schema.ts / seed.ts / queries.ts / mappers.ts / migrations.ts
                   outbox.ts（操作キュー）/ syncTables.ts（同期対象の定義）/ sync.ts（取り込み）
     sync/         pusher.ts（送信役）
@@ -70,6 +72,19 @@ apps/mobile/
 
 DB行型（snake_case）とドメイン型（camelCase）は分離し、変換は `db/mappers.ts` の
 `toBodyPart` / `toExercise` / `toWorkout` に集約する。
+
+## 環境変数
+
+Google OAuth のクライアント ID はリポジトリへ書かない（`.agents/rules/secrets.md`）。
+`apps/mobile/.env.local` に置く（gitignore 済み）。`app.config.js` が `iosUrlScheme` を注入する。
+
+```
+EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.xxxxxxxx  # iOS クライアントの REVERSED_CLIENT_ID
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com   # idToken の取得に必須
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com   # 任意
+```
+
+値を変えたら `npx expo prebuild --clean` からやり直す（ネイティブ設定に焼き込まれる）。
 
 ## 開発コマンド
 

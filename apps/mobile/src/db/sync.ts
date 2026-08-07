@@ -80,10 +80,10 @@ const normalizeBaseUrl = (apiUrl: string): string => apiUrl.trim().replace(/\/+$
 // サーバに保存されている自分のデータを取得する。
 export const fetchBackupFromCloud = async (
   apiUrl: string,
-  apiToken: string,
+  idToken: string,
 ): Promise<BackupPayload> => {
   const response = await fetch(`${normalizeBaseUrl(apiUrl)}/backup`, {
-    headers: { Authorization: `Bearer ${apiToken.trim()}` },
+    headers: { Authorization: `Bearer ${idToken}` },
   });
   if (!response.ok) {
     throw new Error(`データの取得に失敗しました (HTTP ${response.status})`);

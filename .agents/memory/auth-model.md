@@ -1,6 +1,6 @@
 # 認証モデル
 
-Step 4 で実装中。**API 側（認証・認可・スコープ）は実装済み**、モバイル / 管理画面のクライアント側は未着手。
+Step 4 で実装中。**API 側とモバイルは実装済み**（モバイルの実機検証は未）、管理画面は未着手。
 
 設計の詳細（認証・認可・スコープの分離、`users` テーブル、登録ポリシー、
 守れること・守れないこと）は `docs/10_プロダクト設計/認証認可の設計.md` にある。実装前に読む。
@@ -12,11 +12,14 @@ Step 4 で実装中。**API 側（認証・認可・スコープ）は実装済�
 | 認証 | Access JWT / Google ID トークン / CLI トークンの検証 | 済（`src/auth/`） |
 | 認可 | `users` を引き、登録が無ければ 403 | 済（`src/auth/users.ts`） |
 | スコープ | `user_id` で行を絞る | 済（`src/db/scope.ts`） |
-| モバイルのログイン | Google サインイン導入 | **未** |
+| モバイルのログイン | Google サインイン導入 | 済（実機検証は未） |
 | 管理画面 | Cloudflare Access の適用 | **未** |
 
-クライアント側が未対応のため、**現在の API はモバイル / 管理画面の既存実装からは 401 になる**。
+管理画面が未対応のため、**現在の API は管理画面の既存実装からは 401 になる**。
 旧来の単一 Bearer トークン（`API_TOKEN`）の経路は削除済み。
+
+`GOOGLE_CLIENT_IDS` には **Web クライアント ID** を入れる。モバイルは
+`webClientId` を指定して ID トークンを取得するため、`aud` は Web クライアント ID になる。
 
 ## 3つの経路
 
@@ -28,7 +31,7 @@ Step 4 で実装中。**API 側（認証・認可・スコープ）は実装済�
   -> email からユーザーとロールを解決
 
 モバイルアプリ
-  -> Google サインインで ID トークンを取得（expo-secure-store へ保存）
+  -> Google サインインで ID トークンを取得（保存せず、必要な時点で取り直す）
   -> Authorization: Bearer <ID トークン>
   -> Worker が Google の JWKS で署名・aud・iss を検証
   -> google_sub / email からユーザーとロールを解決
@@ -41,10 +44,13 @@ Claude Code（CLI）
 
 経路ごとに違うのは検証方法だけで、その先は同じ「ユーザー ID + ロール」に着地する。
 
-モバイルは当初 `expo-auth-session` を想定していたが、SDK 53 以降の iOS で
-リダイレクトから戻れない不具合が報告されており、ネイティブ向けの現行推奨は
-`@react-native-google-signin/google-signin`。development build 運用のため導入自体は可能だが、
-外部ライブラリの新規導入にあたるため `apps/mobile/AGENTS.md` の方針に従って正式に判断する。
+モバイルは `@react-native-google-signin/google-signin`（2026-08-07 に導入を決定）。
+Expo 公式ガイドは `react-native-nitro-google-signin` も併記しているが、
+iOS 先行の現状では Android Credential Manager の利点が効かず、依存の少なさと情報量で前者を選んだ。
+**Android を本格展開する際は Credential Manager への移行を検討する。**
+
+**ID トークンを端末に保存しない。** 有効期限が1時間しかなく、保存は盗まれる場所を増やすだけ。
+ログイン状態はネイティブ SDK が持ち、送信のたびに `signInSilently()` から取り直す。
 
 ## 必要な Secret
 

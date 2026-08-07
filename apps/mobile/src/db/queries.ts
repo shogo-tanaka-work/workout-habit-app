@@ -85,7 +85,6 @@ const TEMPLATE_EXERCISE_COLUMNS = 'id, template_id, exercise_id, order_index';
 const TIMER_SOUND_KEY = 'timer_sound_enabled';
 const TIMER_VIBRATION_KEY = 'timer_vibration_enabled';
 const SYNC_API_URL_KEY = 'sync_api_url';
-const SYNC_API_TOKEN_KEY = 'sync_api_token';
 const SYNC_LAST_BACKUP_AT_KEY = 'sync_last_backup_at';
 
 const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
@@ -101,7 +100,6 @@ const toSyncSettings = (rows: AppSettingRow[]): SyncSettings => {
   const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
   return {
     apiUrl: valueByKey.get(SYNC_API_URL_KEY) ?? '',
-    apiToken: valueByKey.get(SYNC_API_TOKEN_KEY) ?? '',
     lastBackupAt: valueByKey.get(SYNC_LAST_BACKUP_AT_KEY) ?? null,
   };
 };
@@ -175,13 +173,12 @@ const upsertAppSetting = async (
   );
 };
 
-// クラウドバックアップの接続設定を保存する。
+// サーバの接続先を保存する。認証情報はここに置かない。
 export const upsertSyncConnection = async (
   database: SQLite.SQLiteDatabase,
-  params: { apiUrl: string; apiToken: string },
+  params: { apiUrl: string },
 ): Promise<void> => {
   await upsertAppSetting(database, SYNC_API_URL_KEY, params.apiUrl);
-  await upsertAppSetting(database, SYNC_API_TOKEN_KEY, params.apiToken);
 };
 
 // 最終バックアップ日時を記録する。

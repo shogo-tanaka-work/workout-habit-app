@@ -1,7 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -39,6 +40,18 @@ export default function App() {
   const [restPicker, setRestPicker] = useState<{ exerciseId: string; seconds: number } | null>(
     null,
   );
+
+  // 送信の補助的な契機。バックグラウンドへ移るとき（記録を終えて画面を閉じたとき）と、
+  // 戻ってきたとき（通信が復帰している可能性がある）に、溜まった操作を送る。
+  const { syncInBackground } = data;
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'active') {
+        void syncInBackground();
+      }
+    });
+    return () => subscription.remove();
+  }, [syncInBackground]);
 
   // 記録中の各種目について、直近の完了済み実施記録（前回実績）を引く。
   const previousSessionByExerciseId = useMemo(() => {
@@ -293,8 +306,9 @@ export default function App() {
                   onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
                   onExportCsv={() => void handleExportCsv()}
                   syncSettings={data.syncSettings}
+                  pendingSyncCount={data.pendingSyncCount}
                   onSaveSyncConnection={data.updateSyncConnection}
-                  onBackup={data.backupToCloud}
+                  onSyncNow={data.syncNow}
                   onRestore={data.restoreFromCloud}
                 />
               ) : null}

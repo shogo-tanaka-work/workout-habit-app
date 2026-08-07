@@ -1,109 +1,32 @@
 import type * as SQLite from 'expo-sqlite';
 
-import { nowIso } from '../utils/datetime';
+import type { SyncEntity } from './syncTables';
+import { SYNC_COLUMNS } from './syncTables';
 
-// クラウドバックアップ/復元（apps/api との連携）。
-// テーブル・カラム定義は apps/api/src/tables.ts と同じものを持つ
-// （モノレポ方針によりアプリ間の重複は許容）。
-// app_settings は端末ローカル設定（タイマー設定・同期トークン）のため対象外。
-
-export type SyncTable = {
-  name: string;
-  columns: readonly string[];
-};
-
-export const SYNC_TABLES: readonly SyncTable[] = [
-  { name: 'body_parts', columns: ['id', 'name', 'order_index', 'created_at', 'updated_at'] },
-  {
-    name: 'exercises',
-    columns: [
-      'id',
-      'name',
-      'primary_body_part_id',
-      'default_rest_seconds',
-      'default_bar_weight_kg',
-      'category',
-      'is_archived',
-      'created_at',
-      'updated_at',
-    ],
-  },
-  {
-    name: 'workouts',
-    columns: ['id', 'performed_at', 'status', 'memo', 'last_saved_at', 'created_at', 'updated_at'],
-  },
-  {
-    name: 'workout_exercises',
-    columns: [
-      'id',
-      'workout_id',
-      'exercise_id',
-      'order_index',
-      'rest_seconds_override',
-      'memo',
-      'created_at',
-      'updated_at',
-    ],
-  },
-  {
-    name: 'workout_sets',
-    columns: [
-      'id',
-      'workout_exercise_id',
-      'order_index',
-      'weight_kg',
-      'reps',
-      'rpe',
-      'is_warmup',
-      'is_completed',
-      'memo',
-      'rest_seconds',
-      'started_at',
-      'completed_at',
-      'deleted_at',
-      'created_at',
-      'updated_at',
-    ],
-  },
-  {
-    name: 'timer_events',
-    columns: [
-      'id',
-      'workout_set_id',
-      'exercise_id',
-      'duration_seconds',
-      'started_at',
-      'ended_at',
-      'status',
-      'sound_enabled',
-      'created_at',
-      'updated_at',
-    ],
-  },
-  { name: 'templates', columns: ['id', 'name', 'created_at', 'updated_at'] },
-  {
-    name: 'template_exercises',
-    columns: ['id', 'template_id', 'exercise_id', 'order_index', 'created_at', 'updated_at'],
-  },
-  {
-    name: 'body_logs',
-    columns: [
-      'id',
-      'measured_at',
-      'body_weight_kg',
-      'body_fat_percentage',
-      'estimated_calories_burned',
-      'memo',
-      'created_at',
-      'updated_at',
-    ],
-  },
-];
+// サーバ（apps/api）からの取り込み。
+//
+// 送信は操作キュー（src/db/outbox.ts と src/sync/pusher.ts）が担う。
+// このファイルが受け持つのは「D1 の内容で端末を作り直す」向きだけで、
+// 機種変更・再インストール・端末データ破損からの復帰に使う。
+//
+// body_parts は全ユーザー共有のマスタで seed が投入するため、取り込み対象に含めない。
+// app_settings と sync_outbox は端末ローカルのため対象外。
 
 export type BackupPayload = {
   exportedAt: string;
   tables: Record<string, Record<string, unknown>[]>;
 };
+
+const RESTORE_ORDER: readonly SyncEntity[] = [
+  'exercises',
+  'workouts',
+  'workout_exercises',
+  'workout_sets',
+  'timer_events',
+  'templates',
+  'template_exercises',
+  'body_logs',
+];
 
 // SQLite のバインド値へ安全に変換する（JSON経由の unknown を絞り込む）。
 const toSqlValue = (value: unknown): string | number | null => {
@@ -116,37 +39,33 @@ const toSqlValue = (value: unknown): string | number | null => {
   return String(value);
 };
 
-// ローカルDBの同期対象テーブルをすべて読み出してバックアップペイロードを作る。
-export const exportBackupPayload = async (
-  database: SQLite.SQLiteDatabase,
-): Promise<BackupPayload> => {
-  const tables: Record<string, Record<string, unknown>[]> = {};
-  for (const table of SYNC_TABLES) {
-    tables[table.name] = await database.getAllAsync<Record<string, unknown>>(
-      `SELECT ${table.columns.join(', ')} FROM ${table.name}`,
-    );
-  }
-  return { exportedAt: nowIso(), tables };
-};
-
-// バックアップペイロードでローカルDBを置き換える（復元）。全テーブルを1トランザクションで処理する。
+/**
+ * サーバから取得した内容で端末のデータを作り直す。
+ * **送信待ちの操作は破棄する。** サーバの内容を正とする操作なので、
+ * 古い端末側の操作を後から流し込むと取り込んだ内容を壊す。
+ */
 export const applyBackupPayload = async (
   database: SQLite.SQLiteDatabase,
   payload: BackupPayload,
 ): Promise<void> => {
   try {
     await database.withTransactionAsync(async () => {
-      for (const table of SYNC_TABLES) {
-        await database.runAsync(`DELETE FROM ${table.name}`);
-        const rows = payload.tables[table.name] ?? [];
-        const placeholders = table.columns.map(() => '?').join(', ');
+      // 子から消す（外部キーの順序）。
+      for (const entity of [...RESTORE_ORDER].reverse()) {
+        await database.runAsync(`DELETE FROM ${entity}`);
+      }
+      for (const entity of RESTORE_ORDER) {
+        const columns = SYNC_COLUMNS[entity];
+        const rows = payload.tables[entity] ?? [];
+        const placeholders = columns.map(() => '?').join(', ');
         for (const row of rows) {
           await database.runAsync(
-            `INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES (${placeholders})`,
-            ...table.columns.map((column) => toSqlValue(row[column])),
+            `INSERT INTO ${entity} (${columns.join(', ')}) VALUES (${placeholders})`,
+            ...columns.map((column) => toSqlValue(row[column])),
           );
         }
       }
+      await database.runAsync('DELETE FROM sync_outbox');
     });
   } catch (error) {
     throw new Error(
@@ -158,40 +77,20 @@ export const applyBackupPayload = async (
 
 const normalizeBaseUrl = (apiUrl: string): string => apiUrl.trim().replace(/\/+$/, '');
 
-const authHeaders = (apiToken: string): Record<string, string> => ({
-  Authorization: `Bearer ${apiToken.trim()}`,
-});
-
-// ローカルの全データをクラウドへ送る（クラウド側は全置き換え）。
-export const pushBackupToCloud = async (
-  apiUrl: string,
-  apiToken: string,
-  payload: BackupPayload,
-): Promise<void> => {
-  const response = await fetch(`${normalizeBaseUrl(apiUrl)}/backup`, {
-    method: 'POST',
-    headers: { ...authHeaders(apiToken), 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(`バックアップAPIがエラーを返しました (HTTP ${response.status})`);
-  }
-};
-
-// クラウドのバックアップを取得する。
+// サーバに保存されている自分のデータを取得する。
 export const fetchBackupFromCloud = async (
   apiUrl: string,
   apiToken: string,
 ): Promise<BackupPayload> => {
   const response = await fetch(`${normalizeBaseUrl(apiUrl)}/backup`, {
-    headers: authHeaders(apiToken),
+    headers: { Authorization: `Bearer ${apiToken.trim()}` },
   });
   if (!response.ok) {
-    throw new Error(`バックアップの取得に失敗しました (HTTP ${response.status})`);
+    throw new Error(`データの取得に失敗しました (HTTP ${response.status})`);
   }
   const payload = (await response.json()) as BackupPayload;
   if (typeof payload?.tables !== 'object' || payload.tables === null) {
-    throw new Error('バックアップデータの形式が不正です');
+    throw new Error('取得したデータの形式が不正です');
   }
   return payload;
 };

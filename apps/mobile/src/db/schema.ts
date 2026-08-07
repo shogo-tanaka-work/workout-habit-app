@@ -87,6 +87,18 @@ export const SCHEMA_SQL = `
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS sync_outbox (
+    id TEXT PRIMARY KEY NOT NULL,
+    entity TEXT NOT NULL,
+    op TEXT NOT NULL,
+    row_id TEXT NOT NULL,
+    payload TEXT,
+    occurred_at TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_sync_outbox_occurred_at ON sync_outbox(occurred_at);
   CREATE TABLE IF NOT EXISTS body_logs (
     id TEXT PRIMARY KEY NOT NULL,
     measured_at TEXT NOT NULL UNIQUE,

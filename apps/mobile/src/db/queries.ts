@@ -34,6 +34,26 @@ import {
   toWorkoutExercise,
   toWorkoutSet,
 } from './mappers';
+import { enqueueDelete, enqueueUpsert } from './outbox';
+import { isCustomExerciseId } from './syncTables';
+
+// 書き込みは「ローカルへ即時反映 ＋ 送信キューへ積む」を1トランザクションで行う。
+// 画面はローカルの結果だけを見て進み、送信は src/sync/pusher.ts が契機ごとに引き受ける。
+// この関数を通さない書き込みを増やさないこと（キューに乗らず、端末にしか残らなくなる）。
+const writeWithOutbox = async (
+  database: SQLite.SQLiteDatabase,
+  operationName: string,
+  write: () => Promise<void>,
+): Promise<void> => {
+  try {
+    await database.withTransactionAsync(write);
+  } catch (error) {
+    throw new Error(
+      `${operationName} failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+};
 
 export type WorkoutData = {
   bodyParts: BodyPart[];
@@ -183,21 +203,31 @@ export const upsertBodyLog = async (
   },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await database.runAsync(
-    `INSERT INTO body_logs
+  await writeWithOutbox(database, 'upsertBodyLog', async () => {
+    await database.runAsync(
+      `INSERT INTO body_logs
       (id, measured_at, body_weight_kg, body_fat_percentage, estimated_calories_burned, memo, created_at, updated_at)
       VALUES (?, ?, ?, ?, NULL, '', ?, ?)
      ON CONFLICT(measured_at) DO UPDATE SET
        body_weight_kg = excluded.body_weight_kg,
        body_fat_percentage = excluded.body_fat_percentage,
        updated_at = excluded.updated_at`,
-    params.id,
-    params.measuredAt,
-    params.bodyWeightKg,
-    params.bodyFatPercentage,
-    timestamp,
-    timestamp,
-  );
+      params.id,
+      params.measuredAt,
+      params.bodyWeightKg,
+      params.bodyFatPercentage,
+      timestamp,
+      timestamp,
+    );
+    // 計測日が既にある場合は既存行が更新される。送るのは実際に残った行の ID。
+    const stored = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM body_logs WHERE measured_at = ?',
+      params.measuredAt,
+    );
+    if (stored) {
+      await enqueueUpsert(database, 'body_logs', stored.id);
+    }
+  });
 };
 
 // テンプレートと種目の並びをまとめて保存する。
@@ -206,52 +236,42 @@ export const insertTemplateDeep = async (
   params: { id: string; name: string; exerciseEntries: { id: string; exerciseId: string }[] },
 ): Promise<void> => {
   const timestamp = nowIso();
-  try {
-    await database.withTransactionAsync(async () => {
+  await writeWithOutbox(database, 'insertTemplateDeep', async () => {
+    await database.runAsync(
+      'INSERT INTO templates (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
+      params.id,
+      params.name,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'templates', params.id);
+    for (const [index, entry] of params.exerciseEntries.entries()) {
       await database.runAsync(
-        'INSERT INTO templates (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
+        `INSERT INTO template_exercises
+            (id, template_id, exercise_id, order_index, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+        entry.id,
         params.id,
-        params.name,
+        entry.exerciseId,
+        index + 1,
         timestamp,
         timestamp,
       );
-      for (const [index, entry] of params.exerciseEntries.entries()) {
-        await database.runAsync(
-          `INSERT INTO template_exercises
-            (id, template_id, exercise_id, order_index, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-          entry.id,
-          params.id,
-          entry.exerciseId,
-          index + 1,
-          timestamp,
-          timestamp,
-        );
-      }
-    });
-  } catch (error) {
-    throw new Error(
-      `insertTemplateDeep failed: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error },
-    );
-  }
+      await enqueueUpsert(database, 'template_exercises', entry.id);
+    }
+  });
 };
 
 export const deleteTemplateDeep = async (
   database: SQLite.SQLiteDatabase,
   templateId: string,
 ): Promise<void> => {
-  try {
-    await database.withTransactionAsync(async () => {
-      await database.runAsync('DELETE FROM template_exercises WHERE template_id = ?', templateId);
-      await database.runAsync('DELETE FROM templates WHERE id = ?', templateId);
-    });
-  } catch (error) {
-    throw new Error(
-      `deleteTemplateDeep failed: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error },
-    );
-  }
+  await writeWithOutbox(database, 'deleteTemplateDeep', async () => {
+    await database.runAsync('DELETE FROM template_exercises WHERE template_id = ?', templateId);
+    await database.runAsync('DELETE FROM templates WHERE id = ?', templateId);
+    // 子はサーバ側の外部キー（ON DELETE CASCADE）で消える。親の削除だけを送る。
+    await enqueueDelete(database, 'templates', templateId);
+  });
 };
 
 // タイマー設定（音・振動）を app_settings に保存する。
@@ -280,12 +300,16 @@ export const touchWorkout = async (
   database: SQLite.SQLiteDatabase,
   workoutId: string,
 ): Promise<void> => {
-  await database.runAsync(
-    'UPDATE workouts SET last_saved_at = ?, updated_at = ? WHERE id = ?',
-    nowIso(),
-    nowIso(),
-    workoutId,
-  );
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'touchWorkout', async () => {
+    await database.runAsync(
+      'UPDATE workouts SET last_saved_at = ?, updated_at = ? WHERE id = ?',
+      timestamp,
+      timestamp,
+      workoutId,
+    );
+    await enqueueUpsert(database, 'workouts', workoutId);
+  });
 };
 
 export const findActiveWorkoutRow = (database: SQLite.SQLiteDatabase): Promise<WorkoutRow | null> =>
@@ -298,16 +322,19 @@ export const insertWorkout = async (
   params: { id: string; performedAt: string },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await database.runAsync(
-    'INSERT INTO workouts (id, performed_at, status, memo, last_saved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    params.id,
-    params.performedAt,
-    'active',
-    '',
-    timestamp,
-    timestamp,
-    timestamp,
-  );
+  await writeWithOutbox(database, 'insertWorkout', async () => {
+    await database.runAsync(
+      'INSERT INTO workouts (id, performed_at, status, memo, last_saved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      params.id,
+      params.performedAt,
+      'active',
+      '',
+      timestamp,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'workouts', params.id);
+  });
 };
 
 export const setWorkoutStatus = async (
@@ -315,13 +342,17 @@ export const setWorkoutStatus = async (
   workoutId: string,
   status: 'active' | 'completed',
 ): Promise<void> => {
-  await database.runAsync(
-    'UPDATE workouts SET status = ?, last_saved_at = ?, updated_at = ? WHERE id = ?',
-    status,
-    nowIso(),
-    nowIso(),
-    workoutId,
-  );
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'setWorkoutStatus', async () => {
+    await database.runAsync(
+      'UPDATE workouts SET status = ?, last_saved_at = ?, updated_at = ? WHERE id = ?',
+      status,
+      timestamp,
+      timestamp,
+      workoutId,
+    );
+    await enqueueUpsert(database, 'workouts', workoutId);
+  });
 };
 
 // ワークアウトと、それに紐づく種目・セットをまとめて削除する。
@@ -330,14 +361,18 @@ export const deleteWorkoutDeep = async (
   workoutId: string,
   workoutExerciseIds: string[],
 ): Promise<void> => {
-  for (const workoutExerciseId of workoutExerciseIds) {
-    await database.runAsync(
-      'DELETE FROM workout_sets WHERE workout_exercise_id = ?',
-      workoutExerciseId,
-    );
-  }
-  await database.runAsync('DELETE FROM workout_exercises WHERE workout_id = ?', workoutId);
-  await database.runAsync('DELETE FROM workouts WHERE id = ?', workoutId);
+  await writeWithOutbox(database, 'deleteWorkoutDeep', async () => {
+    for (const workoutExerciseId of workoutExerciseIds) {
+      await database.runAsync(
+        'DELETE FROM workout_sets WHERE workout_exercise_id = ?',
+        workoutExerciseId,
+      );
+    }
+    await database.runAsync('DELETE FROM workout_exercises WHERE workout_id = ?', workoutId);
+    await database.runAsync('DELETE FROM workouts WHERE id = ?', workoutId);
+    // 子はサーバ側の外部キー（ON DELETE CASCADE）で消える。親の削除だけを送る。
+    await enqueueDelete(database, 'workouts', workoutId);
+  });
 };
 
 export const insertWorkoutExercise = async (
@@ -345,19 +380,22 @@ export const insertWorkoutExercise = async (
   params: { id: string; workoutId: string; exerciseId: string; orderIndex: number },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await database.runAsync(
-    `INSERT INTO workout_exercises
+  await writeWithOutbox(database, 'insertWorkoutExercise', async () => {
+    await database.runAsync(
+      `INSERT INTO workout_exercises
       (id, workout_id, exercise_id, order_index, rest_seconds_override, memo, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    params.id,
-    params.workoutId,
-    params.exerciseId,
-    params.orderIndex,
-    null,
-    '',
-    timestamp,
-    timestamp,
-  );
+      params.id,
+      params.workoutId,
+      params.exerciseId,
+      params.orderIndex,
+      null,
+      '',
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'workout_exercises', params.id);
+  });
 };
 
 export const insertWorkoutSet = async (
@@ -373,26 +411,29 @@ export const insertWorkoutSet = async (
   },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await database.runAsync(
-    `INSERT INTO workout_sets
+  await writeWithOutbox(database, 'insertWorkoutSet', async () => {
+    await database.runAsync(
+      `INSERT INTO workout_sets
       (id, workout_exercise_id, order_index, weight_kg, reps, rpe, is_warmup, is_completed, memo, rest_seconds, started_at, completed_at, deleted_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params.id,
-    params.workoutExerciseId,
-    params.orderIndex,
-    params.weightKg,
-    params.reps,
-    params.rpe,
-    0,
-    0,
-    '',
-    params.restSeconds,
-    timestamp,
-    null,
-    null,
-    timestamp,
-    timestamp,
-  );
+      params.id,
+      params.workoutExerciseId,
+      params.orderIndex,
+      params.weightKg,
+      params.reps,
+      params.rpe,
+      0,
+      0,
+      '',
+      params.restSeconds,
+      timestamp,
+      null,
+      null,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'workout_sets', params.id);
+  });
 };
 
 // 完成済みのドメイン WorkoutSet を書き戻す。completed_at は完了状態に応じて設定。
@@ -400,22 +441,27 @@ export const updateWorkoutSet = async (
   database: SQLite.SQLiteDatabase,
   set: WorkoutSet,
 ): Promise<void> => {
-  await database.runAsync(
-    `UPDATE workout_sets
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'updateWorkoutSet', async () => {
+    await database.runAsync(
+      `UPDATE workout_sets
      SET weight_kg = ?, reps = ?, rpe = ?, is_warmup = ?, is_completed = ?, memo = ?, rest_seconds = ?, deleted_at = ?, completed_at = ?, updated_at = ?
      WHERE id = ?`,
-    set.weightKg,
-    set.reps,
-    set.rpe,
-    set.isWarmup ? 1 : 0,
-    set.isCompleted ? 1 : 0,
-    set.memo,
-    set.restSeconds,
-    set.deletedAt,
-    set.isCompleted ? nowIso() : null,
-    nowIso(),
-    set.id,
-  );
+      set.weightKg,
+      set.reps,
+      set.rpe,
+      set.isWarmup ? 1 : 0,
+      set.isCompleted ? 1 : 0,
+      set.memo,
+      set.restSeconds,
+      set.deletedAt,
+      set.isCompleted ? timestamp : null,
+      timestamp,
+      set.id,
+    );
+    // セットの削除は deleted_at による論理削除なので、削除も upsert として送る。
+    await enqueueUpsert(database, 'workout_sets', set.id);
+  });
 };
 
 export const insertTimerEvent = async (
@@ -423,21 +469,24 @@ export const insertTimerEvent = async (
   params: { id: string; workoutSetId: string; exerciseId: string; durationSeconds: number },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await database.runAsync(
-    `INSERT INTO timer_events
+  await writeWithOutbox(database, 'insertTimerEvent', async () => {
+    await database.runAsync(
+      `INSERT INTO timer_events
       (id, workout_set_id, exercise_id, duration_seconds, started_at, ended_at, status, sound_enabled, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params.id,
-    params.workoutSetId,
-    params.exerciseId,
-    params.durationSeconds,
-    timestamp,
-    null,
-    'running',
-    1,
-    timestamp,
-    timestamp,
-  );
+      params.id,
+      params.workoutSetId,
+      params.exerciseId,
+      params.durationSeconds,
+      timestamp,
+      null,
+      'running',
+      1,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'timer_events', params.id);
+  });
 };
 
 // ユーザーが追加するカスタム種目。デフォルト値は既存実装に準拠。
@@ -446,20 +495,23 @@ export const insertExercise = async (
   params: { id: string; name: string; primaryBodyPartId: string },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await database.runAsync(
-    `INSERT INTO exercises
+  await writeWithOutbox(database, 'insertExercise', async () => {
+    await database.runAsync(
+      `INSERT INTO exercises
       (id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params.id,
-    params.name,
-    params.primaryBodyPartId,
-    120,
-    0,
-    'strength',
-    0,
-    timestamp,
-    timestamp,
-  );
+      params.id,
+      params.name,
+      params.primaryBodyPartId,
+      120,
+      0,
+      'strength',
+      0,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'exercises', params.id);
+  });
 };
 
 export const setExerciseRest = async (
@@ -467,10 +519,18 @@ export const setExerciseRest = async (
   exerciseId: string,
   restSeconds: number,
 ): Promise<void> => {
-  await database.runAsync(
-    'UPDATE exercises SET default_rest_seconds = ?, updated_at = ? WHERE id = ?',
-    restSeconds,
-    nowIso(),
-    exerciseId,
-  );
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'setExerciseRest', async () => {
+    await database.runAsync(
+      'UPDATE exercises SET default_rest_seconds = ?, updated_at = ? WHERE id = ?',
+      restSeconds,
+      timestamp,
+      exerciseId,
+    );
+    // プリセット種目は全ユーザー共有のためサーバ側では書き換えられない。
+    // 現状、プリセットのレスト時間の変更は端末内にとどまる（ユーザー別の上書きは未実装）。
+    if (isCustomExerciseId(exerciseId)) {
+      await enqueueUpsert(database, 'exercises', exerciseId);
+    }
+  });
 };

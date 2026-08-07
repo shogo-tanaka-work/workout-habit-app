@@ -27,6 +27,24 @@ export const MIGRATIONS: readonly Migration[] = [
     description: '初期スキーマ（全テーブル作成）',
     statements: [SCHEMA_SQL],
   },
+  {
+    version: 2,
+    description: '送信待ちの操作を貯める sync_outbox を追加',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS sync_outbox (
+        id TEXT PRIMARY KEY NOT NULL,
+        entity TEXT NOT NULL,
+        op TEXT NOT NULL,
+        row_id TEXT NOT NULL,
+        payload TEXT,
+        occurred_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS idx_sync_outbox_occurred_at ON sync_outbox(occurred_at)',
+    ],
+  },
 ];
 
 /** 適用済みの user_version。 */

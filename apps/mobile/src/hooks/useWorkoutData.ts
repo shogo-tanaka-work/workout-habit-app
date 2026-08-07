@@ -25,12 +25,9 @@ import {
   upsertSyncConnection,
   upsertTimerSettings,
 } from '../db/queries';
-import {
-  applyBackupPayload,
-  exportBackupPayload,
-  fetchBackupFromCloud,
-  pushBackupToCloud,
-} from '../db/sync';
+import { countPendingOperations } from '../db/outbox';
+import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
+import { pushPendingOperations } from '../sync/pusher';
 import type {
   BodyLog,
   BodyPart,
@@ -48,7 +45,7 @@ import type {
 } from '../types/domain';
 import type { BodyPartSummary } from '../utils/aggregate';
 import { summarizeByBodyPart } from '../utils/aggregate';
-import { formatDate, nowIso, startOfWeekIso } from '../utils/datetime';
+import { formatDate, nowIso, nowMs, startOfWeekIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 
 // SQLite の初期化・データ読み込み・全 CRUD 操作・派生状態を集約するフック。
@@ -74,6 +71,8 @@ export function useWorkoutData() {
     apiToken: '',
     lastBackupAt: null,
   });
+  // 送信待ちの操作数。ヘッダの控えめな表示に使う（機内モードのような概念は見せない）。
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
   const activeWorkout = useMemo(
     () => workouts.find((workout) => workout.status === 'active') ?? null,
@@ -173,6 +172,7 @@ export function useWorkoutData() {
     setTimerSettings(data.timerSettings);
     setBodyLogs(data.bodyLogs);
     setSyncSettings(data.syncSettings);
+    setPendingSyncCount(await countPendingOperations(database));
   }, []);
 
   useEffect(() => {
@@ -228,6 +228,7 @@ export function useWorkoutData() {
     const database = ensureDb();
     await setWorkoutStatus(database, activeWorkout.id, 'completed');
     await reloadData(database);
+    void syncInBackground();
   };
 
   const pauseWorkout = async () => {
@@ -307,6 +308,18 @@ export function useWorkoutData() {
       await touchWorkout(database, owningWorkoutId);
     }
     await reloadData(database);
+
+    // 送信の契機は「その種目の全セットが完了したとき」。
+    // 1操作ごとに送ると通信が多すぎるため、種目が終わるまでキューに溜める。
+    const setsOfExercise = workoutSets.filter(
+      (set) => set.workoutExerciseId === current.workoutExerciseId && set.deletedAt === null,
+    );
+    const exerciseFinished =
+      setsOfExercise.length > 0 &&
+      setsOfExercise.every((set) => (set.id === setId ? next : set).isCompleted);
+    if (exerciseFinished) {
+      void syncInBackground();
+    }
   };
 
   // 休憩タイマーの開始。セットを完了扱いにし timer_events を記録、TimerState を返す。
@@ -335,7 +348,7 @@ export function useWorkoutData() {
       remaining: duration,
       running: true,
       finished: false,
-      endsAt: Date.now() + duration * 1000,
+      endsAt: nowMs() + duration * 1000,
     };
   };
 
@@ -436,16 +449,42 @@ export function useWorkoutData() {
     return syncSettings;
   };
 
-  // ローカル全データをクラウドへバックアップする（クラウド側は全置き換え）。
-  const backupToCloud = async () => {
+  // 送信待ちの操作をサーバへ送る。手動の「今すぐ同期」から呼ぶ。
+  const syncNow = async () => {
     const database = ensureDb();
     const connection = ensureSyncConnection();
-    const payload = await exportBackupPayload(database);
-    await pushBackupToCloud(connection.apiUrl, connection.apiToken, payload);
-    const timestamp = nowIso();
-    await markLastBackupAt(database, timestamp);
-    setSyncSettings((previous) => ({ ...previous, lastBackupAt: timestamp }));
+    const result = await pushPendingOperations(database, {
+      apiUrl: connection.apiUrl,
+      apiToken: connection.apiToken,
+    });
+    setPendingSyncCount(result.pending);
+    if (result.settled > 0) {
+      const timestamp = nowIso();
+      await markLastBackupAt(database, timestamp);
+      setSyncSettings((previous) => ({ ...previous, lastBackupAt: timestamp }));
+    }
+    if (result.failed > 0) {
+      throw new Error(`${result.failed}件の操作がサーバに拒否されました`);
+    }
   };
+
+  // 自動送信。契機（種目の全セット完了・ワークアウト完了・バックグラウンド遷移）から呼ぶ。
+  // 失敗しても画面は止めない。積まれたまま次の契機で再送する。
+  const syncInBackground = useCallback(async () => {
+    if (!db || !syncSettings.apiUrl || !syncSettings.apiToken) {
+      return;
+    }
+    try {
+      const result = await pushPendingOperations(db, {
+        apiUrl: syncSettings.apiUrl,
+        apiToken: syncSettings.apiToken,
+      });
+      setPendingSyncCount(result.pending);
+    } catch (error: unknown) {
+      console.warn('[sync] 自動送信に失敗', error instanceof Error ? error.message : String(error));
+      setPendingSyncCount(await countPendingOperations(db));
+    }
+  }, [db, syncSettings.apiUrl, syncSettings.apiToken]);
 
   // クラウドのバックアップでローカルを置き換える（復元）。呼び出し側で確認ダイアログを出す。
   const restoreFromCloud = async () => {
@@ -454,6 +493,7 @@ export function useWorkoutData() {
     const payload = await fetchBackupFromCloud(connection.apiUrl, connection.apiToken);
     await applyBackupPayload(database, payload);
     await reloadData(database);
+    setPendingSyncCount(0);
   };
 
   // 今日のボディログを保存する（同日があれば上書き）。体重 0 以下は無効として false。
@@ -502,8 +542,10 @@ export function useWorkoutData() {
     updateTimerSettings,
     saveBodyLog,
     syncSettings,
+    pendingSyncCount,
     updateSyncConnection,
-    backupToCloud,
+    syncNow,
+    syncInBackground,
     restoreFromCloud,
     startWorkout,
     completeWorkout,

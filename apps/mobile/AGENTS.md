@@ -2,7 +2,10 @@
 
 筋トレの習慣化を支援する **オフライン優先** のモバイルアプリ。記録（種目・セット・重量・レップ）と
 インターバルタイマーを端末内 SQLite で扱い、ネットワークが無くてもすべての機能が動く。
-クラウド（Cloudflare D1）へは `src/db/sync.ts` 経由の**任意バックアップ**として同期する。
+
+**正データは D1（サーバ）**で、端末は表示用キャッシュ＋操作キュー（outbox）。
+記録はローカルへ即時反映しつつキューへ積み、種目の完了などの契機で送信する。
+詳細は `.agents/rules/mobile-sqlite.md`。
 
 ## 開発ルール
 
@@ -54,7 +57,9 @@
 apps/mobile/
   src/
     types/        domain.ts（ドメイン型）/ db.ts（SQLite 行型）
-    db/           schema.ts / seed.ts / queries.ts / mappers.ts / sync.ts
+    db/           schema.ts / seed.ts / queries.ts / mappers.ts / migrations.ts
+                  outbox.ts（操作キュー）/ syncTables.ts（同期対象の定義）/ sync.ts（取り込み）
+    sync/         pusher.ts（送信役）
     hooks/        useWorkoutData / useRestTimer
     utils/        datetime / format / number / aggregate / plates / calendar / csv / id
     components/   TimerBanner / SetEditor / SetTable / TrendChart / PlateCalculator ほか

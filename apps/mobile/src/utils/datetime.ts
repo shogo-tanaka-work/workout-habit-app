@@ -7,6 +7,9 @@ export const formatDate = (date: Date): string => {
 
 export const nowIso = (): string => new Date().toISOString();
 
+/** 現在時刻のエポックミリ秒。タイマーの終了時刻の計算に使う。 */
+export const nowMs = (): number => Date.now();
+
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 // performed_at（YYYY-MM-DD）をローカル日付として解釈する。

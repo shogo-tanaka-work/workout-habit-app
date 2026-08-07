@@ -20,8 +20,9 @@ export function ExerciseScreen({
   onUpdateTimerSettings,
   onExportCsv,
   syncSettings,
+  pendingSyncCount,
   onSaveSyncConnection,
-  onBackup,
+  onSyncNow,
   onRestore,
 }: {
   bodyParts: BodyPart[];
@@ -36,8 +37,9 @@ export function ExerciseScreen({
   onUpdateTimerSettings: (settings: TimerSettings) => void;
   onExportCsv: () => void;
   syncSettings: SyncSettings;
+  pendingSyncCount: number;
   onSaveSyncConnection: (apiUrl: string, apiToken: string) => Promise<void>;
-  onBackup: () => Promise<void>;
+  onSyncNow: () => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   return (
@@ -156,8 +158,9 @@ export function ExerciseScreen({
 
       <CloudSyncSection
         syncSettings={syncSettings}
+        pendingCount={pendingSyncCount}
         onSaveConnection={onSaveSyncConnection}
-        onBackup={onBackup}
+        onSyncNow={onSyncNow}
         onRestore={onRestore}
       />
     </View>

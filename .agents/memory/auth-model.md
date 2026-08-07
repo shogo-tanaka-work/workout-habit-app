@@ -13,10 +13,14 @@ Step 4 で実装中。**API 側とモバイルは実装済み**（モバイル�
 | 認可 | `users` を引き、登録が無ければ 403 | 済（`src/auth/users.ts`） |
 | スコープ | `user_id` で行を絞る | 済（`src/db/scope.ts`） |
 | モバイルのログイン | Google サインイン導入 | 済（実機検証は未） |
-| 管理画面 | Cloudflare Access の適用 | **未** |
+| 管理画面 | Cloudflare Access の適用 | コードは対応済み（Access の設定は未） |
 
-管理画面が未対応のため、**現在の API は管理画面の既存実装からは 401 になる**。
 旧来の単一 Bearer トークン（`API_TOKEN`）の経路は削除済み。
+
+管理画面は**同一オリジン化**した。`workout-habit-admin` Worker が `/api/*` を
+Service Binding で `workout-habit-api` へ中継する。Access はホスト単位でしか
+JWT を付けないため、別オリジンのままでは画面から API を呼べないことによる
+（詳細は `apps/web/AGENTS.md`）。
 
 `GOOGLE_CLIENT_IDS` には **Web クライアント ID** を入れる。モバイルは
 `webClientId` を指定して ID トークンを取得するため、`aud` は Web クライアント ID になる。
@@ -25,9 +29,10 @@ Step 4 で実装中。**API 側とモバイルは実装済み**（モバイル�
 
 ```text
 ブラウザ（管理画面）
-  -> Cloudflare Access（Google IdP）
+  -> Cloudflare Access（Google IdP）※ workout-habit-admin のホストに適用
   -> Cf-Access-Jwt-Assertion ヘッダ
-  -> Worker が team domain / AUD / 署名を再検証
+  -> admin Worker が Service Binding で api Worker へ中継（ヘッダはそのまま）
+  -> api Worker が team domain / AUD / 署名を再検証
   -> email からユーザーとロールを解決
 
 モバイルアプリ

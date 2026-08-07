@@ -1,10 +1,11 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-// API は別オリジンの workout-habit-api Worker にあり、接続先は
-// VITE_API_ORIGIN（env.example を .env.local へコピーして設定）で与える。
-// 開発時もプロキシを挟まず本番と同じ経路（絶対 URL + CORS）を通す。
-// 経路を揃えておくと、CORS の設定漏れを開発中に気づける。
+// API は同一オリジンの /api/* 配下にある（配信元の workout-habit-admin Worker が
+// Service Binding で workout-habit-api へ中継する）。CORS も接続先の設定も要らない。
+//
+// **`vite dev` では /api/* が 404 になる。** 中継役の Worker が居ないため。
+// データを伴う確認は `npx wrangler dev` かデプロイ後の環境で行う（apps/web/AGENTS.md）。
 export default defineConfig({
   plugins: [react()],
 });

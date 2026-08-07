@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 
-import { clearToken, hasApiOrigin, loadToken, saveToken } from './api';
 import { ApiContext } from './hooks/useApiData';
 import { BodyLogSection } from './sections/BodyLogSection';
 import { BodyPartSection } from './sections/BodyPartSection';
@@ -8,94 +7,24 @@ import { ContinuitySection } from './sections/ContinuitySection';
 import { ExerciseSection } from './sections/ExerciseSection';
 import { TrendSection } from './sections/TrendSection';
 
-// トークン設定 → ApiContext 提供 → 各セクション描画、の薄いシェル。
+// ApiContext 提供 → 各セクション描画、の薄いシェル。
 // データ取得・集計は各セクションが /analytics API に対して行う。
+//
+// 認証は Cloudflare Access がこのホストの入口で済ませている。
+// ここへ到達している時点でログイン済みなので、画面はログイン UI を持たない。
 
 const App = () => {
-  const [token, setToken] = useState(loadToken);
-  const [tokenInput, setTokenInput] = useState('');
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   // 再読込時にセクションを作り直して全フックに再取得させる。
   const [reloadCount, setReloadCount] = useState(0);
 
+  // Access のセッションが切れた場合。再読み込みでログインし直せる。
   const handleUnauthorized = useCallback(() => {
-    clearToken();
-    setToken('');
-    setAuthMessage('トークンが無効です。再設定してください。');
+    setAuthMessage('ログインの有効期限が切れました。ページを再読み込みしてください。');
   }, []);
 
-  const handleTokenSubmit = (): void => {
-    const trimmedToken = tokenInput.trim();
-    if (!trimmedToken) {
-      return;
-    }
-    saveToken(trimmedToken);
-    setTokenInput('');
-    setAuthMessage(null);
-    setToken(trimmedToken);
-  };
-
-  const handleSignOut = (): void => {
-    clearToken();
-    setToken('');
-    setAuthMessage(null);
-  };
-
-  // ビルド時に API の接続先が入っていないと、何を設定しても失敗する。先に知らせる。
-  if (!hasApiOrigin()) {
-    return (
-      <main className="app">
-        <header className="app-header">
-          <h1 className="app-title">WORKOUT HABIT</h1>
-        </header>
-        <div className="setup">
-          <p className="error-text">API の接続先が設定されていません。</p>
-          <p className="setup-text">
-            ビルド時に <code>VITE_API_ORIGIN</code> が必要です。
-            <code>apps/web/env.example</code> を <code>.env.local</code> へコピーして
-            API Worker のオリジンを設定し、ビルドし直してください。
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!token) {
-    return (
-      <main className="app">
-        <header className="app-header">
-          <h1 className="app-title">WORKOUT HABIT</h1>
-        </header>
-        <div className="setup">
-          <p className="setup-text">
-            分析ダッシュボードを表示するには API トークンを設定してください。
-            トークンはこのブラウザにのみ保存されます。
-          </p>
-          {authMessage ? <p className="error-text">{authMessage}</p> : null}
-          <div className="setup-form">
-            <input
-              type="password"
-              className="setup-input"
-              placeholder="API トークン"
-              value={tokenInput}
-              onChange={(event) => setTokenInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  handleTokenSubmit();
-                }
-              }}
-            />
-            <button type="button" className="button-primary" onClick={handleTokenSubmit}>
-              設定して表示
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <ApiContext.Provider value={{ token, onUnauthorized: handleUnauthorized }}>
+    <ApiContext.Provider value={{ onUnauthorized: handleUnauthorized }}>
       <main className="app">
         <header className="app-header">
           <h1 className="app-title">WORKOUT HABIT</h1>
@@ -107,11 +36,9 @@ const App = () => {
             >
               再読込
             </button>
-            <button type="button" className="button-ghost" onClick={handleSignOut}>
-              トークン再設定
-            </button>
           </div>
         </header>
+        {authMessage ? <p className="error-text">{authMessage}</p> : null}
         <div key={reloadCount}>
           <ContinuitySection />
           <TrendSection />
@@ -120,7 +47,7 @@ const App = () => {
           <BodyLogSection />
         </div>
         <footer className="app-footer">
-          データはアプリから「クラウドへバックアップ」された時点の内容です。
+          記録はモバイルアプリから同期された時点の内容です。
         </footer>
       </main>
     </ApiContext.Provider>

@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-// ビルド時に注入される環境変数。env.example を .env.local へコピーして設定する。
+// API は同一オリジンの /api/* 配下にあり、配信元の Worker が中継する。
+// そのため接続先を指定するビルド時変数は無い。
 interface ImportMetaEnv {
-  /** API Worker（workout-habit-api）のオリジン。例: https://workout-habit-api.example.workers.dev */
-  readonly VITE_API_ORIGIN?: string;
+  readonly MODE: string;
 }
 
 interface ImportMeta {

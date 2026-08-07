@@ -1,17 +1,29 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // 管理画面（分析ダッシュボード）専用の Worker。
-  // Worker スクリプトを持たず、vite のビルド成果物を配信するだけ。
-  // API は別オリジンの workout-habit-api が担当する。
+  // 管理画面（分析ダッシュボード）の Worker。
+  // vite のビルド成果物を配信し、/api/* を workout-habit-api へ中継する。
   //
-  // Step 4 では、この Worker のホストへ Cloudflare Access をまるごと適用して
-  // 許可メール以外を入口で止める。
+  // このホストへ Cloudflare Access をまるごと適用して、許可メール以外を入口で止める。
+  // 画面と API を同一オリジンに寄せているのは、Access の JWT が
+  // 「Access を掛けたホスト宛のリクエスト」にしか付かないため（worker/index.ts の説明を参照）。
   "name": "workout-habit-admin",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-06-01",
+  "observability": {
+    "enabled": true
+  },
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     // クライアントルーティングを持たない SPA だが、
     // 未知のパスで 404 を出さないためフォールバックさせる。
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Worker 間の直接呼び出し。公開インターネットを経由しない。
+  "services": [
+    {
+      "binding": "API",
+      "service": "workout-habit-api"
+    }
+  ]
 }

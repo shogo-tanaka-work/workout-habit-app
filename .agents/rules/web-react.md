@@ -1,5 +1,5 @@
 ---
-paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts"
+paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts,apps/web/worker/**/*.ts"
 ---
 # 管理画面（React + Vite）
 
@@ -15,10 +15,19 @@ paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts"
 
 ## データ取得
 - 取得は `api.ts` の `apiGet` と `hooks/useApiData` を通す。`sections/` から直接 `fetch` しない
-- API は別オリジン。接続先は `import.meta.env.VITE_API_ORIGIN` から取り、URL を直書きしない
+- API は**同一オリジンの `/api/*`**。配信元 Worker（`worker/index.ts`）が
+  Service Binding で `workout-habit-api` へ中継する。オリジンを直書きしない
+- **画面は認証情報を持たない。** 認証は Cloudflare Access がホストの入口で済ませている。
+  トークンの入力・保存・送信を復活させない
 - レスポンス型は `types/api.ts` に定義し、`apps/api` の返す JSON と対応させる。
   API 側のレスポンス形状を変えたらこのファイルも同じ変更セットで直す
 - 読み込み中・エラー・空データの3状態を必ず扱う。`components/Loadable.tsx` を使う
+
+## 配信元 Worker（worker/index.ts）
+
+- 役割は「dist の配信」と「`/api/*` の中継」だけ。**集計・認可・データ加工を持ち込まない**
+- 中継時にヘッダを加工しない。Access の JWT はそのまま渡し、検証は API Worker が行う
+- ここに新しいエンドポイントを生やさない。API が必要なら `apps/api` へ追加する
 
 ## コンポーネント設計
 - `sections/` は1区画1ファイル。区画をまたぐ状態を持たせない

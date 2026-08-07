@@ -2,16 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 
 import { apiGet, UnauthorizedError } from '../api';
 
-// トークンと 401 時のハンドリングを App から各セクションへ配る Context と、
+// セッション切れ時のハンドリングを App から各セクションへ配る Context と、
 // /analytics をパス単位で取得する汎用フック。
+// 認証は Cloudflare Access が担うため、画面はトークンを持たない。
 
 type ApiContextValue = {
-  token: string;
   onUnauthorized: () => void;
 };
 
 export const ApiContext = createContext<ApiContextValue>({
-  token: '',
   onUnauthorized: () => undefined,
 });
 
@@ -24,20 +23,20 @@ export type ApiDataState<Response> = {
 
 // path が null のときは取得しない（依存データ待ちのセクション用）。
 export const useApiData = <Response>(path: string | null): ApiDataState<Response> => {
-  const { token, onUnauthorized } = useContext(ApiContext);
+  const { onUnauthorized } = useContext(ApiContext);
   const [data, setData] = useState<Response | null>(null);
   const [isLoading, setIsLoading] = useState(path !== null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    if (path === null || !token) {
+    if (path === null) {
       return;
     }
     let isStale = false;
     setIsLoading(true);
     setErrorMessage(null);
-    apiGet<Response>(path, token)
+    apiGet<Response>(path)
       .then((response) => {
         if (!isStale) {
           setData(response);
@@ -61,7 +60,7 @@ export const useApiData = <Response>(path: string | null): ApiDataState<Response
     return () => {
       isStale = true;
     };
-  }, [path, token, reloadCount, onUnauthorized]);
+  }, [path, reloadCount, onUnauthorized]);
 
   const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 

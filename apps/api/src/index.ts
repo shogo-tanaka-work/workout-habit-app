@@ -6,6 +6,7 @@ import { backup } from './backup';
 import type { AppEnv } from './env';
 import { authenticate } from './middleware/authenticate';
 import { apiTokens } from './routes/apiTokens';
+import { sync } from './routes/sync';
 
 // workout-habit の API。この Worker は API 専用で、静的アセットを持たない。
 // 管理画面は別オリジン（workout-habit-admin Worker）が配信するため CORS が要る。
@@ -18,6 +19,7 @@ import { apiTokens } from './routes/apiTokens';
 // - GET  /health      … 死活確認（認証不要）
 // - GET  /backup      … 本人の同期対象テーブルを返す（復元用）
 // - POST /backup      … 本人の行だけを置き換える（src/backup.ts）
+// - POST /sync/operations … 操作（intent）ベースの同期。冪等・部分成功（src/routes/sync.ts）
 // - GET  /analytics/* … 読み取り専用の分析API（src/analytics.ts）
 // - /admin/api-tokens … CLI トークンの発行・一覧・失効（admin のみ）
 
@@ -48,6 +50,7 @@ app.use('*', authenticate());
 app.get('/health', (context) => context.json({ ok: true, service: 'workout-habit-api' }));
 
 app.route('/backup', backup);
+app.route('/sync', sync);
 app.route('/analytics', analytics);
 app.route('/admin/api-tokens', apiTokens);
 

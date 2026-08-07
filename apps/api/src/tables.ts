@@ -1,6 +1,7 @@
-// 同期（バックアップ/復元）対象のテーブルとカラム定義。
-// モバイル側 apps/mobile/src/db/sync.ts と同じ定義を持つ（モノレポ方針によりアプリ間の重複は許容）。
-// app_settings は端末ローカル設定（タイマー設定・同期トークン）のため対象外。
+// 同期対象のエンティティ定義。バックアップ（src/backup.ts）と
+// 操作ベースの同期（src/sync/）の両方がこの定義を正とする。
+// モバイル側 apps/mobile/src/db/sync.ts と対になる（モノレポ方針によりアプリ間の重複は許容）。
+// app_settings は端末ローカル設定（タイマー設定）のため対象外。
 //
 // body_parts は全ユーザー共有のマスタで、端末側も seed で同じ行を持つ。
 // 所有者を持てず置換のスコープを切れないため、同期対象から外している。
@@ -8,12 +9,35 @@
 // columns はクライアントとやり取りする列。所有者の列（ownerColumn）は含めない。
 // 所有者はサーバが認証結果から決めるものであり、クライアントの申告を信用しない。
 
+export type ColumnType = 'text' | 'integer' | 'real';
+
+export type SyncColumn = {
+  name: string;
+  type: ColumnType;
+  /** NULL を許す列。 */
+  nullable?: boolean;
+  /** 省略を許す列（DB 側に DEFAULT があるか NULL 可）。 */
+  optional?: boolean;
+};
+
+/** 親テーブルへの参照。存在と所有者の一致を検証する。 */
+export type ParentReference = {
+  column: string;
+  table: string;
+};
+
 export type SyncTable = {
   name: string;
-  columns: readonly string[];
   /** 行の所有者を指す列。置換とスコープはこの列で行う。 */
   ownerColumn: 'user_id' | 'owner_user_id';
+  columns: readonly SyncColumn[];
+  parents?: readonly ParentReference[];
 };
+
+const timestamps: readonly SyncColumn[] = [
+  { name: 'created_at', type: 'text' },
+  { name: 'updated_at', type: 'text' },
+];
 
 export const SYNC_TABLES: readonly SyncTable[] = [
   {
@@ -21,103 +45,128 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     name: 'exercises',
     ownerColumn: 'owner_user_id',
     columns: [
-      'id',
-      'name',
-      'primary_body_part_id',
-      'default_rest_seconds',
-      'default_bar_weight_kg',
-      'category',
-      'is_archived',
-      'created_at',
-      'updated_at',
+      { name: 'id', type: 'text' },
+      { name: 'name', type: 'text' },
+      { name: 'primary_body_part_id', type: 'text' },
+      { name: 'default_rest_seconds', type: 'integer' },
+      { name: 'default_bar_weight_kg', type: 'real' },
+      { name: 'category', type: 'text' },
+      { name: 'is_archived', type: 'integer', optional: true },
+      ...timestamps,
     ],
+    parents: [{ column: 'primary_body_part_id', table: 'body_parts' }],
   },
   {
     name: 'workouts',
     ownerColumn: 'user_id',
     columns: [
-      'id',
-      'performed_at',
-      'status',
-      'source',
-      'memo',
-      'last_saved_at',
-      'created_at',
-      'updated_at',
+      { name: 'id', type: 'text' },
+      { name: 'performed_at', type: 'text' },
+      { name: 'status', type: 'text' },
+      { name: 'source', type: 'text', optional: true },
+      { name: 'memo', type: 'text', optional: true },
+      { name: 'last_saved_at', type: 'text' },
+      ...timestamps,
     ],
   },
   {
     name: 'workout_exercises',
     ownerColumn: 'user_id',
     columns: [
-      'id',
-      'workout_id',
-      'exercise_id',
-      'order_index',
-      'rest_seconds_override',
-      'memo',
-      'created_at',
-      'updated_at',
+      { name: 'id', type: 'text' },
+      { name: 'workout_id', type: 'text' },
+      { name: 'exercise_id', type: 'text' },
+      { name: 'order_index', type: 'integer' },
+      { name: 'rest_seconds_override', type: 'integer', nullable: true, optional: true },
+      { name: 'memo', type: 'text', optional: true },
+      ...timestamps,
+    ],
+    parents: [
+      { column: 'workout_id', table: 'workouts' },
+      { column: 'exercise_id', table: 'exercises' },
     ],
   },
   {
     name: 'workout_sets',
     ownerColumn: 'user_id',
     columns: [
-      'id',
-      'workout_exercise_id',
-      'order_index',
-      'weight_kg',
-      'reps',
-      'rpe',
-      'is_warmup',
-      'is_completed',
-      'memo',
-      'rest_seconds',
-      'started_at',
-      'completed_at',
-      'deleted_at',
-      'created_at',
-      'updated_at',
+      { name: 'id', type: 'text' },
+      { name: 'workout_exercise_id', type: 'text' },
+      { name: 'order_index', type: 'integer' },
+      { name: 'weight_kg', type: 'real' },
+      { name: 'reps', type: 'integer' },
+      { name: 'rpe', type: 'real' },
+      { name: 'is_warmup', type: 'integer', optional: true },
+      { name: 'is_completed', type: 'integer', optional: true },
+      { name: 'memo', type: 'text', optional: true },
+      { name: 'rest_seconds', type: 'integer' },
+      { name: 'started_at', type: 'text', nullable: true, optional: true },
+      { name: 'completed_at', type: 'text', nullable: true, optional: true },
+      { name: 'deleted_at', type: 'text', nullable: true, optional: true },
+      ...timestamps,
     ],
+    parents: [{ column: 'workout_exercise_id', table: 'workout_exercises' }],
   },
   {
     name: 'timer_events',
     ownerColumn: 'user_id',
     columns: [
-      'id',
-      'workout_set_id',
-      'exercise_id',
-      'duration_seconds',
-      'started_at',
-      'ended_at',
-      'status',
-      'sound_enabled',
-      'created_at',
-      'updated_at',
+      { name: 'id', type: 'text' },
+      { name: 'workout_set_id', type: 'text' },
+      { name: 'exercise_id', type: 'text' },
+      { name: 'duration_seconds', type: 'integer' },
+      { name: 'started_at', type: 'text' },
+      { name: 'ended_at', type: 'text', nullable: true, optional: true },
+      { name: 'status', type: 'text' },
+      { name: 'sound_enabled', type: 'integer' },
+      ...timestamps,
+    ],
+    parents: [
+      { column: 'workout_set_id', table: 'workout_sets' },
+      { column: 'exercise_id', table: 'exercises' },
     ],
   },
-  { name: 'templates', ownerColumn: 'user_id', columns: ['id', 'name', 'created_at', 'updated_at'] },
+  {
+    name: 'templates',
+    ownerColumn: 'user_id',
+    columns: [{ name: 'id', type: 'text' }, { name: 'name', type: 'text' }, ...timestamps],
+  },
   {
     name: 'template_exercises',
     ownerColumn: 'user_id',
-    columns: ['id', 'template_id', 'exercise_id', 'order_index', 'created_at', 'updated_at'],
+    columns: [
+      { name: 'id', type: 'text' },
+      { name: 'template_id', type: 'text' },
+      { name: 'exercise_id', type: 'text' },
+      { name: 'order_index', type: 'integer' },
+      ...timestamps,
+    ],
+    parents: [
+      { column: 'template_id', table: 'templates' },
+      { column: 'exercise_id', table: 'exercises' },
+    ],
   },
   {
     name: 'body_logs',
     ownerColumn: 'user_id',
     columns: [
-      'id',
-      'measured_at',
-      'body_weight_kg',
-      'body_fat_percentage',
-      'estimated_calories_burned',
-      'memo',
-      'created_at',
-      'updated_at',
+      { name: 'id', type: 'text' },
+      { name: 'measured_at', type: 'text' },
+      { name: 'body_weight_kg', type: 'real' },
+      { name: 'body_fat_percentage', type: 'real', nullable: true, optional: true },
+      { name: 'estimated_calories_burned', type: 'real', nullable: true, optional: true },
+      { name: 'memo', type: 'text', optional: true },
+      ...timestamps,
     ],
   },
 ];
+
+/** 同期対象テーブルを名前で引く。エンティティ名の許可リストも兼ねる。 */
+export const findSyncTable = (name: string): SyncTable | undefined =>
+  SYNC_TABLES.find((table) => table.name === name);
+
+export const columnNamesOf = (table: SyncTable): string[] =>
+  table.columns.map((column) => column.name);
 
 export type BackupPayload = {
   exportedAt: string;

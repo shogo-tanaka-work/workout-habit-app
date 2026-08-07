@@ -23,6 +23,17 @@ paths: "apps/api/src/**/*.ts"
 - 週の定義（月曜はじまり）や Epley 係数など、モバイルと共通の計算規則は定数に名前を付ける。
   モバイル側の同名ロジック（`utils/aggregate.ts` など）と定義を揃える
 
+## /sync/operations（操作ベースの同期）
+
+- 送られるのはスナップショットではなく操作（intent）。`upsert` / `delete` の2種類
+- エンティティ名と列は `src/tables.ts` の定義を許可リストとする。未知の列は通さない
+- 検証は `src/sync/validate.ts`、適用は `src/sync/apply.ts`。route に SQL を書かない
+- 冪等性は `sync_operations` 台帳（`(user_id, id)` が主キー）で担保する。
+  **操作 ID をユーザー横断の一意キーにしない**（他人が先に同じ ID を送ると適用を妨げられる）
+- 競合は後勝ち。ただし手元の行の `updated_at` が新しければ適用せず `stale` を返す
+- 対象行と親行の所有者を必ず確かめる。他人の行の存在は `row not found` で伏せる
+- 1件が失敗しても残りは適用する（部分成功）。HTTP 400 は body 自体が不正なときだけ
+
 ## /backup
 
 - 全テーブルの DELETE → INSERT による全置換。**破壊的操作**であることを常に意識する

@@ -40,7 +40,8 @@ src/
   env.ts        Bindings と Hono の型引数
   analytics.ts  /analytics/* の集計エンドポイント
   backup.ts     /backup の読み出しと置換（本人スコープ）
-  tables.ts     同期対象テーブルとカラム定義（apps/mobile/src/db/sync.ts と対になる）
+  tables.ts     同期対象エンティティの定義（列の型・親参照）。apps/mobile/src/db/sync.ts と対になる
+  sync/         操作（intent）ベースの同期。validate（形式検証）・apply（冪等な適用）
   auth/         認証と認可。types / jwt / access / google / apiToken / users
   middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
   db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
@@ -59,8 +60,12 @@ worker-configuration.d.ts  wrangler types の生成型
 | `GET /health` | 不要 | 死活確認 |
 | `GET /backup` | 必要 | 本人の同期対象テーブルを返す（復元用） |
 | `POST /backup` | 必要 | 本人の行だけを置き換える（**破壊的**） |
+| `POST /sync/operations` | 必要 | 操作（intent）ベースの同期。冪等・部分成功 |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/analytics.ts` |
 | `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
+
+`POST /backup` はモバイルが outbox へ移行するまでの経路。移行後は
+初回同期（D1 → 端末）の `GET /backup` だけを残す。
 
 静的アセットを持たないため、パスの振り分け設定は不要。追加したら認証要否を明示的に判断する。
 

@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 
 import type { AppEnv } from './env';
 import type { BackupPayload, SyncTable } from './tables';
-import { SYNC_TABLES } from './tables';
+import { columnNamesOf, SYNC_TABLES } from './tables';
 
 // D1 の 1 クエリあたりのバインド変数上限（100）を超えないための行チャンクサイズ算出。
 const MAX_BOUND_PARAMS = 90;
@@ -31,7 +31,7 @@ backup.get('/', async (context) => {
   const tables: Record<string, Record<string, unknown>[]> = {};
   for (const table of SYNC_TABLES) {
     const result = await context.env.DB.prepare(
-      `SELECT ${table.columns.join(', ')} FROM ${table.name} WHERE ${selectScopeOf(table)}`,
+      `SELECT ${columnNamesOf(table).join(', ')} FROM ${table.name} WHERE ${selectScopeOf(table)}`,
     )
       .bind(user.id)
       .all();
@@ -74,13 +74,14 @@ backup.post('/', async (context) => {
     const rows = payload.tables[table.name] ?? [];
     counts[table.name] = rows.length;
 
-    const columns = [...table.columns, table.ownerColumn];
+    const tableColumns = columnNamesOf(table);
+    const columns = [...tableColumns, table.ownerColumn];
     const rowsPerStatement = Math.max(1, Math.floor(MAX_BOUND_PARAMS / columns.length));
     for (let offset = 0; offset < rows.length; offset += rowsPerStatement) {
       const chunk = rows.slice(offset, offset + rowsPerStatement);
       const valuesClause = chunk.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
       const bindings = chunk.flatMap((row) => [
-        ...table.columns.map((column) => row[column] ?? null),
+        ...tableColumns.map((column) => row[column] ?? null),
         user.id,
       ]);
       insertStatements.push(

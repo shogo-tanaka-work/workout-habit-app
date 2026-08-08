@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 
 import { analytics } from './analytics';
 import { backup } from './backup';
@@ -9,7 +8,10 @@ import { apiTokens } from './routes/apiTokens';
 import { sync } from './routes/sync';
 
 // workout-habit の API。この Worker は API 専用で、静的アセットを持たない。
-// 管理画面は別オリジン（workout-habit-admin Worker）が配信するため CORS が要る。
+//
+// **ブラウザから直接呼ばれることはない。** 管理画面は workout-habit-admin Worker が配信し、
+// そこから Service Binding で中継されるため同一オリジン扱いになる。
+// モバイルと Claude Code もブラウザ経由ではない。したがって CORS の設定を持たない。
 //
 // 認証は3経路。詳細は src/middleware/authenticate.ts と .agents/memory/auth-model.md。
 // - ブラウザ（管理画面）: Cloudflare Access の JWT を Worker 側で再検証
@@ -23,27 +25,7 @@ import { sync } from './routes/sync';
 // - GET  /analytics/* … 読み取り専用の分析API（src/analytics.ts）
 // - /admin/api-tokens … CLI トークンの発行・一覧・失効（admin のみ）
 
-const parseAllowedOrigins = (value: string | undefined): string[] =>
-  (value ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0);
-
 const app = new Hono<AppEnv>();
-
-// CORS は認証より先に置く。プリフライト（OPTIONS）は Authorization を持たないため、
-// 認証ミドルウェアより後ろに置くと 401 になってブラウザ側で失敗する。
-app.use('*', (context, next) =>
-  cors({
-    origin: (requestOrigin) => {
-      const allowed = parseAllowedOrigins(context.env.ALLOWED_ORIGINS);
-      return allowed.includes(requestOrigin) ? requestOrigin : undefined;
-    },
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Authorization', 'Content-Type'],
-    maxAge: 86400,
-  })(context, next),
-);
 
 app.use('*', authenticate());
 

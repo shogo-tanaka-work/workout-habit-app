@@ -190,10 +190,13 @@ Step 3.5 の Worker 分割は維持する。中継役は経路を束ねるだけ
   検証するのは api Worker であり、admin は中継するだけ。
   Access アプリ（守る対象のホスト指定）は admin に掛けるので、名前が同じで紛らわしい
 
+片付け済み（2026-08-08）。
+
+- CORS（`ALLOWED_ORIGINS`）と `API_TOKEN` を削除。API はブラウザから直接呼ばれないため CORS 自体が不要
+- `workout-habit-admin` へ誤って入れた `ACCESS_*` も削除
+
 残る宿題。
 
-- API の CORS（`ALLOWED_ORIGINS`）は管理画面が同一オリジンになったため不要になった。削除する
-- `API_TOKEN` も未使用のまま残っている。削除する
 - `member` へ開放する区画の切り分けは未着手（現状は Access の許可メールで入口を制御するだけ）
 
 ### データフロー一本化（2026-08-07 決定）

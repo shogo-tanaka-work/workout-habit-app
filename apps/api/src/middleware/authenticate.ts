@@ -39,10 +39,6 @@ const identify = async (context: Context<AppEnv>): Promise<Identity | null> => {
 };
 
 export const authenticate = (): MiddlewareHandler<AppEnv> => async (context, next) => {
-  // プリフライトは Authorization を持たないため認証の対象外。
-  if (context.req.method === 'OPTIONS') {
-    return next();
-  }
   if (PUBLIC_PATHS.has(context.req.path)) {
     return next();
   }

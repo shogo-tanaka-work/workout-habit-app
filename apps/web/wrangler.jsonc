@@ -17,7 +17,11 @@
     "binding": "ASSETS",
     // クライアントルーティングを持たない SPA だが、
     // 未知のパスで 404 を出さないためフォールバックさせる。
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // 既定ではアセットが先に解決され、一致しないパスは SPA フォールバックへ回る。
+    // そのままだと /api/* も index.html になり Worker まで届かないため、
+    // 中継対象のパスだけ Worker を先に走らせる。
+    "run_worker_first": ["/api/*"]
   },
   // Worker 間の直接呼び出し。公開インターネットを経由しない。
   "services": [

@@ -126,7 +126,7 @@ Step 4 の `user_id` 追加でも同じ再構築が必要なので、**1回の�
 | 4-3 | 操作ベース（intent）の CRUD エンドポイント | 完了 |
 | 4-4a | モバイルの outbox とデータ層の書き換え | 完了 |
 | 4-4b | モバイルの Google サインイン | 完了（シミュレータで疎通確認済み） |
-| 4-5 | 管理画面（Cloudflare Access 適用・member 区画） | コード対応済み・**Access 設定は未** |
+| 4-5 | 管理画面（Cloudflare Access 適用・member 区画） | 完了（member 区画の切り分けは未着手） |
 
 本番適用は 2026-08-07 に完了（migration 0002 / 0003 → API デプロイの順）。
 モバイルからの同期疎通も確認済み。経緯と落とし穴は `docs/60_ログ/2026-08.md`。
@@ -182,10 +182,18 @@ API 側にも Access を掛けると未認証の XHR がログイン画面への
 
 Step 3.5 の Worker 分割は維持する。中継役は経路を束ねるだけで、集計も認可も API Worker のまま。
 
+実装上の落とし穴（2026-08-08 に踏んだもの。詳細は `docs/60_ログ/2026-08.md`）。
+
+- Workers Assets は既定でアセットを先に解決するため、`/api/*` が SPA フォールバックに吸われる。
+  `assets.run_worker_first` で中継対象のパスだけ Worker を先に走らせる
+- **`ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` は `workout-habit-api` に設定する。**
+  検証するのは api Worker であり、admin は中継するだけ。
+  Access アプリ（守る対象のホスト指定）は admin に掛けるので、名前が同じで紛らわしい
+
 残る宿題。
 
-- API の CORS（`ALLOWED_ORIGINS`）は管理画面が同一オリジンになったため不要になった。
-  Access 経由の疎通を確認できたら削除する
+- API の CORS（`ALLOWED_ORIGINS`）は管理画面が同一オリジンになったため不要になった。削除する
+- `API_TOKEN` も未使用のまま残っている。削除する
 - `member` へ開放する区画の切り分けは未着手（現状は Access の許可メールで入口を制御するだけ）
 
 ### データフロー一本化（2026-08-07 決定）

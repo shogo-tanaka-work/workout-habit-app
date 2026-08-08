@@ -9,6 +9,17 @@ import { verifyJwt } from './jwt';
 /** Access が JWT を載せてくるヘッダ。 */
 export const ACCESS_JWT_HEADER = 'Cf-Access-Jwt-Assertion';
 
+/**
+ * チームドメインの表記ゆれを吸収する。
+ * ダッシュボードからは `https://` 付きでコピーされることがあり、
+ * そのまま URL を組み立てると `https://https://...` になって JWKS の取得に失敗する。
+ */
+const normalizeTeamDomain = (teamDomain: string): string =>
+  teamDomain
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/+$/, '');
+
 const certsUrlOf = (teamDomain: string): string =>
   `https://${teamDomain}/cdn-cgi/access/certs`;
 
@@ -24,7 +35,7 @@ export const verifyAccessJwt = async (
   token: string,
   bindings: AccessBindings,
 ): Promise<Identity | null> => {
-  const teamDomain = bindings.ACCESS_TEAM_DOMAIN?.trim();
+  const teamDomain = normalizeTeamDomain(bindings.ACCESS_TEAM_DOMAIN ?? '');
   const audience = bindings.ACCESS_AUD?.trim();
   if (!teamDomain || !audience) {
     throw new Error(

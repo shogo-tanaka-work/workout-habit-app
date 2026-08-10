@@ -66,6 +66,7 @@ paths: "apps/mobile/src/db/**/*.ts"
 | `db/outbox.ts` | 操作キューの出し入れ。`sync_outbox` テーブル |
 | `sync/pusher.ts` | 送信役。`POST /sync/operations` へ送り、確定した操作を取り下げる |
 | `db/sync.ts` | サーバの内容で端末を作り直す取り込み（機種変更・再インストール向け） |
+| `db/plans.ts` | 予定（`status='planned'`）の取り込み。`GET /plans` の期間をまるごと置き換える |
 
 - `app_settings` と `sync_outbox` は端末ローカルのため同期対象外。
   `body_parts` は共有マスタで seed が持つため同期しない
@@ -76,6 +77,10 @@ paths: "apps/mobile/src/db/**/*.ts"
   種目の同期はカスタム種目（`exercise-` 始まりの ID）だけを対象にする
 - `applyBackupPayload` は端末側データを置き換え、**送信待ちの操作を破棄する**。
   取り込み前に確認を挟む
+- **受信は outbox へ積まない。** サーバから来た内容を送り返すことになり、更新時刻だけが無意味に進む。
+  `writeWithOutbox` を通す書き込みは「端末で起きた操作」に限る
+- 予定の取り込みは `planned` の行しか消さない。実績（`active` / `completed`）に触れると記録が消える。
+  同じ ID の予定を端末が先に開始していたら**取り込まない**（進行中の記録を予定で上書きしないため）
 - `SYNC_COLUMNS` は `apps/api/src/tables.ts` と対になる。片方だけ変えない
 - 通信の詳細は [auth.md](auth.md)
 

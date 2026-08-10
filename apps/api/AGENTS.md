@@ -2,13 +2,15 @@
 
 Cloudflare Workers 上の Hono API。**D1 の所有者であり、認証境界**。
 
-役割は2つ。
+役割は3つ。
 
-1. モバイルアプリのクラウドバックアップ（`/backup` の GET / POST）
+1. 操作（intent）ベースの同期の受け口（`POST /sync/operations`）— 記録の正データはここ
 2. 読み取り専用の分析 API（`/analytics/*`）— 集計ロジックの正本
+3. Claude Code が書いた予定の配布（`GET /plans`）
 
 **静的アセットは持たない。** 管理画面は別 Worker（`workout-habit-admin` / `apps/web`）が
-配信するため、この Worker は純粋な API として動く。別オリジンになるので CORS を設定している。
+配信し、`/api/*` を Service Binding でこの Worker へ中継する。同一オリジン扱いになるため
+**CORS は持たない**（ブラウザから直接呼ばれる経路が無い）。
 
 ## 開発ルール
 
@@ -29,7 +31,6 @@ Cloudflare Workers 上の Hono API。**D1 の所有者であり、認証境界**
 | ランタイム | Cloudflare Workers | `compatibility_date: 2026-06-01`、Observability 有効 |
 | フレームワーク | Hono 4 | |
 | DB | Cloudflare D1（binding: `DB`） | データベース名 `workout-habit-db` |
-| CORS | hono/cors | 許可オリジンは `ALLOWED_ORIGINS` シークレット |
 | 認証 | Access JWT / Google ID トークン / CLI トークンの3経路 | 検証は Web Crypto で自前実装（`src/auth/`） |
 
 ## ディレクトリ構成
@@ -45,7 +46,7 @@ src/
   auth/         認証と認可。types / jwt / access / google / apiToken / users
   middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
   db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
-  routes/       ドメイン単位の route（apiTokens）
+  routes/       ドメイン単位の route（sync / plans / apiTokens）
 migrations/     D1 のマイグレーション。0001 が初期スキーマ、0002 がマルチユーザー化
 wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
@@ -61,6 +62,7 @@ worker-configuration.d.ts  wrangler types の生成型
 | `GET /backup` | 必要 | 本人の同期対象テーブルを返す（復元用） |
 | `POST /backup` | 必要 | 本人の行だけを置き換える（**破壊的**） |
 | `POST /sync/operations` | 必要 | 操作（intent）ベースの同期。冪等・部分成功 |
+| `GET /plans` | 必要 | 期間内の予定（`status='planned'`）を本人分だけ返す。Step 5 の受信経路 |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/analytics.ts` |
 | `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
 

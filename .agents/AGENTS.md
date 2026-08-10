@@ -6,13 +6,16 @@
 
 | アプリ | 役割 | 責務 |
 |---|---|---|
-| `apps/mobile` | 入力 | トレーニング記録の唯一の入力経路。端末内 SQLite が正データ。`/backup` へ全件同期する |
+| `apps/mobile` | 入力 | トレーニング記録の唯一の入力経路。端末内 SQLite は表示用キャッシュ＋操作キュー |
 | `apps/web` | 管理画面 | 読み取り専用の分析ダッシュボード。集計はしない。API の集計結果を表示整形するだけ |
-| `apps/api` | サーバ | D1 の所有者、認証境界、`apps/web` の静的アセット配信元。集計ロジックの一元管理先 |
+| `apps/api` | サーバ | **D1 の所有者＝正データ**、認証境界、集計ロジックの一元管理先 |
+
+Claude Code は4つ目のクライアント。書き込みはモバイルと同じ `POST /sync/operations` を使い、
+専用の書き込み API は持たない（`memory/claude-code-integration.md`）。
 
 境界を越えさせない。
 
-- モバイルは D1 を直接読まない。`/backup` の送受信だけを行う。
+- モバイルは D1 を直接読まない。操作の送信と、予定の取り込みだけを行う。
 - web は書き込み系 API を呼ばない。集計をクライアントで再実装しない。
 - API は表示都合の整形（桁揃え・ラベル文言・空週の穴埋め）を持たない。
 
@@ -21,7 +24,7 @@
 - モバイル: Expo SDK 56 / React Native 0.85 / React 19 / expo-sqlite
 - API: Hono on Cloudflare Workers
 - DB: Cloudflare D1（SQLite）
-- 管理画面: Vite + React 19（workout-habit-admin Worker が静的配信。API とは別オリジン）
+- 管理画面: Vite + React 19（workout-habit-admin Worker が静的配信し、`/api/*` を API へ中継。同一オリジン）
 - 言語: TypeScript（全アプリ `strict: true`）
 
 ## 構成の把握
@@ -31,8 +34,8 @@
 - `memory/roadmap.md` — 大きな実行計画と決定済み方針。作業の位置づけを確認する
 - `memory/cloudflare.md` — Worker / D1 / 静的配信の構成と、公開リポジトリに書いてよい値の線引き
 - `memory/auth-model.md` — 認証のゴール像と未確定事項
-- `memory/claude-code-integration.md` — Claude Code 連携（Step 5）の構想。
-  **現行の全置換同期と衝突するため、データモデルや同期を触る前に読む**
+- `memory/claude-code-integration.md` — Claude Code 連携（Step 5）の決定と使い方。
+  トークンの用意、計画の書き方、`GET /plans` による取り込みまで
 
 データモデルや API を変更する前に、対応する仕様書を読む。実装を変えたら同じ変更セットで更新する。
 `docs/` は非公開のためリポジトリには含まれない（ローカルにのみ存在する）。

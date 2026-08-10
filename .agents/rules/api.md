@@ -9,9 +9,9 @@ paths: "apps/api/src/**/*.ts"
 - URL パラメータと JSON body を未検証のまま処理へ渡さない
 - 検証は route 層で行い、その先は検証済みの型付き入力だけを受け取る
 - Hono のサブ Router をドメイン単位で構成する（`/analytics` は `src/analytics.ts`）
-- CORS の許可オリジンは `ALLOWED_ORIGINS` シークレットから読む。ワイルドカードを使わない
-- CORS ミドルウェアは**認証より前**に置く。プリフライト（OPTIONS）は `Authorization` を
-  持たないため、認証を先に通すと 401 になってブラウザ側で失敗する
+- **CORS は持たない。** 管理画面は `workout-habit-admin` からの Service Binding 中継で
+  同一オリジンになり、モバイルと Claude Code はブラウザ経由ではない。
+  CORS が要る状況になったら、その前に経路の設計を疑う
 
 ## 集計エンドポイント（/analytics/*）
 
@@ -33,6 +33,14 @@ paths: "apps/api/src/**/*.ts"
 - 競合は後勝ち。ただし手元の行の `updated_at` が新しければ適用せず `stale` を返す
 - 対象行と親行の所有者を必ず確かめる。他人の行の存在は `row not found` で伏せる
 - 1件が失敗しても残りは適用する（部分成功）。HTTP 400 は body 自体が不正なときだけ
+
+## /plans（予定の配布）
+
+- 返すのは `status='planned'` の行だけ。実績（`active` / `completed`）を混ぜない。
+  端末は取り込んだ内容で期間を置き換えるため、実績が混ざると記録が消える
+- **ロールに関わらず本人の予定だけを返す。** admin が全件を見るのは分析 API の役割
+- 期間（`from` / `to`）は必須。サーバの UTC 今日を暗黙の基準にしない
+- 差分（`?since=`）にしない。削除が物理削除で tombstone を持たず、差分では消えたことを表現できない
 
 ## /backup
 

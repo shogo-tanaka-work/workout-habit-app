@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { BodyLogSection } from '../components/BodyLogSection';
+import { PlannedWorkoutSection } from '../components/PlannedWorkoutSection';
 import { StatSummary } from '../components/StatSummary';
 import { styles } from '../styles/appStyles';
 import type {
@@ -19,6 +20,7 @@ import { formatCount, formatVolume } from '../utils/number';
 export function HomeScreen({
   activeWorkout,
   completedWorkouts,
+  plannedWorkouts,
   workoutExercises,
   visibleSets,
   exerciseById,
@@ -27,10 +29,12 @@ export function HomeScreen({
   bodyLogs,
   onStart,
   onResume,
+  onBeginPlanned,
   onSaveBodyLog,
 }: {
   activeWorkout: Workout | null;
   completedWorkouts: Workout[];
+  plannedWorkouts: Workout[];
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
@@ -39,6 +43,7 @@ export function HomeScreen({
   bodyLogs: BodyLog[];
   onStart: () => void;
   onResume: () => void;
+  onBeginPlanned: (workoutId: string) => void;
   onSaveBodyLog: (bodyWeightKg: number, bodyFatPercentage: number | null) => void;
 }) {
   const maxBodyPartVolume = bodyPartSummaries.reduce(
@@ -71,6 +76,15 @@ export function HomeScreen({
           </Pressable>
         </View>
       </View>
+
+      <PlannedWorkoutSection
+        plannedWorkouts={plannedWorkouts}
+        workoutExercises={workoutExercises}
+        visibleSets={visibleSets}
+        exerciseById={exerciseById}
+        hasActiveWorkout={activeWorkout !== null}
+        onBegin={onBeginPlanned}
+      />
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>

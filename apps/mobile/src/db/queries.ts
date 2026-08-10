@@ -334,6 +334,30 @@ export const insertWorkout = async (
   });
 };
 
+/**
+ * 予定を開始して実績へ移す。
+ *
+ * **performed_at は開始した日で上書きする。** 予定日と違う日に実施しても、
+ * 記録は実施した日のものとして残るのが正しい（予定日のまま残すと履歴と集計がずれる）。
+ */
+export const startPlannedWorkout = async (
+  database: SQLite.SQLiteDatabase,
+  workoutId: string,
+  performedAt: string,
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'startPlannedWorkout', async () => {
+    await database.runAsync(
+      "UPDATE workouts SET status = 'active', performed_at = ?, last_saved_at = ?, updated_at = ? WHERE id = ? AND status = 'planned'",
+      performedAt,
+      timestamp,
+      timestamp,
+      workoutId,
+    );
+    await enqueueUpsert(database, 'workouts', workoutId);
+  });
+};
+
 export const setWorkoutStatus = async (
   database: SQLite.SQLiteDatabase,
   workoutId: string,

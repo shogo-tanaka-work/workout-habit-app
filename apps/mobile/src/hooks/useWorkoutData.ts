@@ -19,6 +19,7 @@ import {
   markLastBackupAt,
   setExerciseRest,
   setWorkoutStatus,
+  startPlannedWorkout,
   touchWorkout,
   updateWorkoutSet,
   upsertBodyLog,
@@ -34,6 +35,7 @@ import {
   signOut as signOutFromGoogle,
 } from '../auth/googleAuth';
 import { countPendingOperations } from '../db/outbox';
+import { fetchPlansFromCloud, replacePlannedWorkouts } from '../db/plans';
 import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
 import { pushPendingOperations } from '../sync/pusher';
 import type {
@@ -53,8 +55,20 @@ import type {
 } from '../types/domain';
 import type { BodyPartSummary } from '../utils/aggregate';
 import { summarizeByBodyPart } from '../utils/aggregate';
-import { formatDate, nowIso, nowMs, startOfWeekIso } from '../utils/datetime';
+import { formatDate, isoDatePlusDays, nowIso, nowMs, startOfWeekIso } from '../utils/datetime';
 import { newId } from '../utils/id';
+
+// 予定を取り込む期間。過去は取りこぼした予定を拾える程度に、先は数週間分だけ見る。
+const PLAN_RANGE_DAYS_BACK = 7;
+const PLAN_RANGE_DAYS_AHEAD = 28;
+
+const planRange = (): { from: string; to: string } => {
+  const today = formatDate(new Date());
+  return {
+    from: isoDatePlusDays(today, -PLAN_RANGE_DAYS_BACK),
+    to: isoDatePlusDays(today, PLAN_RANGE_DAYS_AHEAD),
+  };
+};
 
 // SQLite の初期化・データ読み込み・全 CRUD 操作・派生状態を集約するフック。
 // UI（タブ・編集中ID・入力欄など）の状態は持たず、App 側が管理する。
@@ -123,10 +137,26 @@ export function useWorkoutData() {
     [workouts],
   );
 
+  // Claude Code が書いた予定のうち、まだ実施していないもの（日付の早い順）。
+  const plannedWorkouts = useMemo(
+    () =>
+      workouts
+        .filter((workout) => workout.status === 'planned')
+        .sort((a, b) => a.performedAt.localeCompare(b.performedAt)),
+    [workouts],
+  );
+
+  // 実績だけを集計対象にする。予定のセットは「やっていない記録」なので、
+  // 混ぜるとボリュームも回数も水増しされる。
+  const performedWorkouts = useMemo(
+    () => workouts.filter((workout) => workout.status !== 'planned'),
+    [workouts],
+  );
+
   // ホーム表示用の「今週（月曜はじまり）」の集計。
   const stats = useMemo((): WeeklyStats => {
     const weekStart = startOfWeekIso(new Date());
-    const weekWorkouts = workouts.filter((workout) => workout.performedAt >= weekStart);
+    const weekWorkouts = performedWorkouts.filter((workout) => workout.performedAt >= weekStart);
     const weekWorkoutIds = new Set(weekWorkouts.map((workout) => workout.id));
     const weekExerciseIds = new Set(
       workoutExercises.filter((item) => weekWorkoutIds.has(item.workoutId)).map((item) => item.id),
@@ -143,19 +173,21 @@ export function useWorkoutData() {
       totalReps += set.reps;
     }
     return { workoutCount: weekWorkouts.length, setCount, totalVolume, totalReps };
-  }, [workouts, workoutExercises, visibleSets]);
+  }, [performedWorkouts, workoutExercises, visibleSets]);
 
   // ホーム表示用の「今週の部位別」集計（ボリューム降順）。
   const weeklyBodyPartSummary = useMemo((): BodyPartSummary[] => {
     const weekStart = startOfWeekIso(new Date());
     const weekWorkoutIds = new Set(
-      workouts.filter((workout) => workout.performedAt >= weekStart).map((workout) => workout.id),
+      performedWorkouts
+        .filter((workout) => workout.performedAt >= weekStart)
+        .map((workout) => workout.id),
     );
     const weekExercises = workoutExercises.filter((item) => weekWorkoutIds.has(item.workoutId));
     const weekExerciseIds = new Set(weekExercises.map((item) => item.id));
     const weekSets = visibleSets.filter((set) => weekExerciseIds.has(set.workoutExerciseId));
     return summarizeByBodyPart(weekExercises, weekSets, exerciseById, bodyPartById);
-  }, [workouts, workoutExercises, visibleSets, exerciseById, bodyPartById]);
+  }, [performedWorkouts, workoutExercises, visibleSets, exerciseById, bodyPartById]);
 
   // 記録画面の種目追加用に、使用回数の多い順（同数は名前順）へ並べ替えた種目一覧。
   const exercisesByUsage = useMemo(() => {
@@ -515,6 +547,43 @@ export function useWorkoutData() {
     }
   }, [db, syncSettings.apiUrl, account]);
 
+  // 予定の取り込み。**受信なので outbox には積まない**（src/db/plans.ts）。
+  // 送信と違い、失敗しても端末には何も残らない。次の契機で取り直せばよい。
+  const importPlansInBackground = useCallback(async () => {
+    if (!db || !syncSettings.apiUrl || !account) {
+      return;
+    }
+    try {
+      const { from, to } = planRange();
+      const payload = await fetchPlansFromCloud(syncSettings.apiUrl, await getIdToken(), from, to);
+      await replacePlannedWorkouts(db, payload);
+      await reloadData(db);
+    } catch (error: unknown) {
+      console.warn(
+        '[plans] 予定の取り込みに失敗',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }, [db, syncSettings.apiUrl, account, reloadData]);
+
+  // 手動の取り込み。失敗を画面へ伝えたいので、こちらは例外を投げる。
+  const importPlans = async (): Promise<void> => {
+    const database = ensureDb();
+    const connection = ensureSyncConnection();
+    const { from, to } = planRange();
+    const payload = await fetchPlansFromCloud(connection.apiUrl, await getIdToken(), from, to);
+    await replacePlannedWorkouts(database, payload);
+    await reloadData(database);
+  };
+
+  // 予定を開始して実績へ移す。開始した日の記録として残る。
+  const beginPlannedWorkout = async (workoutId: string): Promise<void> => {
+    const database = ensureDb();
+    await startPlannedWorkout(database, workoutId, formatDate(new Date()));
+    await reloadData(database);
+    void syncInBackground();
+  };
+
   // クラウドのバックアップでローカルを置き換える（復元）。呼び出し側で確認ダイアログを出す。
   const restoreFromCloud = async () => {
     const database = ensureDb();
@@ -558,6 +627,7 @@ export function useWorkoutData() {
     bodyPartById,
     activeWorkoutExercises,
     completedWorkouts,
+    plannedWorkouts,
     stats,
     weeklyBodyPartSummary,
     exercisesByUsage,
@@ -579,6 +649,9 @@ export function useWorkoutData() {
     updateSyncConnection,
     syncNow,
     syncInBackground,
+    importPlans,
+    importPlansInBackground,
+    beginPlannedWorkout,
     restoreFromCloud,
     startWorkout,
     completeWorkout,

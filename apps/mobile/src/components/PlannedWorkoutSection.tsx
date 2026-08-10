@@ -1,0 +1,80 @@
+import { Pressable, Text, View } from 'react-native';
+
+import { styles } from '../styles/appStyles';
+import type { Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import { formatSetsInline } from '../utils/aggregate';
+import { formatJapaneseDate } from '../utils/datetime';
+
+// Claude Code が立てた予定の一覧。予定が無いときは何も出さない
+// （空状態を置くと、使っていない人にまで機能を見せることになる）。
+//
+// 予定は下書きであり、開始した後は普通の記録として扱う。
+// 実施しながら重量やレップを直すことは想定内で、予定値は残らない。
+
+export function PlannedWorkoutSection({
+  plannedWorkouts,
+  workoutExercises,
+  visibleSets,
+  exerciseById,
+  hasActiveWorkout,
+  onBegin,
+}: {
+  plannedWorkouts: Workout[];
+  workoutExercises: WorkoutExercise[];
+  visibleSets: WorkoutSet[];
+  exerciseById: Map<string, Exercise>;
+  hasActiveWorkout: boolean;
+  onBegin: (workoutId: string) => void;
+}) {
+  if (plannedWorkouts.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>予定しているメニュー</Text>
+      </View>
+      {plannedWorkouts.map((workout) => {
+        const items = workoutExercises
+          .filter((item) => item.workoutId === workout.id)
+          .sort((a, b) => a.orderIndex - b.orderIndex);
+        return (
+          <View key={workout.id} style={styles.exerciseRow}>
+            <View style={styles.exerciseRowHeader}>
+              <View style={styles.exerciseDot} />
+              <Text style={styles.exerciseRowName}>{formatJapaneseDate(workout.performedAt)}</Text>
+              <Text style={styles.faint}>{items.length} 種目</Text>
+            </View>
+            <View style={styles.sectionBody}>
+              {items.map((item) => {
+                const itemSets = visibleSets
+                  .filter((set) => set.workoutExerciseId === item.id)
+                  .sort((a, b) => a.orderIndex - b.orderIndex);
+                return (
+                  <View key={item.id} style={styles.rowBetween}>
+                    <Text style={styles.panelText}>
+                      {exerciseById.get(item.exerciseId)?.name ?? '種目'}
+                    </Text>
+                    <Text style={styles.muted}>{formatSetsInline(itemSets)}</Text>
+                  </View>
+                );
+              })}
+              {workout.memo ? <Text style={styles.muted}>{workout.memo}</Text> : null}
+              {hasActiveWorkout ? (
+                // 進行中の記録があるうちは開始させない（active は同時に1つ）。
+                <Text style={styles.faint}>
+                  記録途中のワークアウトを終えると、この予定から始められます。
+                </Text>
+              ) : (
+                <Pressable style={styles.secondaryButton} onPress={() => onBegin(workout.id)}>
+                  <Text style={styles.secondaryButtonText}>この予定で開始</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}

@@ -51,6 +51,12 @@ export const isoDateMonthsAgo = (months: number, from: Date): string => {
   return formatDate(date);
 };
 
+// 端末ローカル日付を日数分ずらす（YYYY-MM-DD）。予定の取得期間の算出に使う。
+export const isoDatePlusDays = (isoDate: string, days: number): string => {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return formatDate(new Date(year ?? 1970, (month ?? 1) - 1, (day ?? 1) + days));
+};
+
 // 月曜はじまりで「今週」の開始日（YYYY-MM-DD）を返す。ホームの週間統計に使う。
 export const startOfWeekIso = (date: Date): string => {
   const dayOfWeek = date.getDay();

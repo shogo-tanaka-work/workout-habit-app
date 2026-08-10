@@ -20,7 +20,8 @@ export type ExerciseRow = {
 export type WorkoutRow = {
   id: string;
   performed_at: string;
-  status: 'active' | 'completed';
+  // planned は Claude Code が書いた予定。端末が開始すると active になる。
+  status: 'planned' | 'active' | 'completed';
   memo: string;
   last_saved_at: string;
   created_at: string;

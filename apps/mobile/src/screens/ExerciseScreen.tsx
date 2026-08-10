@@ -28,6 +28,7 @@ export function ExerciseScreen({
   onSignIn,
   onSignOut,
   onSyncNow,
+  onImportPlans,
   onRestore,
 }: {
   bodyParts: BodyPart[];
@@ -49,6 +50,7 @@ export function ExerciseScreen({
   onSignIn: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
+  onImportPlans: () => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   return (
@@ -174,6 +176,7 @@ export function ExerciseScreen({
         onSignIn={onSignIn}
         onSignOut={onSignOut}
         onSyncNow={onSyncNow}
+        onImportPlans={onImportPlans}
         onRestore={onRestore}
       />
     </View>

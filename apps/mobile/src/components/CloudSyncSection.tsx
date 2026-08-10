@@ -11,7 +11,8 @@ import { formatDateTime } from '../utils/datetime';
 // 種目タブに置く。接続先は app_settings に保存され同期対象外。
 //
 // 記録は操作キューへ積まれ、種目の完了などの契機で自動送信される。
-// ここにあるのは「ログイン」「自動を待たずに送る」「サーバの内容で作り直す」だけ。
+// ここにあるのは「ログイン」「自動を待たずに送る」「予定を取り込む」
+// 「サーバの内容で作り直す」だけ。
 export function CloudSyncSection({
   syncSettings,
   pendingCount,
@@ -21,6 +22,7 @@ export function CloudSyncSection({
   onSignIn,
   onSignOut,
   onSyncNow,
+  onImportPlans,
   onRestore,
 }: {
   syncSettings: SyncSettings;
@@ -31,6 +33,7 @@ export function CloudSyncSection({
   onSignIn: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
+  onImportPlans: () => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   const [apiUrl, setApiUrl] = useState(syncSettings.apiUrl);
@@ -122,6 +125,16 @@ export function CloudSyncSection({
           >
             <Text style={styles.secondaryButtonText}>{isBusy ? '処理中…' : '今すぐ同期'}</Text>
           </Pressable>
+          {/* 予定の取り込みは受信だけで、端末の記録には触れない（作り直しとは別物）。 */}
+          <Pressable
+            style={[styles.secondaryButton, styles.flex]}
+            disabled={isBusy}
+            onPress={() => void run('予定の取り込み', onImportPlans)}
+          >
+            <Text style={styles.secondaryButtonText}>予定を取り込む</Text>
+          </Pressable>
+        </View>
+        <View style={styles.headerActions}>
           <Pressable
             style={[styles.dangerButton, styles.flex]}
             disabled={isBusy}

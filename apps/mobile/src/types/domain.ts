@@ -22,7 +22,7 @@ export type Exercise = {
 export type Workout = {
   id: string;
   performedAt: string;
-  status: 'active' | 'completed';
+  status: 'planned' | 'active' | 'completed';
   memo: string;
   lastSavedAt: string;
   createdAt: string;

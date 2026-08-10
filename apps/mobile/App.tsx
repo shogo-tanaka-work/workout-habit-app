@@ -43,15 +43,25 @@ export default function App() {
 
   // 送信の補助的な契機。バックグラウンドへ移るとき（記録を終えて画面を閉じたとき）と、
   // 戻ってきたとき（通信が復帰している可能性がある）に、溜まった操作を送る。
-  const { syncInBackground } = data;
+  const { syncInBackground, importPlansInBackground } = data;
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'background' || state === 'active') {
         void syncInBackground();
       }
+      // 予定の取り込みは復帰時だけ。Claude Code が書いた計画を持ち帰る向きなので、
+      // アプリを閉じる方向では要らない。
+      if (state === 'active') {
+        void importPlansInBackground();
+      }
     });
     return () => subscription.remove();
-  }, [syncInBackground]);
+  }, [syncInBackground, importPlansInBackground]);
+
+  // 起動直後にも一度取り込む（AppState の change は起動時には発火しない）。
+  useEffect(() => {
+    void importPlansInBackground();
+  }, [importPlansInBackground]);
 
   // 記録中の各種目について、直近の完了済み実施記録（前回実績）を引く。
   const previousSessionByExerciseId = useMemo(() => {
@@ -235,6 +245,7 @@ export default function App() {
                 <HomeScreen
                   activeWorkout={data.activeWorkout}
                   completedWorkouts={data.completedWorkouts}
+                  plannedWorkouts={data.plannedWorkouts}
                   workoutExercises={data.workoutExercises}
                   visibleSets={data.visibleSets}
                   exerciseById={data.exerciseById}
@@ -243,6 +254,9 @@ export default function App() {
                   bodyLogs={data.bodyLogs}
                   onStart={handleStart}
                   onResume={() => setTab('workout')}
+                  onBeginPlanned={(workoutId) => {
+                    void data.beginPlannedWorkout(workoutId).then(() => setTab('workout'));
+                  }}
                   onSaveBodyLog={(weightKg, fatPercentage) =>
                     void data.saveBodyLog(weightKg, fatPercentage)
                   }
@@ -313,6 +327,7 @@ export default function App() {
                   onSignIn={data.signInToGoogle}
                   onSignOut={data.signOutOfGoogle}
                   onSyncNow={data.syncNow}
+                  onImportPlans={data.importPlans}
                   onRestore={data.restoreFromCloud}
                 />
               ) : null}

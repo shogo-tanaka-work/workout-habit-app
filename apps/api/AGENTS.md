@@ -46,7 +46,7 @@ src/
   auth/         認証と認可。types / jwt / access / google / apiToken / users
   middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
   db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
-  routes/       ドメイン単位の route（sync / plans / apiTokens）
+  routes/       ドメイン単位の route（sync / plans / me / apiTokens）
 migrations/     D1 のマイグレーション。0001 が初期スキーマ、0002 がマルチユーザー化
 wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
@@ -63,6 +63,7 @@ worker-configuration.d.ts  wrangler types の生成型
 | `POST /backup` | 必要 | 本人の行だけを置き換える（**破壊的**） |
 | `POST /sync/operations` | 必要 | 操作（intent）ベースの同期。冪等・部分成功 |
 | `GET /plans` | 必要 | 期間内の予定（`status='planned'`）を本人分だけ返す。Step 5 の受信経路 |
+| `GET /me` | 必要 | 自分の id / 表示名 / ロール。ユーザー一覧の経路は作らない |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/analytics.ts` |
 | `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
 

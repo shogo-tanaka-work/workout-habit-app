@@ -86,6 +86,7 @@ const TIMER_SOUND_KEY = 'timer_sound_enabled';
 const TIMER_VIBRATION_KEY = 'timer_vibration_enabled';
 const SYNC_API_URL_KEY = 'sync_api_url';
 const SYNC_LAST_BACKUP_AT_KEY = 'sync_last_backup_at';
+const SYNC_PAUSED_KEY = 'sync_paused';
 
 const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
@@ -101,6 +102,8 @@ const toSyncSettings = (rows: AppSettingRow[]): SyncSettings => {
   return {
     apiUrl: valueByKey.get(SYNC_API_URL_KEY) ?? '',
     lastBackupAt: valueByKey.get(SYNC_LAST_BACKUP_AT_KEY) ?? null,
+    // 未設定は「停止していない」。自動送信が既定。
+    isPaused: valueByKey.get(SYNC_PAUSED_KEY) === '1',
   };
 };
 
@@ -179,6 +182,14 @@ export const upsertSyncConnection = async (
   params: { apiUrl: string },
 ): Promise<void> => {
   await upsertAppSetting(database, SYNC_API_URL_KEY, params.apiUrl);
+};
+
+// 自動送信の一時停止を保存する。端末ローカル設定のため同期対象外。
+export const setSyncPaused = async (
+  database: SQLite.SQLiteDatabase,
+  isPaused: boolean,
+): Promise<void> => {
+  await upsertAppSetting(database, SYNC_PAUSED_KEY, isPaused ? '1' : '0');
 };
 
 // 最終バックアップ日時を記録する。

@@ -18,6 +18,7 @@ import {
   loadWorkoutData,
   markLastBackupAt,
   setExerciseRest,
+  setSyncPaused,
   setWorkoutStatus,
   startPlannedWorkout,
   touchWorkout,
@@ -58,6 +59,9 @@ import { summarizeByBodyPart } from '../utils/aggregate';
 import { formatDate, isoDatePlusDays, nowIso, nowMs, startOfWeekIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 
+// 未送信が残っているときの再送間隔。短すぎると圏外で無駄な試行を繰り返す。
+const SYNC_RETRY_INTERVAL_MS = 60_000;
+
 // 予定を取り込む期間。過去は取りこぼした予定を拾える程度に、先は数週間分だけ見る。
 const PLAN_RANGE_DAYS_BACK = 7;
 const PLAN_RANGE_DAYS_AHEAD = 28;
@@ -91,6 +95,7 @@ export function useWorkoutData() {
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
     apiUrl: '',
     lastBackupAt: null,
+    isPaused: false,
   });
   // ログイン中の Google アカウント。トークンは保持せず、必要になった時点で取り直す。
   const [account, setAccount] = useState<GoogleAccount | null>(null);
@@ -529,10 +534,19 @@ export function useWorkoutData() {
     }
   };
 
+  // 自動送信の一時停止。**送信役だけを止める**ので、記録の保存処理は1実装のまま。
+  // ローミング中や通信量を抑えたいときに使う。手動の「今すぐ同期」は止めない
+  // （止めると、送り忘れた分が端末にしか存在しない状態を自分で作ることになる）。
+  const updateSyncPaused = async (isPaused: boolean): Promise<void> => {
+    const database = ensureDb();
+    await setSyncPaused(database, isPaused);
+    setSyncSettings((previous) => ({ ...previous, isPaused }));
+  };
+
   // 自動送信。契機（種目の全セット完了・ワークアウト完了・バックグラウンド遷移）から呼ぶ。
   // 失敗しても画面は止めない。積まれたまま次の契機で再送する。
   const syncInBackground = useCallback(async () => {
-    if (!db || !syncSettings.apiUrl || !account) {
+    if (!db || !syncSettings.apiUrl || !account || syncSettings.isPaused) {
       return;
     }
     try {
@@ -545,12 +559,28 @@ export function useWorkoutData() {
       console.warn('[sync] 自動送信に失敗', error instanceof Error ? error.message : String(error));
       setPendingSyncCount(await countPendingOperations(db));
     }
-  }, [db, syncSettings.apiUrl, account]);
+  }, [db, syncSettings.apiUrl, account, syncSettings.isPaused]);
+
+  // 未送信が残っている間だけ定期的に再送する。
+  //
+  // 他の契機（種目の完了・アプリの復帰・バックグラウンド遷移）はどれも操作か画面遷移が要る。
+  // アプリを開いたまま通信が一時的に失敗すると、**次に画面を離れるまで送信されない**。
+  // 定期リトライがあれば、その状態を利用者が気付かないうちに吸収できる。
+  //
+  // 未送信が 0 になればタイマーは張り直されない（常駐させない）。
+  useEffect(() => {
+    if (pendingSyncCount === 0) {
+      return;
+    }
+    const timer = setInterval(() => void syncInBackground(), SYNC_RETRY_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [pendingSyncCount, syncInBackground]);
 
   // 予定の取り込み。**受信なので outbox には積まない**（src/db/plans.ts）。
   // 送信と違い、失敗しても端末には何も残らない。次の契機で取り直せばよい。
   const importPlansInBackground = useCallback(async () => {
-    if (!db || !syncSettings.apiUrl || !account) {
+    // 一時停止は通信量を抑えるための設定なので、受信も止める。手動の取り込みは止めない。
+    if (!db || !syncSettings.apiUrl || !account || syncSettings.isPaused) {
       return;
     }
     try {
@@ -564,7 +594,7 @@ export function useWorkoutData() {
         error instanceof Error ? error.message : String(error),
       );
     }
-  }, [db, syncSettings.apiUrl, account, reloadData]);
+  }, [db, syncSettings.apiUrl, account, syncSettings.isPaused, reloadData]);
 
   // 手動の取り込み。失敗を画面へ伝えたいので、こちらは例外を投げる。
   const importPlans = async (): Promise<void> => {
@@ -647,6 +677,7 @@ export function useWorkoutData() {
     signInToGoogle,
     signOutOfGoogle,
     updateSyncConnection,
+    updateSyncPaused,
     syncNow,
     syncInBackground,
     importPlans,

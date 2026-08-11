@@ -29,6 +29,7 @@ export function ExerciseScreen({
   onSignOut,
   onSyncNow,
   onImportPlans,
+  onTogglePaused,
   onRestore,
 }: {
   bodyParts: BodyPart[];
@@ -51,6 +52,7 @@ export function ExerciseScreen({
   onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
   onImportPlans: () => Promise<void>;
+  onTogglePaused: (isPaused: boolean) => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   return (
@@ -177,6 +179,7 @@ export function ExerciseScreen({
         onSignOut={onSignOut}
         onSyncNow={onSyncNow}
         onImportPlans={onImportPlans}
+        onTogglePaused={onTogglePaused}
         onRestore={onRestore}
       />
     </View>

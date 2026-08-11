@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
 
 import type { GoogleAccount } from '../auth/googleAuth';
 import { styles } from '../styles/appStyles';
@@ -11,7 +11,7 @@ import { formatDateTime } from '../utils/datetime';
 // 種目タブに置く。接続先は app_settings に保存され同期対象外。
 //
 // 記録は操作キューへ積まれ、種目の完了などの契機で自動送信される。
-// ここにあるのは「ログイン」「自動を待たずに送る」「予定を取り込む」
+// ここにあるのは「ログイン」「自動送信の停止」「自動を待たずに送る」「予定を取り込む」
 // 「サーバの内容で作り直す」だけ。
 export function CloudSyncSection({
   syncSettings,
@@ -23,6 +23,7 @@ export function CloudSyncSection({
   onSignOut,
   onSyncNow,
   onImportPlans,
+  onTogglePaused,
   onRestore,
 }: {
   syncSettings: SyncSettings;
@@ -34,6 +35,7 @@ export function CloudSyncSection({
   onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
   onImportPlans: () => Promise<void>;
+  onTogglePaused: (isPaused: boolean) => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   const [apiUrl, setApiUrl] = useState(syncSettings.apiUrl);
@@ -98,6 +100,24 @@ export function CloudSyncSection({
             この端末ではGoogleサインインを設定していません（クライアントIDが未設定）。
           </Text>
         )}
+
+        <Text style={styles.inputLabel}>自動送信</Text>
+        {/* 止まるのは送信役だけで、記録の保存は変わらない。
+            手動の「今すぐ同期」も止めない（送り忘れを自分で作らないため）。 */}
+        <View style={styles.rowBetween}>
+          <Text style={styles.faint}>
+            {syncSettings.isPaused
+              ? '停止中。記録は端末に溜まり、再開すると送られます。'
+              : '記録した内容を自動でサーバへ送ります。'}
+          </Text>
+          <Switch
+            value={!syncSettings.isPaused}
+            disabled={isBusy}
+            onValueChange={(isEnabled) => void onTogglePaused(!isEnabled)}
+            trackColor={{ true: colors.accentSurfaceStrong, false: colors.hairlineStrong }}
+            thumbColor={colors.textPrimary}
+          />
+        </View>
 
         <Text style={styles.inputLabel}>API URL</Text>
         <TextInput

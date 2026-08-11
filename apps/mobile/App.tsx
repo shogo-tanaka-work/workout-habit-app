@@ -328,6 +328,7 @@ export default function App() {
                   onSignOut={data.signOutOfGoogle}
                   onSyncNow={data.syncNow}
                   onImportPlans={data.importPlans}
+                  onTogglePaused={data.updateSyncPaused}
                   onRestore={data.restoreFromCloud}
                 />
               ) : null}

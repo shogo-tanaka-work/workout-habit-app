@@ -77,6 +77,8 @@ export type TimerSettings = {
 export type SyncSettings = {
   apiUrl: string;
   lastBackupAt: string | null;
+  /** 自動送信を止めているか。手動の「今すぐ同期」は止めない。 */
+  isPaused: boolean;
 };
 
 // 体重・体脂肪のボディログ（1日1件）。

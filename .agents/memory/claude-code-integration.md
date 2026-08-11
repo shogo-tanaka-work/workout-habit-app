@@ -93,7 +93,17 @@ npx wrangler d1 execute workout-habit-db --remote --command \
 2本目以降は 1本目のトークンで `POST /admin/api-tokens` を叩ける。
 失効は `POST /admin/api-tokens/:id/revoke`。
 
-**トークン値はこのリポジトリへ書かない**（`rules/secrets.md`）。
+### トークンと接続先の置き場所
+
+**リポジトリルートの `.env.local`**（`.gitignore` 済み）に置く。
+
+```bash
+set -a && . ./.env.local && set +a
+```
+
+平文トークンは D1 に無い（ハッシュのみ）ため、**このファイルが唯一の保管場所**になる。
+`rules/secrets.md` のとおり、値をリポジトリ内のファイルへ書かない。
+`echo` などで画面へ出さない（履歴と、AI へ貼ったログに残る）。
 
 ### 2. 実績を読む
 

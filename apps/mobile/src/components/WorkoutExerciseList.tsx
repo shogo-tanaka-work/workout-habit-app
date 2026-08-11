@@ -3,10 +3,10 @@ import { Pressable, Text, View } from 'react-native';
 import { styles } from '../styles/appStyles';
 import type { Exercise, SetPatch, WorkoutExercise, WorkoutSet } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
-import { formatSetsInline } from '../utils/aggregate';
+import { formatSetsInline, summarizeSets } from '../utils/aggregate';
 import { formatMonthDay } from '../utils/datetime';
 import { formatTimer } from '../utils/format';
-import { estimateOneRepMax, formatVolume, formatWeight } from '../utils/number';
+import { formatVolume, formatWeight } from '../utils/number';
 import { SetEditor } from './SetEditor';
 
 export function WorkoutExerciseList({
@@ -38,11 +38,8 @@ export function WorkoutExerciseList({
         const sets = visibleSets
           .filter((set) => set.workoutExerciseId === workoutExercise.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);
-        const volume = sets.reduce((sum, set) => sum + set.weightKg * set.reps, 0);
-        const bestOneRepMax = sets.reduce(
-          (best, set) => Math.max(best, estimateOneRepMax(set.weightKg, set.reps)),
-          0,
-        );
+        // ウォームアップを除いた集計。規則は utils/aggregate.ts に集約している。
+        const summary = summarizeSets(sets);
         const restSeconds =
           workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120;
         const previousSession = previousSessionByExerciseId?.get(workoutExercise.exerciseId);
@@ -52,8 +49,10 @@ export function WorkoutExerciseList({
               <View style={styles.flex}>
                 <Text style={styles.exerciseTitle}>{exercise?.name ?? '種目'}</Text>
                 <Text style={styles.faint}>
-                  {sets.length} セット ・ {formatVolume(volume)} ・ 推定1RM{' '}
-                  {formatWeight(bestOneRepMax)}
+                  {summary.setCount} セット
+                  {summary.warmupCount > 0 ? `（＋WU ${summary.warmupCount}）` : ''} ・{' '}
+                  {formatVolume(summary.totalVolume)} ・ 推定1RM{' '}
+                  {formatWeight(summary.bestOneRepMax)}
                 </Text>
               </View>
               <Pressable style={styles.smallButton} onPress={() => onAddSet(workoutExercise)}>

@@ -5,6 +5,10 @@ import { scopeForExercise, scopeForUser } from './db/scope';
 import type { AppEnv } from './env';
 
 // Phase 3 分析API。D1 のワークアウト記録を読み取り専用で集計する。
+//
+// **ウォームアップ（is_warmup = 1）は集計に入れない。** UI で WU を指定できるのに
+// 総ボリュームへ算入されると、軽い準備セットを足すほど数字が実態から離れる。
+// モバイル側 utils/aggregate.ts も同じ規則。片方だけ変えない。
 // 認証は親アプリ（src/index.ts）のミドルウェアが担い、ここでは行スコープだけを適用する。
 // member は自分の記録のみ、admin は全件（src/db/scope.ts）。
 // 日付はモバイル側が端末ローカル日付（YYYY-MM-DD）で保存しているため、
@@ -97,7 +101,7 @@ const loadWorkoutAggregates = async (
               SUM(s.reps) AS reps
        FROM workouts w
        JOIN workout_exercises we ON we.workout_id = w.id
-       JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
+       JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0
        WHERE w.status = 'completed' AND w.performed_at >= ? AND ${scope.condition}
        GROUP BY w.id
        ORDER BY w.performed_at`,
@@ -179,7 +183,7 @@ analytics.get('/body-parts', async (context) => {
      JOIN workouts w ON we.workout_id = w.id
      JOIN exercises e ON we.exercise_id = e.id
      LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
-     WHERE w.status = 'completed' AND s.deleted_at IS NULL AND w.performed_at >= ?
+     WHERE w.status = 'completed' AND s.deleted_at IS NULL AND s.is_warmup = 0 AND w.performed_at >= ?
        AND ${scope.condition}
      GROUP BY w.performed_at, bp.id
      ORDER BY w.performed_at`,
@@ -240,7 +244,7 @@ analytics.get('/daily', async (context) => {
             SUM(s.weight_kg * s.reps) AS volume
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id
-     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
+     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0
      WHERE w.status = 'completed' AND w.performed_at >= ? AND ${scope.condition}
      GROUP BY w.performed_at
      ORDER BY w.performed_at`,
@@ -319,7 +323,7 @@ analytics.get('/exercises', async (context) => {
      LEFT JOIN workouts w
        ON w.id = we.workout_id AND w.status = 'completed' AND ${workoutScope.condition}
      LEFT JOIN workout_sets s
-       ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND w.id IS NOT NULL
+       ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0 AND w.id IS NOT NULL
      WHERE e.is_archived = 0 AND ${exerciseScope.condition}
      GROUP BY e.id
      ORDER BY session_count DESC, e.name`,
@@ -376,7 +380,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
             ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${EPLEY_DIVISOR}.0)), 1) AS best_one_rep_max
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id AND we.exercise_id = ?
-     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL
+     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0
      WHERE w.status = 'completed' AND w.performed_at >= ? AND ${workoutScope.condition}
      GROUP BY w.id
      ORDER BY w.performed_at`,

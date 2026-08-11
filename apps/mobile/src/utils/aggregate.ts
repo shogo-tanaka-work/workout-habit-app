@@ -2,9 +2,16 @@ import type { BodyPart, Exercise, Workout, WorkoutExercise, WorkoutSet } from '.
 import { estimateOneRepMax } from './number';
 
 // セット集計とサマリ（日別履歴・種目詳細・前回実績で共用する純粋関数群）。
+//
+// **ウォームアップ（isWarmup）は集計に入れない。** UI で WU を指定できるのに
+// 総ボリュームへ算入されると、軽い準備セットを足すほど数字が実態から離れる。
+// API 側 apps/api/src/analytics.ts も同じ規則。片方だけ変えない。
 
 export type SetSummary = {
+  /** ワーキングセットの数。ウォームアップは含めない。 */
   setCount: number;
+  /** ウォームアップの数。集計からは外すが、やったこと自体は見せられるように持つ。 */
+  warmupCount: number;
   totalReps: number;
   maxReps: number;
   totalVolume: number;
@@ -12,17 +19,24 @@ export type SetSummary = {
 };
 
 export const summarizeSets = (sets: WorkoutSet[]): SetSummary => {
+  let setCount = 0;
+  let warmupCount = 0;
   let totalReps = 0;
   let maxReps = 0;
   let totalVolume = 0;
   let bestOneRepMax = 0;
   for (const set of sets) {
+    if (set.isWarmup) {
+      warmupCount += 1;
+      continue;
+    }
+    setCount += 1;
     totalReps += set.reps;
     maxReps = Math.max(maxReps, set.reps);
     totalVolume += set.weightKg * set.reps;
     bestOneRepMax = Math.max(bestOneRepMax, estimateOneRepMax(set.weightKg, set.reps));
   }
-  return { setCount: sets.length, totalReps, maxReps, totalVolume, bestOneRepMax };
+  return { setCount, warmupCount, totalReps, maxReps, totalVolume, bestOneRepMax };
 };
 
 // 1回のワークアウトにおける、ある種目の実施記録（セット＋集計）。
@@ -106,6 +120,10 @@ export const summarizeByBodyPart = (
   );
   const summaryByBodyPartId = new Map<string, BodyPartSummary>();
   for (const set of sets) {
+    // ウォームアップは部位別ボリュームにも入れない（summarizeSets と同じ規則）。
+    if (set.isWarmup) {
+      continue;
+    }
     const exerciseId = exerciseIdByWorkoutExerciseId.get(set.workoutExerciseId);
     if (!exerciseId) {
       continue;

@@ -170,7 +170,8 @@ export function useWorkoutData() {
     let totalVolume = 0;
     let totalReps = 0;
     for (const set of visibleSets) {
-      if (!weekExerciseIds.has(set.workoutExerciseId)) {
+      // ウォームアップは集計に入れない（utils/aggregate.ts と同じ規則）。
+      if (set.isWarmup || !weekExerciseIds.has(set.workoutExerciseId)) {
         continue;
       }
       setCount += 1;

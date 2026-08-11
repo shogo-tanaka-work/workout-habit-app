@@ -79,6 +79,40 @@ const activate = async (
 };
 
 /**
+ * 空のままの項目を Identity の値で埋める。
+ *
+ * 有効化は invited のときしか走らないため、これが無いと
+ * **すでに active の行は google_sub も display_name も永久に NULL のまま**になる。
+ * 既存の値は上書きしない（COALESCE の順序が activate と逆なのはそのため）。
+ *
+ * 認証の成否には影響させない。失敗しても警告だけ出して通す。
+ */
+const fillMissingProfile = async (
+  database: D1Database,
+  userId: string,
+  googleSub: string | null,
+  displayName: string | null,
+): Promise<void> => {
+  if (googleSub === null && displayName === null) {
+    return;
+  }
+  try {
+    await database
+      .prepare(
+        `UPDATE users
+         SET google_sub = COALESCE(google_sub, ?),
+             display_name = COALESCE(display_name, ?),
+             updated_at = ?
+         WHERE id = ? AND (google_sub IS NULL OR display_name IS NULL)`,
+      )
+      .bind(googleSub, displayName, new Date().toISOString(), userId)
+      .run();
+  } catch (error) {
+    console.warn('[auth] users の補完に失敗', error instanceof Error ? error.message : '');
+  }
+};
+
+/**
  * 招待済み（invited）なら有効化して通す。それ以外は active のときだけ通す。
  * disabled は常に拒否する（行を消さずに止められる）。
  */
@@ -92,7 +126,11 @@ const acceptOrActivate = async (
     return null;
   }
   if (row.status === ACTIVE_STATUS) {
-    return toAuthenticatedUser(row);
+    const user = toAuthenticatedUser(row);
+    if (user) {
+      await fillMissingProfile(database, row.id, googleSub, displayName);
+    }
+    return user;
   }
   if (row.status === INVITED_STATUS) {
     const user = toAuthenticatedUser(row);

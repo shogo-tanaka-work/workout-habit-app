@@ -14,6 +14,7 @@ export function HistoryScreen({
   workouts,
   workoutExercises,
   visibleSets,
+  deletedSets,
   exerciseById,
   editingWorkoutId,
   onEdit,
@@ -28,6 +29,7 @@ export function HistoryScreen({
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
+  deletedSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
   editingWorkoutId: string | null;
   onEdit: (workoutId: string) => void;
@@ -120,6 +122,7 @@ export function HistoryScreen({
                 <WorkoutExerciseList
                   workoutExercises={items}
                   visibleSets={visibleSets}
+                  deletedSets={deletedSets}
                   exerciseById={exerciseById}
                   onAddSet={onAddSet}
                   onPatchSet={onPatchSet}

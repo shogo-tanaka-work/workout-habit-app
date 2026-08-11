@@ -23,6 +23,7 @@ export function WorkoutScreen({
   activeWorkout,
   workoutExercises,
   visibleSets,
+  deletedSets,
   exercises,
   exerciseById,
   bodyPartById,
@@ -44,6 +45,7 @@ export function WorkoutScreen({
   activeWorkout: Workout | null;
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
+  deletedSets: WorkoutSet[];
   exercises: Exercise[];
   exerciseById: Map<string, Exercise>;
   bodyPartById: Map<string, BodyPart>;
@@ -170,6 +172,7 @@ export function WorkoutScreen({
       <WorkoutExerciseList
         workoutExercises={workoutExercises}
         visibleSets={visibleSets}
+        deletedSets={deletedSets}
         exerciseById={exerciseById}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}

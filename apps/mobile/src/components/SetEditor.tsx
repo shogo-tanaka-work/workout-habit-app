@@ -1,4 +1,4 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
@@ -6,6 +6,14 @@ import type { SetPatch, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { nowIso } from '../utils/datetime';
 import { estimateOneRepMax } from '../utils/number';
 import { LabeledNumber } from './LabeledNumber';
+
+// 1セットの編集行。
+//
+// RPE は入力欄に出さない。列とデータは残しているが、実績は全行 0 で使われておらず、
+// トレーニング中の一等地を使わない値に割いていた（重量と回数だけが常に要る）。
+//
+// 完了はタイマーと切り離す。「完了＋タイマー」しか無かったころは、
+// タイマーが要らないときに完了を付けられず、履歴の編集画面では操作すらできなかった。
 
 export function SetEditor({
   set,
@@ -23,6 +31,22 @@ export function SetEditor({
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   showTimer: boolean;
 }) {
+  // 記録は消えると取り返しがつかない。論理削除で戻せるとはいえ、まず一拍置く。
+  const confirmDelete = () => {
+    Alert.alert(
+      `セット ${setNumber} を削除`,
+      `${set.weightKg}kg × ${set.reps} 回 の記録を削除します。あとで戻せます。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: () => onPatchSet(set.id, { deletedAt: nowIso() }),
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.setEditor}>
       <View style={styles.rowBetween}>
@@ -32,15 +56,18 @@ export function SetEditor({
         </Text>
         <View style={styles.setActions}>
           <Pressable
+            style={[styles.pill, set.isCompleted && styles.activePill]}
+            onPress={() => onPatchSet(set.id, { isCompleted: !set.isCompleted })}
+          >
+            <Text style={[styles.pillText, set.isCompleted && styles.activePillText]}>完了</Text>
+          </Pressable>
+          <Pressable
             style={[styles.pill, set.isWarmup && styles.activePill]}
             onPress={() => onPatchSet(set.id, { isWarmup: !set.isWarmup })}
           >
             <Text style={[styles.pillText, set.isWarmup && styles.activePillText]}>WU</Text>
           </Pressable>
-          <Pressable
-            style={styles.deleteButton}
-            onPress={() => onPatchSet(set.id, { deletedAt: nowIso() })}
-          >
+          <Pressable style={styles.deleteButton} onPress={confirmDelete}>
             <Text style={styles.deleteButtonText}>削除</Text>
           </Pressable>
         </View>
@@ -58,12 +85,6 @@ export function SetEditor({
           suffix="回"
           onChange={(value) => onPatchSet(set.id, { reps: Math.max(0, Math.round(value)) })}
         />
-        <LabeledNumber
-          label="RPE"
-          value={set.rpe}
-          suffix=""
-          onChange={(value) => onPatchSet(set.id, { rpe: value })}
-        />
       </View>
       <TextInput
         value={set.memo}
@@ -73,7 +94,11 @@ export function SetEditor({
         style={styles.memoInput}
       />
       <View style={styles.rowBetween}>
-        <Text style={styles.muted}>推定1RM {estimateOneRepMax(set.weightKg, set.reps)} kg</Text>
+        <Text style={styles.muted}>
+          {set.isWarmup
+            ? 'ウォームアップ（集計に入りません）'
+            : `推定1RM ${estimateOneRepMax(set.weightKg, set.reps)} kg`}
+        </Text>
         {showTimer ? (
           <Pressable
             style={[styles.timerButton, set.isCompleted && styles.doneButton]}

@@ -1,8 +1,23 @@
-import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useId, useState } from 'react';
+import {
+  InputAccessoryView,
+  Keyboard,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { styles } from '../styles/appStyles';
 import { parseNumber } from '../utils/number';
+
+// ステッパー付きの数値入力。
+//
+// **`decimal-pad` にはリターンキーが無い。** そのままだと入力を確定して次へ移るのに
+// 画面のどこかをタップさせることになり、記録中に毎回その一手が挟まる。
+// iOS ではキーボード上部にアクセサリを出して「完了」で閉じられるようにする
+// （閉じると onEndEditing が走り、下の commit が呼ばれる）。
 
 export function LabeledNumber({
   label,
@@ -18,6 +33,7 @@ export function LabeledNumber({
   // ステッパーの刻み幅。省略時は kg なら 2.5、それ以外は 1。
   step?: number;
 }) {
+  const accessoryId = useId();
   const [draft, setDraft] = useState(String(value));
   const [lastValue, setLastValue] = useState(value);
 
@@ -39,6 +55,9 @@ export function LabeledNumber({
     onChange(next);
   };
 
+  // InputAccessoryView は iOS のみ。Android では ID を渡さず、既定の挙動に任せる。
+  const isAccessorySupported = Platform.OS === 'ios';
+
   return (
     <View style={styles.numberField}>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -52,6 +71,7 @@ export function LabeledNumber({
           onEndEditing={commit}
           onSubmitEditing={commit}
           keyboardType="decimal-pad"
+          inputAccessoryViewID={isAccessorySupported ? accessoryId : undefined}
           style={styles.numberInput}
         />
         {suffix ? <Text style={styles.suffix}>{suffix}</Text> : null}
@@ -59,6 +79,21 @@ export function LabeledNumber({
           <Text style={styles.stepButtonText}>+</Text>
         </Pressable>
       </View>
+      {isAccessorySupported ? (
+        <InputAccessoryView nativeID={accessoryId}>
+          <View style={styles.keyboardAccessory}>
+            <Pressable
+              style={styles.keyboardAccessoryButton}
+              onPress={() => {
+                commit();
+                Keyboard.dismiss();
+              }}
+            >
+              <Text style={styles.keyboardAccessoryText}>完了</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
     </View>
   );
 }

@@ -495,6 +495,24 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  // キーボード上部のアクセサリ。decimal-pad にリターンキーが無いための「完了」だけを置く。
+  keyboardAccessory: {
+    alignItems: 'flex-end',
+    backgroundColor: colors.surfaceRaised,
+    borderTopColor: colors.hairline,
+    borderTopWidth: hairlineWidth,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  keyboardAccessoryButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  keyboardAccessoryText: {
+    color: colors.accentText,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
   pill: {
     borderColor: colors.hairlineStrong,
     borderWidth: hairlineWidth,

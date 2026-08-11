@@ -268,6 +268,7 @@ export default function App() {
                   activeWorkout={data.activeWorkout}
                   workoutExercises={data.activeWorkoutExercises}
                   visibleSets={data.visibleSets}
+                  deletedSets={data.deletedSets}
                   exercises={data.exercisesByUsage}
                   exerciseById={data.exerciseById}
                   bodyPartById={data.bodyPartById}
@@ -293,6 +294,7 @@ export default function App() {
                   workouts={data.completedWorkouts}
                   workoutExercises={data.workoutExercises}
                   visibleSets={data.visibleSets}
+                  deletedSets={data.deletedSets}
                   exerciseById={data.exerciseById}
                   editingWorkoutId={editingWorkoutId}
                   onEdit={setEditingWorkoutId}

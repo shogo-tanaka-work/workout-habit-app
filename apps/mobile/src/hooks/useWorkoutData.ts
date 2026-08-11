@@ -112,6 +112,12 @@ export function useWorkoutData() {
     [workoutSets],
   );
 
+  // 論理削除済みのセット。戻す導線に使う（削除しても取り返しがつくようにするため）。
+  const deletedSets = useMemo(
+    () => workoutSets.filter((set) => set.deletedAt !== null),
+    [workoutSets],
+  );
+
   const exerciseById = useMemo(
     () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
     [exercises],
@@ -338,7 +344,8 @@ export function useWorkoutData() {
       orderIndex: nextOrderIndex,
       weightKg: previousSet?.weightKg ?? exercise?.defaultBarWeightKg ?? 0,
       reps: previousSet?.reps ?? 8,
-      rpe: previousSet?.rpe ?? 8,
+      // RPE は入力欄から外している。既定は 0（実績データもすべて 0）。
+      rpe: previousSet?.rpe ?? 0,
       restSeconds: workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120,
     });
     if (workoutExercise.workoutId) {
@@ -654,6 +661,7 @@ export function useWorkoutData() {
     workoutSets,
     activeWorkout,
     visibleSets,
+    deletedSets,
     exerciseById,
     bodyPartById,
     activeWorkoutExercises,

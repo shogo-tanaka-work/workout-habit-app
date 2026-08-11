@@ -8,6 +8,7 @@ import type {
   Template,
   TemplateExercise,
   TimerSettings,
+  TimerState,
   UserExerciseSetting,
   Workout,
   WorkoutExercise,
@@ -93,6 +94,7 @@ const TIMER_VIBRATION_KEY = 'timer_vibration_enabled';
 const SYNC_API_URL_KEY = 'sync_api_url';
 const SYNC_LAST_BACKUP_AT_KEY = 'sync_last_backup_at';
 const SYNC_PAUSED_KEY = 'sync_paused';
+const REST_TIMER_KEY = 'rest_timer';
 
 const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
@@ -219,6 +221,50 @@ export const setSyncPaused = async (
   isPaused: boolean,
 ): Promise<void> => {
   await upsertAppSetting(database, SYNC_PAUSED_KEY, isPaused ? '1' : '0');
+};
+
+/**
+ * 実行中の休憩タイマーを保存する。端末ローカル設定のため同期対象外。
+ * null を渡すと消す（タイマーを閉じたとき）。
+ *
+ * 保存するのは終了時刻（endsAt）を含む状態そのもの。残り秒だけを持つと、
+ * アプリが落ちている間の経過を復元できない。
+ */
+export const saveRestTimer = async (
+  database: SQLite.SQLiteDatabase,
+  timer: TimerState | null,
+): Promise<void> => {
+  if (!timer) {
+    await database.runAsync('DELETE FROM app_settings WHERE key = ?', REST_TIMER_KEY);
+    return;
+  }
+  await upsertAppSetting(database, REST_TIMER_KEY, JSON.stringify(timer));
+};
+
+/** 保存された休憩タイマーを読む。壊れていたら無視する（タイマーは復元できなくても致命的ではない）。 */
+export const loadRestTimer = async (
+  database: SQLite.SQLiteDatabase,
+): Promise<TimerState | null> => {
+  const row = await database.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_settings WHERE key = ?',
+    REST_TIMER_KEY,
+  );
+  if (!row) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(row.value);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null;
+    }
+    return parsed as TimerState;
+  } catch (error) {
+    console.warn(
+      '[timer] 保存された休憩タイマーを読めませんでした',
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
 };
 
 // 最終バックアップ日時を記録する。

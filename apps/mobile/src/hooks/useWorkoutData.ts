@@ -738,6 +738,8 @@ export function useWorkoutData() {
   };
 
   return {
+    // 休憩タイマーの永続化に使う（useRestTimer が直接読み書きする）。
+    database: db,
     isReady,
     errorMessage,
     bodyParts,

@@ -69,7 +69,8 @@ paths: "apps/mobile/src/db/**/*.ts"
 | `db/sync.ts` | サーバの内容で端末を作り直す取り込み（機種変更・再インストール向け） |
 | `db/plans.ts` | 予定（`status='planned'`）の取り込み。`GET /plans` の期間をまるごと置き換える |
 
-- `app_settings` と `sync_outbox` は端末ローカルのため同期対象外。
+- `app_settings`（接続先・タイマー設定・`sync_paused`・`rest_timer`）と `sync_outbox` は
+  端末ローカルのため同期対象外。
   `body_parts` は共有マスタで seed が持つため同期しない
 - `enqueueUpsert` は同じ行の未送信 upsert があれば payload を差し替える。
   **並び順は据え置く**（積み直すと親より子が先に送られ、サーバで弾かれる）

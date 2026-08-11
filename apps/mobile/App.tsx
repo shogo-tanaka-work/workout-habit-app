@@ -31,7 +31,7 @@ import { buildWorkoutCsv } from './src/utils/csv';
 
 export default function App() {
   const data = useWorkoutData();
-  const { timer, setTimer } = useRestTimer(data.timerSettings);
+  const { timer, setTimer } = useRestTimer(data.timerSettings, data.database);
 
   // UI（ナビゲーション・入力・編集状態）はシェルである App が保持する。
   const [tab, setTab] = useState<Tab>('home');

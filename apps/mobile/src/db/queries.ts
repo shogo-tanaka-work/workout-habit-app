@@ -8,6 +8,7 @@ import type {
   Template,
   TemplateExercise,
   TimerSettings,
+  UserExerciseSetting,
   Workout,
   WorkoutExercise,
   WorkoutSet,
@@ -19,23 +20,25 @@ import type {
   ExerciseRow,
   TemplateExerciseRow,
   TemplateRow,
+  UserExerciseSettingRow,
   WorkoutRow,
   WorkoutExerciseRow,
   WorkoutSetRow,
 } from '../types/db';
 import { nowIso } from '../utils/datetime';
+import { newId } from '../utils/id';
 import {
   toBodyLog,
   toBodyPart,
   toExercise,
   toTemplate,
   toTemplateExercise,
+  toUserExerciseSetting,
   toWorkout,
   toWorkoutExercise,
   toWorkoutSet,
 } from './mappers';
 import { enqueueDelete, enqueueUpsert } from './outbox';
-import { isCustomExerciseId } from './syncTables';
 
 // 書き込みは「ローカルへ即時反映 ＋ 送信キューへ積む」を1トランザクションで行う。
 // 画面はローカルの結果だけを見て進み、送信は src/sync/pusher.ts が契機ごとに引き受ける。
@@ -57,7 +60,9 @@ const writeWithOutbox = async (
 
 export type WorkoutData = {
   bodyParts: BodyPart[];
+  /** 上書きを反映した実効値。生の行が要る場面は無いため、こちらだけを配る。 */
   exercises: Exercise[];
+  userExerciseSettings: UserExerciseSetting[];
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   workoutSets: WorkoutSet[];
@@ -73,6 +78,7 @@ export type WorkoutData = {
 const BODY_PART_COLUMNS = 'id, name, order_index';
 const EXERCISE_COLUMNS =
   'id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived';
+const USER_EXERCISE_SETTING_COLUMNS = 'id, exercise_id, rest_seconds, bar_weight_kg, is_archived';
 const WORKOUT_COLUMNS = 'id, performed_at, status, memo, last_saved_at, created_at';
 const WORKOUT_EXERCISE_COLUMNS =
   'id, workout_id, exercise_id, order_index, rest_seconds_override, memo';
@@ -113,6 +119,7 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
   const [
     bodyPartRows,
     exerciseRows,
+    settingRows,
     workoutRows,
     workoutExerciseRows,
     workoutSetRows,
@@ -128,6 +135,9 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
       // アーカイブ済みも読み込む。除外すると戻す手段が無くなるうえ、
       // 過去の記録から種目名を引けなくなる。表示側で絞る。
       `SELECT ${EXERCISE_COLUMNS} FROM exercises ORDER BY name`,
+    ),
+    database.getAllAsync<UserExerciseSettingRow>(
+      `SELECT ${USER_EXERCISE_SETTING_COLUMNS} FROM user_exercise_settings`,
     ),
     database.getAllAsync<WorkoutRow>(
       `SELECT ${WORKOUT_COLUMNS} FROM workouts ORDER BY created_at DESC`,
@@ -149,9 +159,26 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
       'SELECT id, measured_at, body_weight_kg, body_fat_percentage, memo FROM body_logs ORDER BY measured_at DESC',
     ),
   ]);
+  const settings = settingRows.map(toUserExerciseSetting);
+  const settingByExerciseId = new Map(settings.map((setting) => [setting.exerciseId, setting]));
+
   return {
     bodyParts: bodyPartRows.map(toBodyPart),
-    exercises: exerciseRows.map(toExercise),
+    // 上書きをここで畳み込む。画面ごとに合成すると、必ずどこかで忘れる。
+    exercises: exerciseRows.map((row) => {
+      const exercise = toExercise(row);
+      const setting = settingByExerciseId.get(exercise.id);
+      if (!setting) {
+        return exercise;
+      }
+      return {
+        ...exercise,
+        defaultRestSeconds: setting.restSeconds ?? exercise.defaultRestSeconds,
+        defaultBarWeightKg: setting.barWeightKg ?? exercise.defaultBarWeightKg,
+        isArchived: setting.isArchived ?? exercise.isArchived,
+      };
+    }),
+    userExerciseSettings: settings,
     workouts: workoutRows.map(toWorkout),
     workoutExercises: workoutExerciseRows.map(toWorkoutExercise),
     workoutSets: workoutSetRows.map(toWorkoutSet),
@@ -602,6 +629,51 @@ export const updateExercise = async (
   });
 };
 
+/**
+ * 共有プリセット種目の上書きを保存する（1行を丸ごと置き換える）。
+ *
+ * プリセットは全ユーザー共有の行でサーバが書き換えを拒むため、
+ * 上書きを別テーブルに持つ。`null` を渡した項目は「上書きしない」に戻る。
+ */
+export const upsertUserExerciseSetting = async (
+  database: SQLite.SQLiteDatabase,
+  params: {
+    exerciseId: string;
+    restSeconds: number | null;
+    barWeightKg: number | null;
+    isArchived: boolean | null;
+  },
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'upsertUserExerciseSetting', async () => {
+    // 既存があればその id を使い回す。新しい id を振ると UNIQUE(exercise_id) に当たる。
+    const existing = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM user_exercise_settings WHERE exercise_id = ?',
+      params.exerciseId,
+    );
+    const id = existing?.id ?? newId('ues');
+    await database.runAsync(
+      `INSERT INTO user_exercise_settings
+        (id, exercise_id, rest_seconds, bar_weight_kg, is_archived, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         rest_seconds = excluded.rest_seconds,
+         bar_weight_kg = excluded.bar_weight_kg,
+         is_archived = excluded.is_archived,
+         updated_at = excluded.updated_at`,
+      id,
+      params.exerciseId,
+      params.restSeconds,
+      params.barWeightKg,
+      params.isArchived === null ? null : params.isArchived ? 1 : 0,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'user_exercise_settings', id);
+  });
+};
+
+/** レスト時間の変更。**カスタム種目専用**（プリセットは upsertUserExerciseSetting を使う）。 */
 export const setExerciseRest = async (
   database: SQLite.SQLiteDatabase,
   exerciseId: string,
@@ -615,10 +687,6 @@ export const setExerciseRest = async (
       timestamp,
       exerciseId,
     );
-    // プリセット種目は全ユーザー共有のためサーバ側では書き換えられない。
-    // 現状、プリセットのレスト時間の変更は端末内にとどまる（ユーザー別の上書きは未実装）。
-    if (isCustomExerciseId(exerciseId)) {
-      await enqueueUpsert(database, 'exercises', exerciseId);
-    }
+    await enqueueUpsert(database, 'exercises', exerciseId);
   });
 };

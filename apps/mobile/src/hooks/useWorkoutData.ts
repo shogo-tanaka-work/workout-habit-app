@@ -21,6 +21,7 @@ import {
   setExerciseRest,
   updateExercise,
   setSyncPaused,
+  upsertUserExerciseSetting,
   setWorkoutStatus,
   startPlannedWorkout,
   touchWorkout,
@@ -52,6 +53,7 @@ import type {
   TemplateExercise,
   TimerSettings,
   TimerState,
+  UserExerciseSetting,
   WeeklyStats,
   Workout,
   WorkoutExercise,
@@ -94,6 +96,7 @@ export function useWorkoutData() {
     soundEnabled: true,
     vibrationEnabled: true,
   });
+  const [userExerciseSettings, setUserExerciseSettings] = useState<UserExerciseSetting[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
     apiUrl: '',
@@ -227,6 +230,7 @@ export function useWorkoutData() {
     const data = await loadWorkoutData(database);
     setBodyParts(data.bodyParts);
     setExercises(data.exercises);
+    setUserExerciseSettings(data.userExerciseSettings);
     setWorkouts(data.workouts);
     setWorkoutExercises(data.workoutExercises);
     setWorkoutSets(data.workoutSets);
@@ -460,19 +464,59 @@ export function useWorkoutData() {
   // 種目の設定を保存する。**プリセットは対象外**（サーバが書き換えを拒むため、
   // 端末だけ変えるとサーバと静かに食い違う）。
   const saveExercise = async (next: Exercise): Promise<void> => {
-    if (!isCustomExerciseId(next.id)) {
-      return;
-    }
     const database = ensureDb();
-    await updateExercise(database, next);
+    if (isCustomExerciseId(next.id)) {
+      await updateExercise(database, next);
+    } else {
+      // プリセットは名前と部位を変えられない（共有の意味が失われるため）。
+      // 上書きできるのはバー重量と非表示だけ。
+      await writeExerciseOverride(database, next.id, {
+        barWeightKg: next.defaultBarWeightKg,
+        isArchived: next.isArchived,
+      });
+    }
     await reloadData(database);
     void syncInBackground();
   };
 
+  // 種目の設定変更は種類で経路が分かれる。
+  //
+  // カスタム種目は自分の行なので `exercises` を直接更新する。
+  // プリセットは全ユーザー共有でサーバが書き換えを拒むため、上書きテーブルへ書く。
+  // ここを間違えると、端末だけ変わってサーバと静かに食い違う。
+  const settingByExerciseId = new Map(
+    userExerciseSettings.map((setting) => [setting.exerciseId, setting]),
+  );
+
+  const writeExerciseOverride = async (
+    database: SQLite.SQLiteDatabase,
+    exerciseId: string,
+    patch: Partial<{
+      restSeconds: number | null;
+      barWeightKg: number | null;
+      isArchived: boolean | null;
+    }>,
+  ): Promise<void> => {
+    const current = settingByExerciseId.get(exerciseId);
+    await upsertUserExerciseSetting(database, {
+      exerciseId,
+      restSeconds:
+        patch.restSeconds !== undefined ? patch.restSeconds : (current?.restSeconds ?? null),
+      barWeightKg:
+        patch.barWeightKg !== undefined ? patch.barWeightKg : (current?.barWeightKg ?? null),
+      isArchived: patch.isArchived !== undefined ? patch.isArchived : (current?.isArchived ?? null),
+    });
+  };
+
   const updateExerciseRest = async (exercise: Exercise, restSeconds: number) => {
     const database = ensureDb();
-    await setExerciseRest(database, exercise.id, restSeconds);
+    if (isCustomExerciseId(exercise.id)) {
+      await setExerciseRest(database, exercise.id, restSeconds);
+    } else {
+      await writeExerciseOverride(database, exercise.id, { restSeconds });
+    }
     await reloadData(database);
+    void syncInBackground();
   };
 
   // 記録中のワークアウトの種目並びをテンプレートとして保存する。

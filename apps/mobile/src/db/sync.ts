@@ -22,6 +22,7 @@ const RESTORE_ORDER: readonly SyncEntity[] = [
   'workouts',
   'workout_exercises',
   'workout_sets',
+  'user_exercise_settings',
   'timer_events',
   'templates',
   'template_exercises',

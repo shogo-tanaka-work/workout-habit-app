@@ -12,6 +12,7 @@ export type SyncEntity =
   | 'workouts'
   | 'workout_exercises'
   | 'workout_sets'
+  | 'user_exercise_settings'
   | 'timer_events'
   | 'templates'
   | 'template_exercises'
@@ -62,6 +63,16 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
     'started_at',
     'completed_at',
     'deleted_at',
+    'created_at',
+    'updated_at',
+  ],
+  // 共有プリセット種目のユーザー別上書き。user_id はサーバが埋めるので端末は持たない。
+  user_exercise_settings: [
+    'id',
+    'exercise_id',
+    'rest_seconds',
+    'bar_weight_kg',
+    'is_archived',
     'created_at',
     'updated_at',
   ],

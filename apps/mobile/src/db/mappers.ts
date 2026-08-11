@@ -4,6 +4,7 @@ import type {
   Exercise,
   Template,
   TemplateExercise,
+  UserExerciseSetting,
   Workout,
   WorkoutExercise,
   WorkoutSet,
@@ -12,6 +13,7 @@ import type {
   BodyLogRow,
   BodyPartRow,
   ExerciseRow,
+  UserExerciseSettingRow,
   TemplateExerciseRow,
   TemplateRow,
   WorkoutRow,
@@ -36,6 +38,15 @@ export const toExercise = (row: ExerciseRow): Exercise => ({
   defaultBarWeightKg: row.default_bar_weight_kg,
   category: row.category,
   isArchived: row.is_archived === 1,
+});
+
+export const toUserExerciseSetting = (row: UserExerciseSettingRow): UserExerciseSetting => ({
+  id: row.id,
+  exerciseId: row.exercise_id,
+  restSeconds: row.rest_seconds,
+  barWeightKg: row.bar_weight_kg,
+  // 0/1 と NULL を保つ（NULL は「上書きしない」）。
+  isArchived: row.is_archived === null ? null : row.is_archived === 1,
 });
 
 export const toWorkout = (row: WorkoutRow): Workout => ({

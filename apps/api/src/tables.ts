@@ -147,6 +147,22 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     ],
   },
   {
+    // 共有プリセット種目に対する、ユーザーごとの上書き（migration 0004）。
+    // NULL の列は「上書きしない」。親は共有プリセットなので owner が NULL でも参照できる
+    // （parentIsUsable が owner === null を許可している）。
+    name: 'user_exercise_settings',
+    ownerColumn: 'user_id',
+    columns: [
+      { name: 'id', type: 'text' },
+      { name: 'exercise_id', type: 'text' },
+      { name: 'rest_seconds', type: 'integer', nullable: true, optional: true },
+      { name: 'bar_weight_kg', type: 'real', nullable: true, optional: true },
+      { name: 'is_archived', type: 'integer', nullable: true, optional: true },
+      ...timestamps,
+    ],
+    parents: [{ column: 'exercise_id', table: 'exercises' }],
+  },
+  {
     name: 'body_logs',
     ownerColumn: 'user_id',
     columns: [

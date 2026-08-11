@@ -19,6 +19,15 @@ export type Exercise = {
   isArchived: boolean;
 };
 
+/** 共有プリセット種目に対する、この端末のユーザーの上書き。NULL は「上書きしない」。 */
+export type UserExerciseSetting = {
+  id: string;
+  exerciseId: string;
+  restSeconds: number | null;
+  barWeightKg: number | null;
+  isArchived: boolean | null;
+};
+
 export type Workout = {
   id: string;
   performedAt: string;

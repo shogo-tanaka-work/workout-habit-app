@@ -23,8 +23,9 @@ paths: "apps/mobile/src/db/**/*.ts"
 
 ## スキーマの集約
 - テーブル DDL は `src/db/schema.ts` の `SCHEMA_SQL` に集約する。各所に散らさない
-- 現在のテーブル: `body_parts` `exercises` `workouts` `workout_exercises` `workout_sets`
-  `timer_events` `templates` `template_exercises` `app_settings` `body_logs`
+- 現在のテーブル: `body_parts` `exercises` `user_exercise_settings` `workouts`
+  `workout_exercises` `workout_sets` `timer_events` `templates` `template_exercises`
+  `app_settings` `body_logs`
 - カラム名は snake_case。`created_at` / `updated_at` を持たせ、主キーは文字列ID（`newId()` で発番）
 - `CREATE TABLE IF NOT EXISTS` で冪等に保つ。起動のたび再実行しても既存データを壊さない
 
@@ -74,8 +75,11 @@ paths: "apps/mobile/src/db/**/*.ts"
   **並び順は据え置く**（積み直すと親より子が先に送られ、サーバで弾かれる）
 - 親を消したときは親の `delete` だけを積む。子はサーバ側の外部キーで消える
 - プリセット種目は全ユーザー共有のためサーバでは書き換えられない。
-  種目の同期はカスタム種目（`exercise-` 始まりの ID）だけを対象にする。
-  **編集 UI も同じ境界で塞ぐ**（端末だけ変わってサーバと静かに食い違うため）
+  `exercises` を直接更新してよいのはカスタム種目（`exercise-` 始まりの ID）だけ。
+  **プリセットの設定変更は `user_exercise_settings` へ書く**（休憩・バー重量・非表示）。
+  名前と部位は上書きの対象にしない
+- 上書きの実効値は `loadWorkoutData` が畳み込んでから配る。
+  画面ごとに合成すると必ずどこかで忘れる。`NULL` は「上書きしない」
 - 種目は**アーカイブ済みも読み込む**。除外すると戻す手段が無くなり、
   過去の記録から種目名も引けなくなる。選択肢に出すかどうかは表示側で絞る
 - `applyBackupPayload` は端末側データを置き換え、**送信待ちの操作を破棄する**。

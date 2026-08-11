@@ -50,6 +50,22 @@ export const MIGRATIONS: readonly Migration[] = [
     description: '平文で保存していた同期トークンを削除（認証は Google サインインへ移行）',
     statements: ["DELETE FROM app_settings WHERE key = 'sync_api_token'"],
   },
+  {
+    version: 4,
+    description: '共有プリセット種目のユーザー別上書き（user_exercise_settings）を追加',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS user_exercise_settings (
+        id TEXT PRIMARY KEY NOT NULL,
+        exercise_id TEXT NOT NULL,
+        rest_seconds INTEGER,
+        bar_weight_kg REAL,
+        is_archived INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (exercise_id)
+      )`,
+    ],
+  },
 ];
 
 /** 適用済みの user_version。 */

@@ -17,6 +17,15 @@ export type ExerciseRow = {
   is_archived: number;
 };
 
+export type UserExerciseSettingRow = {
+  id: string;
+  exercise_id: string;
+  // NULL は「上書きしない」。
+  rest_seconds: number | null;
+  bar_weight_kg: number | null;
+  is_archived: number | null;
+};
+
 export type WorkoutRow = {
   id: string;
   performed_at: string;

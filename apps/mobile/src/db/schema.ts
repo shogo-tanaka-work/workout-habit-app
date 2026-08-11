@@ -20,6 +20,16 @@ export const SCHEMA_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS user_exercise_settings (
+    id TEXT PRIMARY KEY NOT NULL,
+    exercise_id TEXT NOT NULL,
+    rest_seconds INTEGER,
+    bar_weight_kg REAL,
+    is_archived INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (exercise_id)
+  );
   CREATE TABLE IF NOT EXISTS workouts (
     id TEXT PRIMARY KEY NOT NULL,
     performed_at TEXT NOT NULL,

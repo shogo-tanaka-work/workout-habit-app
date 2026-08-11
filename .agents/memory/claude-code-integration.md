@@ -68,12 +68,26 @@ Step 4 のテーブル再構築で必要な列は入っている。**追加の�
 ```bash
 TOKEN="whk_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
 HASH=$(printf '%s' "$TOKEN" | shasum -a 256 | cut -d' ' -f1)
-echo "$TOKEN"   # ← この1回しか読めない。以降はハッシュしか残らない
+printf '%s' "$TOKEN" | pbcopy   # クリップボードへ。画面へ出さない
 
 cd apps/api
 npx wrangler d1 execute workout-habit-db --remote --command \
   "INSERT INTO api_tokens (id, user_id, name, token_hash, created_at, updated_at)
-   VALUES (lower(hex(randomblob(16))), 'usr-owner', 'claude-code', '$HASH', datetime('now'), datetime('now'))"
+   VALUES (lower(hex(randomblob(16))), 'usr-owner', 'claude-code', '$HASH',
+           strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+```
+
+**トークンを画面へ出さない。** `echo` するとターミナルの履歴や、AI へ貼ったログに残る。
+出してしまったら、その行を `revoked_at` で失効させて作り直す。
+
+`datetime('now')` は `2026-08-11 05:19:03` を返し、DB の他の行（ISO 8601）と書式がずれる。
+認証は `expires_at` / `revoked_at` しか見ないため動きはするが、`strftime` で揃える。
+
+投入できたか確認する（`token_hash` は表示しない）。
+
+```bash
+npx wrangler d1 execute workout-habit-db --remote --command \
+  "SELECT id, name, created_at, revoked_at FROM api_tokens"
 ```
 
 2本目以降は 1本目のトークンで `POST /admin/api-tokens` を叩ける。

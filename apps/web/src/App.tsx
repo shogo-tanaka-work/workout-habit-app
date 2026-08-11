@@ -5,7 +5,9 @@ import { BodyLogSection } from './sections/BodyLogSection';
 import { BodyPartSection } from './sections/BodyPartSection';
 import { ContinuitySection } from './sections/ContinuitySection';
 import { ExerciseSection } from './sections/ExerciseSection';
+import { PlanSection } from './sections/PlanSection';
 import { TrendSection } from './sections/TrendSection';
+import { Viewer } from './components/Viewer';
 
 // ApiContext 提供 → 各セクション描画、の薄いシェル。
 // データ取得・集計は各セクションが /analytics API に対して行う。
@@ -29,6 +31,7 @@ const App = () => {
         <header className="app-header">
           <h1 className="app-title">WORKOUT HABIT</h1>
           <div className="app-header-actions">
+            <Viewer />
             <button
               type="button"
               className="button-ghost"
@@ -41,6 +44,7 @@ const App = () => {
         {authMessage ? <p className="error-text">{authMessage}</p> : null}
         <div key={reloadCount}>
           <ContinuitySection />
+          <PlanSection />
           <TrendSection />
           <BodyPartSection />
           <ExerciseSection />

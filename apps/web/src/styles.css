@@ -444,3 +444,76 @@ select,
 .exercise-select {
   max-width: 240px;
 }
+
+/* 閲覧者 */
+.viewer {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.viewer-name {
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+}
+
+.viewer-role {
+  color: var(--text-faint);
+  font-size: var(--font-xs);
+}
+
+/* 予定 */
+.plan-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-item {
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.plan-item:first-child {
+  border-top: none;
+}
+
+.plan-item-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.plan-item-date {
+  color: var(--accent-text);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+.plan-item-memo {
+  color: var(--text-faint);
+  font-size: var(--font-xs);
+}
+
+.plan-exercise-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-exercise {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xxs) 0;
+  color: var(--text-primary);
+  font-size: var(--font-sm);
+}
+
+.plan-exercise-sets {
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  text-align: right;
+}

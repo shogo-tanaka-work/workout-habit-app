@@ -93,3 +93,33 @@ export type DailyResponse = {
 export type BodyLogsResponse = {
   bodyLogs: { date: string; bodyWeightKg: number | null; bodyFatPercentage: number | null }[];
 };
+
+export type MeResponse = {
+  id: string;
+  role: 'admin' | 'member';
+  status: string;
+  email: string;
+  /** 表示用の名前。display_name が空なら email が入る（API 側で寄せている）。 */
+  displayName: string;
+};
+
+/**
+ * /plans のレスポンス。行そのままの形で、テーブル単位に分かれている
+ * （モバイルが同じ形で取り込むため。apps/api/src/routes/plans.ts）。
+ */
+export type PlansResponse = {
+  from: string;
+  to: string;
+  fetchedAt: string;
+  tables: {
+    workouts: { id: string; performed_at: string; memo: string; source: string }[];
+    workout_exercises: { id: string; workout_id: string; exercise_id: string; order_index: number }[];
+    workout_sets: {
+      id: string;
+      workout_exercise_id: string;
+      order_index: number;
+      weight_kg: number;
+      reps: number;
+    }[];
+  };
+};

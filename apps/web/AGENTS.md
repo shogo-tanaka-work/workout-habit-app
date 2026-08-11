@@ -22,7 +22,7 @@
 | UI | React 19 / TypeScript（strict） | |
 | グラフ | 自作 SVG コンポーネント | 外部チャートライブラリは未導入（モバイルの TrendChart と同方針） |
 | 認証 | Cloudflare Access（Google IdP） | このホストの入口で止める。画面はログイン UI もトークンも持たない |
-| データ取得 | `GET /api/analytics/*` | **同一オリジン**。配信元 Worker が API Worker へ中継する |
+| データ取得 | `GET /api/*`（analytics / plans / me） | **同一オリジン**。配信元 Worker が API Worker へ中継する |
 | 配信 | `workout-habit-admin` Worker（`worker/index.ts` + dist） | 静的配信と `/api/*` の中継のみ。集計も認可もしない |
 
 外部ライブラリの新規導入は方針判断が必要なため、勝手に追加しない。
@@ -31,11 +31,11 @@
 
 ```
 src/
-  types/        api.ts（/analytics レスポンス型。apps/api 側の JSON と対応）
+  types/        api.ts（API レスポンス型。apps/api 側の JSON と対応）
   hooks/        useApiData（セッション切れ通知の Context ＋ パス単位の取得フック）
   utils/        datetime / number（表示整形の純粋関数のみ。集計はAPI側）
-  components/   LineChart / BarChart / CalendarHeatmap / Section / Loadable
-  sections/     ダッシュボードの各区画（1区画=1ファイル。各自が /analytics を取得）
+  components/   LineChart / BarChart / CalendarHeatmap / Section / Loadable / Viewer
+  sections/     ダッシュボードの各区画（1区画=1ファイル。各自が API を取得）
   api.ts        apiGet（同一オリジンの /api/*）と表示設定の localStorage 管理
   App.tsx       ApiContext 提供 → セクション描画の薄いシェル
   styles.css    CSS カスタムプロパティとクラス定義

@@ -520,6 +520,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: spacing.xs + 2,
   },
+  disabledPill: {
+    opacity: 0.4,
+  },
   activePill: {
     backgroundColor: colors.accentSurface,
     borderColor: colors.accent,

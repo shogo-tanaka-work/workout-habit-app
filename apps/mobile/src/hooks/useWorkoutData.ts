@@ -19,6 +19,7 @@ import {
   markLastBackupAt,
   restoreWorkoutSets,
   setExerciseRest,
+  updateExercise,
   setSyncPaused,
   setWorkoutStatus,
   startPlannedWorkout,
@@ -37,6 +38,7 @@ import {
   signOut as signOutFromGoogle,
 } from '../auth/googleAuth';
 import { countPendingOperations } from '../db/outbox';
+import { isCustomExerciseId } from '../db/syncTables';
 import { fetchPlansFromCloud, replacePlannedWorkouts } from '../db/plans';
 import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
 import { pushPendingOperations } from '../sync/pusher';
@@ -117,6 +119,13 @@ export function useWorkoutData() {
   const deletedSets = useMemo(
     () => workoutSets.filter((set) => set.deletedAt !== null),
     [workoutSets],
+  );
+
+  // 選択肢に出す種目。アーカイブ済みは除く（exerciseById には残すので、
+  // 過去の記録からは引き続き名前を引ける）。
+  const activeExercises = useMemo(
+    () => exercises.filter((exercise) => !exercise.isArchived),
+    [exercises],
   );
 
   const exerciseById = useMemo(
@@ -208,11 +217,11 @@ export function useWorkoutData() {
     for (const item of workoutExercises) {
       usageCount.set(item.exerciseId, (usageCount.get(item.exerciseId) ?? 0) + 1);
     }
-    return [...exercises].sort((a, b) => {
+    return [...activeExercises].sort((a, b) => {
       const countDiff = (usageCount.get(b.id) ?? 0) - (usageCount.get(a.id) ?? 0);
       return countDiff !== 0 ? countDiff : a.name.localeCompare(b.name, 'ja');
     });
-  }, [exercises, workoutExercises]);
+  }, [activeExercises, workoutExercises]);
 
   const reloadData = useCallback(async (database: SQLite.SQLiteDatabase) => {
     const data = await loadWorkoutData(database);
@@ -432,7 +441,7 @@ export function useWorkoutData() {
   };
 
   // カスタム種目の追加。空文字なら何もせず false を返す（呼び出し側の入力クリア判断に使う）。
-  const addCustomExercise = async (rawName: string): Promise<boolean> => {
+  const addCustomExercise = async (rawName: string, bodyPartId: string): Promise<boolean> => {
     const name = rawName.trim();
     if (!name) {
       return false;
@@ -441,10 +450,23 @@ export function useWorkoutData() {
     await insertExercise(database, {
       id: newId('exercise'),
       name,
-      primaryBodyPartId: bodyParts[0]?.id ?? 'chest',
+      // 部位は呼び出し側で選ばせる。既定を押し付けると全部が最初の部位になる。
+      primaryBodyPartId: bodyPartId || (bodyParts[0]?.id ?? 'chest'),
     });
     await reloadData(database);
     return true;
+  };
+
+  // 種目の設定を保存する。**プリセットは対象外**（サーバが書き換えを拒むため、
+  // 端末だけ変えるとサーバと静かに食い違う）。
+  const saveExercise = async (next: Exercise): Promise<void> => {
+    if (!isCustomExerciseId(next.id)) {
+      return;
+    }
+    const database = ensureDb();
+    await updateExercise(database, next);
+    await reloadData(database);
+    void syncInBackground();
   };
 
   const updateExerciseRest = async (exercise: Exercise, restSeconds: number) => {
@@ -723,6 +745,7 @@ export function useWorkoutData() {
     restoreSets,
     beginRestTimer,
     addCustomExercise,
+    saveExercise,
     updateExerciseRest,
   };
 }

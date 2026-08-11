@@ -125,7 +125,9 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
       `SELECT ${BODY_PART_COLUMNS} FROM body_parts ORDER BY order_index`,
     ),
     database.getAllAsync<ExerciseRow>(
-      `SELECT ${EXERCISE_COLUMNS} FROM exercises WHERE is_archived = 0 ORDER BY name`,
+      // アーカイブ済みも読み込む。除外すると戻す手段が無くなるうえ、
+      // 過去の記録から種目名を引けなくなる。表示側で絞る。
+      `SELECT ${EXERCISE_COLUMNS} FROM exercises ORDER BY name`,
     ),
     database.getAllAsync<WorkoutRow>(
       `SELECT ${WORKOUT_COLUMNS} FROM workouts ORDER BY created_at DESC`,
@@ -570,6 +572,33 @@ export const insertExercise = async (
       timestamp,
     );
     await enqueueUpsert(database, 'exercises', params.id);
+  });
+};
+
+/**
+ * 種目の設定を更新する（名前・部位・バー重量・アーカイブ）。
+ *
+ * **プリセット種目には使わない。** 全ユーザー共有の行でサーバが書き換えを拒むため、
+ * 端末とサーバが静かに食い違う。呼び出し側で `isCustomExerciseId` を確かめること。
+ */
+export const updateExercise = async (
+  database: SQLite.SQLiteDatabase,
+  exercise: Exercise,
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'updateExercise', async () => {
+    await database.runAsync(
+      `UPDATE exercises
+       SET name = ?, primary_body_part_id = ?, default_bar_weight_kg = ?, is_archived = ?, updated_at = ?
+       WHERE id = ?`,
+      exercise.name,
+      exercise.primaryBodyPartId,
+      exercise.defaultBarWeightKg,
+      exercise.isArchived ? 1 : 0,
+      timestamp,
+      exercise.id,
+    );
+    await enqueueUpsert(database, 'exercises', exercise.id);
   });
 };
 

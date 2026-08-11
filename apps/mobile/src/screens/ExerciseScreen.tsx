@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 
 import type { GoogleAccount } from '../auth/googleAuth';
+import { BodyPartPicker } from '../components/BodyPartPicker';
 import { CloudSyncSection } from '../components/CloudSyncSection';
 import { PlateCalculator } from '../components/PlateCalculator';
 import { styles } from '../styles/appStyles';
@@ -16,6 +18,7 @@ export function ExerciseScreen({
   timerSettings,
   onChangeNewExerciseName,
   onAddCustomExercise,
+  onEditExercise,
   onOpenRestPicker,
   onSelectExercise,
   onUpdateTimerSettings,
@@ -38,7 +41,8 @@ export function ExerciseScreen({
   newExerciseName: string;
   timerSettings: TimerSettings;
   onChangeNewExerciseName: (value: string) => void;
-  onAddCustomExercise: () => void;
+  onAddCustomExercise: (bodyPartId: string) => void;
+  onEditExercise: (exerciseId: string) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onSelectExercise: (exerciseId: string) => void;
   onUpdateTimerSettings: (settings: TimerSettings) => void;
@@ -55,6 +59,21 @@ export function ExerciseScreen({
   onTogglePaused: (isPaused: boolean) => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
+  // 新規登録の入力状態。名前は親（App）が持つが、部位とフィルタはこの画面だけの関心。
+  const [newBodyPartId, setNewBodyPartId] = useState(bodyParts[0]?.id ?? '');
+  const [keyword, setKeyword] = useState('');
+  const [filterBodyPartId, setFilterBodyPartId] = useState<string | null>(null);
+
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const matchesFilter = (exercise: Exercise): boolean =>
+    (filterBodyPartId === null || exercise.primaryBodyPartId === filterBodyPartId) &&
+    (normalizedKeyword === '' || exercise.name.toLowerCase().includes(normalizedKeyword));
+
+  const listedExercises = exercises
+    .filter((exercise) => !exercise.isArchived)
+    .filter(matchesFilter);
+  const archivedExercises = exercises.filter((exercise) => exercise.isArchived);
+
   return (
     <View style={styles.stack}>
       <View style={styles.section}>
@@ -97,7 +116,16 @@ export function ExerciseScreen({
             placeholderTextColor={colors.textFaint}
             style={styles.textInput}
           />
-          <Pressable style={styles.primaryButton} onPress={onAddCustomExercise}>
+          <Text style={styles.inputLabel}>部位</Text>
+          <BodyPartPicker
+            bodyParts={bodyParts}
+            selectedId={newBodyPartId}
+            onSelect={setNewBodyPartId}
+          />
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => onAddCustomExercise(newBodyPartId)}
+          >
             <Text style={styles.primaryButtonText}>種目を登録</Text>
           </Pressable>
         </View>
@@ -105,24 +133,47 @@ export function ExerciseScreen({
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>部位マスター</Text>
+          <Text style={styles.sectionHeaderText}>種目一覧</Text>
+          <Text style={styles.faint}>{listedExercises.length} 件</Text>
         </View>
         <View style={styles.sectionBody}>
+          <TextInput
+            value={keyword}
+            onChangeText={setKeyword}
+            placeholder="種目名で絞り込む"
+            placeholderTextColor={colors.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.textInput}
+          />
           <View style={styles.chipWrap}>
+            <Pressable
+              style={[styles.pill, filterBodyPartId === null && styles.activePill]}
+              onPress={() => setFilterBodyPartId(null)}
+            >
+              <Text style={[styles.pillText, filterBodyPartId === null && styles.activePillText]}>
+                すべて
+              </Text>
+            </Pressable>
             {bodyParts.map((part) => (
-              <View key={part.id} style={styles.staticChip}>
-                <Text style={styles.staticChipText}>{part.name}</Text>
-              </View>
+              <Pressable
+                key={part.id}
+                style={[styles.pill, filterBodyPartId === part.id && styles.activePill]}
+                onPress={() => setFilterBodyPartId(filterBodyPartId === part.id ? null : part.id)}
+              >
+                <Text
+                  style={[styles.pillText, filterBodyPartId === part.id && styles.activePillText]}
+                >
+                  {part.name}
+                </Text>
+              </Pressable>
             ))}
           </View>
+          {listedExercises.length === 0 ? (
+            <Text style={styles.muted}>条件に合う種目がありません。</Text>
+          ) : null}
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>種目一覧</Text>
-        </View>
-        {exercises.map((exercise) => {
+        {listedExercises.map((exercise) => {
           const bodyPart = bodyPartById.get(exercise.primaryBodyPartId);
           return (
             <View key={exercise.id} style={styles.exerciseRow}>
@@ -147,11 +198,39 @@ export function ExerciseScreen({
                   <Text style={styles.muted}>デフォルト休憩</Text>
                   <Text style={styles.restValue}>{formatTimer(exercise.defaultRestSeconds)} ›</Text>
                 </Pressable>
+                <Pressable style={styles.restRow} onPress={() => onEditExercise(exercise.id)}>
+                  <Text style={styles.muted}>設定</Text>
+                  <Text style={styles.restValue}>編集 ›</Text>
+                </Pressable>
               </View>
             </View>
           );
         })}
       </View>
+
+      {/* アーカイブ済み。読み込み対象に含めているので、ここから戻せる。 */}
+      {archivedExercises.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>アーカイブ済み</Text>
+            <Text style={styles.faint}>{archivedExercises.length} 件</Text>
+          </View>
+          {archivedExercises.map((exercise) => (
+            <View key={exercise.id} style={styles.exerciseRow}>
+              <Pressable
+                style={styles.exerciseRowHeader}
+                onPress={() => onEditExercise(exercise.id)}
+              >
+                <View style={styles.flex}>
+                  <Text style={styles.exerciseRowName}>{exercise.name}</Text>
+                  <Text style={styles.faint}>選択肢に出ません</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       <PlateCalculator />
 

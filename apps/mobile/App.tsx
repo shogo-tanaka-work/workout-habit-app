@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { ExerciseEditModal } from './src/components/ExerciseEditModal';
 import { RestPickerModal } from './src/components/RestPickerModal';
 import { TimerBanner } from './src/components/TimerBanner';
 import { useRestTimer } from './src/hooks/useRestTimer';
@@ -37,6 +38,8 @@ export default function App() {
   const [newExerciseName, setNewExerciseName] = useState('');
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
+  // 編集中の種目 ID。モーダルの表示はこれで決める。
+  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
   const [restPicker, setRestPicker] = useState<{ exerciseId: string; seconds: number } | null>(
     null,
   );
@@ -120,13 +123,17 @@ export default function App() {
     setTab('home');
   };
 
+  const editingExercise = editingExerciseId
+    ? (data.exerciseById.get(editingExerciseId) ?? null)
+    : null;
+
   const handleStartRestTimer = async (set: WorkoutSet, workoutExercise: WorkoutExercise) => {
     const nextTimer = await data.beginRestTimer(set, workoutExercise);
     setTimer(nextTimer);
   };
 
-  const handleAddCustomExercise = async () => {
-    const added = await data.addCustomExercise(newExerciseName);
+  const handleAddCustomExercise = async (bodyPartId: string) => {
+    const added = await data.addCustomExercise(newExerciseName, bodyPartId);
     if (added) {
       setNewExerciseName('');
     }
@@ -319,6 +326,7 @@ export default function App() {
                   timerSettings={data.timerSettings}
                   onChangeNewExerciseName={setNewExerciseName}
                   onAddCustomExercise={handleAddCustomExercise}
+                  onEditExercise={setEditingExerciseId}
                   onOpenRestPicker={openRestPicker}
                   onSelectExercise={setSelectedExerciseId}
                   onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
@@ -340,6 +348,18 @@ export default function App() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {editingExercise ? (
+        <ExerciseEditModal
+          exercise={editingExercise}
+          bodyParts={data.bodyParts}
+          onSave={(next) => {
+            setEditingExerciseId(null);
+            void data.saveExercise(next);
+          }}
+          onCancel={() => setEditingExerciseId(null)}
+        />
+      ) : null}
 
       {restPicker ? (
         <RestPickerModal

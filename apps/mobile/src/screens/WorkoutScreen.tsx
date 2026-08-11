@@ -1,8 +1,10 @@
-import { Alert, Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { StatSummary } from '../components/StatSummary';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
 import { styles } from '../styles/appStyles';
+import { colors } from '../styles/theme';
 import type {
   BodyPart,
   Exercise,
@@ -66,6 +68,10 @@ export function WorkoutScreen({
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
+  // 種目を探すための絞り込み。種目が増えるほどチップの壁を縦に辿ることになる。
+  const [keyword, setKeyword] = useState('');
+  const [filterBodyPartId, setFilterBodyPartId] = useState<string | null>(null);
+
   const confirmDeleteTemplate = (template: Template) => {
     Alert.alert('テンプレートを削除', `「${template.name}」を削除します。`, [
       { text: 'キャンセル', style: 'cancel' },
@@ -139,6 +145,14 @@ export function WorkoutScreen({
     );
   }
 
+  // 並び順は使用頻度順のまま（親が exercisesByUsage を渡す）。絞り込みだけを重ねる。
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const visibleExercises = exercises.filter(
+    (exercise) =>
+      (filterBodyPartId === null || exercise.primaryBodyPartId === filterBodyPartId) &&
+      (normalizedKeyword === '' || exercise.name.toLowerCase().includes(normalizedKeyword)),
+  );
+
   const activeSets = visibleSets.filter((set) =>
     workoutExercises.some((item) => item.id === set.workoutExerciseId),
   );
@@ -190,8 +204,40 @@ export function WorkoutScreen({
           <Text style={styles.sectionHeaderText}>種目を追加</Text>
         </View>
         <View style={styles.sectionBody}>
+          <TextInput
+            value={keyword}
+            onChangeText={setKeyword}
+            placeholder="種目名で絞り込む"
+            placeholderTextColor={colors.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.textInput}
+          />
           <View style={styles.chipWrap}>
-            {exercises.map((exercise) => {
+            <Pressable
+              style={[styles.pill, filterBodyPartId === null && styles.activePill]}
+              onPress={() => setFilterBodyPartId(null)}
+            >
+              <Text style={[styles.pillText, filterBodyPartId === null && styles.activePillText]}>
+                すべて
+              </Text>
+            </Pressable>
+            {[...bodyPartById.values()].map((part) => (
+              <Pressable
+                key={part.id}
+                style={[styles.pill, filterBodyPartId === part.id && styles.activePill]}
+                onPress={() => setFilterBodyPartId(filterBodyPartId === part.id ? null : part.id)}
+              >
+                <Text
+                  style={[styles.pillText, filterBodyPartId === part.id && styles.activePillText]}
+                >
+                  {part.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.chipWrap}>
+            {visibleExercises.map((exercise) => {
               const bodyPart = bodyPartById.get(exercise.primaryBodyPartId);
               return (
                 <Pressable
@@ -207,6 +253,9 @@ export function WorkoutScreen({
               );
             })}
           </View>
+          {visibleExercises.length === 0 ? (
+            <Text style={styles.muted}>条件に合う種目がありません。</Text>
+          ) : null}
         </View>
       </View>
 

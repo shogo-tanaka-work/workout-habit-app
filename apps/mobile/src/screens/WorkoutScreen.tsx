@@ -39,6 +39,7 @@ export function WorkoutScreen({
   onAddExercise,
   onAddSet,
   onPatchSet,
+  onRestoreSets,
   onStartRestTimer,
   onOpenRestPicker,
 }: {
@@ -61,6 +62,7 @@ export function WorkoutScreen({
   onAddExercise: (exercise: Exercise) => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onRestoreSets: (workoutExerciseId: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
@@ -176,6 +178,7 @@ export function WorkoutScreen({
         exerciseById={exerciseById}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
+        onRestoreSets={onRestoreSets}
         onStartRestTimer={onStartRestTimer}
         onOpenRestPicker={onOpenRestPicker}
         showTimer

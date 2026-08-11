@@ -284,6 +284,7 @@ export default function App() {
                   onAddExercise={data.addExerciseToWorkout}
                   onAddSet={data.addSet}
                   onPatchSet={data.patchSet}
+                  onRestoreSets={data.restoreSets}
                   onStartRestTimer={handleStartRestTimer}
                   onOpenRestPicker={openRestPicker}
                 />
@@ -301,6 +302,7 @@ export default function App() {
                   onStopEdit={() => setEditingWorkoutId(null)}
                   onAddSet={data.addSet}
                   onPatchSet={data.patchSet}
+                  onRestoreSets={data.restoreSets}
                   onStartRestTimer={handleStartRestTimer}
                   onOpenRestPicker={openRestPicker}
                   onDeleteWorkout={handleDeleteWorkout}

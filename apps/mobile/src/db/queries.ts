@@ -496,6 +496,33 @@ export const updateWorkoutSet = async (
   });
 };
 
+/**
+ * 論理削除したセットをまとめて戻す。
+ *
+ * **1トランザクションで処理する。** 1件ずつ updateWorkoutSet を呼ぶと、
+ * 同じ接続でトランザクションが重なって失敗する（expo-sqlite はネストを許さない）。
+ */
+export const restoreWorkoutSets = async (
+  database: SQLite.SQLiteDatabase,
+  setIds: readonly string[],
+): Promise<void> => {
+  if (setIds.length === 0) {
+    return;
+  }
+  const timestamp = nowIso();
+  await writeWithOutbox(database, 'restoreWorkoutSets', async () => {
+    for (const setId of setIds) {
+      await database.runAsync(
+        'UPDATE workout_sets SET deleted_at = NULL, updated_at = ? WHERE id = ?',
+        timestamp,
+        setId,
+      );
+      // 復元も「その行の最新状態」を送るだけでよい（後勝ち）。
+      await enqueueUpsert(database, 'workout_sets', setId);
+    }
+  });
+};
+
 export const insertTimerEvent = async (
   database: SQLite.SQLiteDatabase,
   params: { id: string; workoutSetId: string; exerciseId: string; durationSeconds: number },

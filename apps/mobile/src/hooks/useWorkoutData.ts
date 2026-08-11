@@ -17,6 +17,7 @@ import {
   insertWorkoutSet,
   loadWorkoutData,
   markLastBackupAt,
+  restoreWorkoutSets,
   setExerciseRest,
   setSyncPaused,
   setWorkoutStatus,
@@ -381,6 +382,25 @@ export function useWorkoutData() {
     }
   };
 
+  // 削除したセットをまとめて戻す。**1操作として扱う**（1件ずつ patchSet を呼ぶと
+  // トランザクションが重なって失敗する）。
+  const restoreSets = async (workoutExerciseId: string) => {
+    const database = ensureDb();
+    const targets = deletedSets.filter((set) => set.workoutExerciseId === workoutExerciseId);
+    if (targets.length === 0) {
+      return;
+    }
+    await restoreWorkoutSets(
+      database,
+      targets.map((set) => set.id),
+    );
+    const owningWorkoutId = workoutExerciseById.get(workoutExerciseId)?.workoutId;
+    if (owningWorkoutId) {
+      await touchWorkout(database, owningWorkoutId);
+    }
+    await reloadData(database);
+  };
+
   // 休憩タイマーの開始。セットを完了扱いにし timer_events を記録、TimerState を返す。
   // 返した状態は呼び出し側（App）が useRestTimer の setTimer に渡す。
   const beginRestTimer = async (
@@ -700,6 +720,7 @@ export function useWorkoutData() {
     addExerciseToWorkout,
     addSet,
     patchSet,
+    restoreSets,
     beginRestTimer,
     addCustomExercise,
     updateExerciseRest,

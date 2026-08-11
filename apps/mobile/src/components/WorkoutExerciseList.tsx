@@ -16,6 +16,7 @@ export function WorkoutExerciseList({
   exerciseById,
   onAddSet,
   onPatchSet,
+  onRestoreSets,
   onStartRestTimer,
   onOpenRestPicker,
   showTimer,
@@ -28,6 +29,7 @@ export function WorkoutExerciseList({
   exerciseById: Map<string, Exercise>;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onRestoreSets: (workoutExerciseId: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   showTimer: boolean;
@@ -106,9 +108,7 @@ export function WorkoutExerciseList({
               {removedSets.length > 0 ? (
                 <Pressable
                   style={styles.restRow}
-                  onPress={() =>
-                    removedSets.forEach((set) => onPatchSet(set.id, { deletedAt: null }))
-                  }
+                  onPress={() => onRestoreSets(workoutExercise.id)}
                 >
                   <Text style={styles.faint}>削除したセット {removedSets.length} 件</Text>
                   <Text style={styles.restValue}>戻す ›</Text>

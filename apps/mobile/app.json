@@ -26,7 +26,12 @@
     "plugins": [
       "expo-sqlite",
       "expo-audio",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": ["./assets/timer-complete.wav"]
+        }
+      ],
       "@react-native-google-signin/google-signin"
     ]
   }

@@ -8,6 +8,10 @@ import * as Notifications from 'expo-notifications';
 // OS に時刻を預けて鳴らしてもらう。
 //
 // 前面にいるときは通知を出さない（アプリ内の音と振動が既に鳴っており、二重になる）。
+//
+// 通知音はアプリ内と同じ timer-complete.wav を使う。前面と背面で鳴る音が違うと、
+// 同じ「休憩終了」なのに別の出来事に聞こえる。ファイルは app.json の
+// expo-notifications プラグイン（sounds）が端末へ焼き込む。**差し替えには再ビルドが要る。**
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -65,7 +69,8 @@ export const scheduleRestFinished = async (
       content: {
         title: '休憩終了',
         body: `${exerciseName} の次のセットへ`,
-        sound: true,
+        // ファイル名で指定する（プラグインが同名で焼き込む）。true だと OS 標準音になる。
+        sound: 'timer-complete.wav',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

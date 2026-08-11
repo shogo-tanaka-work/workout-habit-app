@@ -33,8 +33,9 @@
 | フレームワーク | Expo SDK 56 / React Native 0.85 | New Architecture（Fabric/TurboModules）が標準 |
 | UI ランタイム | React 19 | |
 | 言語 | TypeScript（strict） | `expo/tsconfig.base` を extends |
-| ローカルDB | expo-sqlite | 10テーブル。マスタ（部位・種目）＋記録（workout/sets）＋設定・ボディログ |
+| ローカルDB | expo-sqlite | 11テーブル。マスタ（部位・種目・上書き）＋記録（workout/sets）＋設定・ボディログ |
 | 音声 | expo-audio | タイマー完了音（timer-complete.wav） |
+| 通知 | expo-notifications | 休憩終了のローカル通知。アプリ内と同じ音を鳴らす |
 | ピッカー | @react-native-picker/picker | レスト時間選択 |
 | 認証 | @react-native-google-signin/google-signin | Google サインイン。ID トークンは保存せず都度取得 |
 | ナビゲーション | **自前の state 方式**（タブ4画面） | React Navigation / Expo Router は未導入 |
@@ -85,6 +86,22 @@ EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com   # 任意
 ```
 
 値を変えたら `npx expo prebuild --clean` からやり直す（ネイティブ設定に焼き込まれる）。
+
+## ⚠️ app.json のプラグイン設定を変えたら prebuild を明示的に実行する
+
+**`npm run ios` は `ios/` が既にあると prebuild を再実行しない。**
+`app.json` の `plugins` を変えても、そのままではネイティブへ反映されずビルドは成功する。
+「ビルドが通ったのに設定が効かない」という形で出るため気づきにくい。
+
+```bash
+npx expo prebuild -p ios   # プラグイン設定を反映
+npm run ios                # そのあとビルド
+```
+
+例: 通知音（`expo-notifications` の `sounds`）を足したときは、
+prebuild を挟まないと wav がアプリバンドルへ入らず、通知が無音になる。
+反映されたかは `find ios -name '<ファイル名>'` と、
+ビルド後の `.app` の中を見て確かめる。
 
 ## 開発コマンド
 

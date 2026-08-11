@@ -38,14 +38,41 @@ paths: "apps/api/src/**/*.ts,apps/mobile/src/db/sync.ts,apps/web/src/api.ts"
 **新しいエンドポイントを足すときは、必ず `src/db/scope.ts` の条件を通す。**
 `WHERE user_id = ?` を route へ直接書かない。書き忘れた瞬間に他人のデータが漏れる。
 
-- 記録テーブル: `scopeForUser(user, 'w.user_id')`。member は自分の行、admin は全件
+- 記録テーブル: `scopeForUser(user, 'w.user_id')`。**ロールに関わらず本人の行だけ**
 - 種目マスタ: `scopeForExercise(user, 'e.owner_user_id')`。
-  `owner_user_id IS NULL` は全ユーザー共有のプリセット
-- `/backup` はロールに関わらず本人スコープ。admin でも他人の行を復元・置換させない
+  `owner_user_id IS NULL` は全ユーザー共有のプリセット。他人のカスタム種目は見えない
+- `/backup` と `/plans` も本人スコープ。admin でも他人の行を復元・置換・閲覧させない
 - 列名は呼び出し側のリテラルだけを渡す。外部入力を列名に使わない
 
-## 残作業（Step 4）
+### admin を無制限にしない（2026-08-11 決定）
 
-- モバイル: Google サインイン導入、ID トークンの取得と `expo-secure-store` への保存
-- 管理画面: `workout-habit-admin` へ Cloudflare Access を適用し、トークン入力 UI を撤去
-- `/backup` の全置換を操作ベース（intent）の CRUD へ移行する
+かつて `scopeForUser` は admin へ `1 = 1` を返していた。ユーザーが1人の間は無害だが、
+**member が加わった瞬間に分析が全員の合算になる。**
+「先月の総ボリューム」が他人の分を含む数字になり、分析として意味を失う。
+
+他人の記録を見る必要が出たら、**明示的な指定（`?userId=`）を足す**。
+既定で混ざるのは事故でしかない。
+
+## 書き込みの保証
+
+member を受け入れる前提で `src/sync/apply.ts` を監査した結果（2026-08-11）。
+新しい書き込み経路を足すときは、同じ保証が成り立つことを確かめる。
+
+| 保証 | 実装 |
+|---|---|
+| 他人の行を書けない | `checkExistingOwner` が `row not found` で拒否する |
+| 共有プリセットを書き換えられない | 同上（`owner_user_id IS NULL` は自分の行ではない） |
+| 所有者を横取りできない | `buildUpsertStatement` の `WHERE ownerColumn = excluded.ownerColumn` |
+| 削除も自分の行だけ | `DELETE ... AND ownerColumn = ?` |
+| 共有プリセットの参照はできる | `parentIsUsable` が `owner === null` を許可する |
+
+**拒否の理由は `row not found` で揃える。** 「他人の行だから」と返すと、
+その ID の行が存在することを漏らしてしまう。
+
+## 自分の情報
+
+`GET /me`（`src/routes/me.ts`）が id / 表示名 / ロールを返す。
+**ユーザー一覧の経路は作らない。** 引くのは常に自分の行だけ。
+
+表示名は `display_name ?? email`。Access 経路のユーザーは JWT に名前が無く
+`display_name` が埋まらないため、API 側でフォールバックまで済ませる。

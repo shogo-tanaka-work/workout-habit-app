@@ -14,22 +14,27 @@ export type Scope = {
   params: readonly string[];
 };
 
-/** 常に真の条件。admin（全件閲覧）で使う。 */
-const UNRESTRICTED: Scope = { condition: '1 = 1', params: [] };
-
 /**
- * 記録テーブル用のスコープ。member は自分の行だけ、admin は全件。
+ * 記録テーブル用のスコープ。**ロールに関わらず自分の行だけ。**
+ *
+ * かつては admin を無制限（`1 = 1`）にしていたが、ユーザーが増えた瞬間に
+ * 分析が全員の合算になる。「先月の総ボリューム」が他人の分を含む数字になり、
+ * 分析として意味を失う。他人の記録を見る必要が出たら、
+ * **明示的な指定（`?userId=`）を足す**。既定で混ざるのは事故でしかない。
+ *
  * @param column 修飾済みの列名（例: 'w.user_id'）。呼び出し側のリテラルであること。
  */
-export const scopeForUser = (user: AuthenticatedUser, column: string): Scope =>
-  user.role === 'admin' ? UNRESTRICTED : { condition: `${column} = ?`, params: [user.id] };
+export const scopeForUser = (user: AuthenticatedUser, column: string): Scope => ({
+  condition: `${column} = ?`,
+  params: [user.id],
+});
 
 /**
  * 種目マスタ用のスコープ。owner_user_id が NULL の行は全ユーザー共有のプリセット、
- * 非 NULL はそのユーザーのカスタム種目。
+ * 非 NULL はそのユーザーのカスタム種目。他人のカスタム種目は見えない。
  * @param column 修飾済みの列名（例: 'e.owner_user_id'）。
  */
-export const scopeForExercise = (user: AuthenticatedUser, column: string): Scope =>
-  user.role === 'admin'
-    ? UNRESTRICTED
-    : { condition: `(${column} IS NULL OR ${column} = ?)`, params: [user.id] };
+export const scopeForExercise = (user: AuthenticatedUser, column: string): Scope => ({
+  condition: `(${column} IS NULL OR ${column} = ?)`,
+  params: [user.id],
+});

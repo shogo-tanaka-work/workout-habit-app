@@ -214,14 +214,6 @@ export function WorkoutScreen({
             style={styles.textInput}
           />
           <View style={styles.chipWrap}>
-            <Pressable
-              style={[styles.pill, filterBodyPartId === null && styles.activePill]}
-              onPress={() => setFilterBodyPartId(null)}
-            >
-              <Text style={[styles.pillText, filterBodyPartId === null && styles.activePillText]}>
-                すべて
-              </Text>
-            </Pressable>
             {[...bodyPartById.values()].map((part) => (
               <Pressable
                 key={part.id}

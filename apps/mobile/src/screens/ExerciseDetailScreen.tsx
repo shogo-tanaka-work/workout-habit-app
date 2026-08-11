@@ -39,13 +39,13 @@ export function ExerciseDetailScreen({
   if (sessions.length === 0) {
     return (
       <View style={styles.stack}>
+        {/* 画面のヘッダーが種目名を出しているので、ここで名前を繰り返さない。 */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{exercise.name}</Text>
-          </View>
           <View style={styles.sectionBody}>
+            <Text style={styles.sectionTitle}>まだ記録がありません</Text>
             <Text style={styles.muted}>
-              この種目の記録はまだありません。ワークアウトで種目に追加すると、推移が見られます。
+              この画面では、実施ごとのセット内容と、ボリューム・推定1RM の推移を振り返れます。
+              記録画面でこの種目を追加してセットを入れると、ここに並びます。
             </Text>
           </View>
         </View>
@@ -93,7 +93,10 @@ export function ExerciseDetailScreen({
 
       {recentPastSessions.length > 0 ? (
         <View style={styles.stack}>
-          <Text style={styles.muted}>過去{recentPastSessions.length}回分の記録</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>過去の記録</Text>
+            <Text style={styles.faint}>直近 {recentPastSessions.length} 回</Text>
+          </View>
           {recentPastSessions.map((session) => (
             <SessionSection
               key={session.workout.id}
@@ -104,7 +107,9 @@ export function ExerciseDetailScreen({
         </View>
       ) : null}
 
-      <Text style={styles.muted}>推移</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>推移</Text>
+      </View>
       <View style={styles.segmentRow}>
         {PERIODS.map((candidate, index) => {
           const isActive = candidate.key === periodKey;
@@ -202,7 +207,7 @@ function RmCalculator({
               <Text style={styles.setTableLabelText}>レップ数</Text>
             </View>
             {RM_TABLE_REPS.map((tableReps) => (
-              <View key={`reps-${tableReps}`} style={styles.setTableCell}>
+              <View key={`reps-${tableReps}`} style={styles.rmTableCell}>
                 <Text style={styles.setTableCellText}>{tableReps}</Text>
               </View>
             ))}
@@ -212,7 +217,7 @@ function RmCalculator({
               <Text style={styles.setTableLabelText}>目安重量</Text>
             </View>
             {RM_TABLE_REPS.map((tableReps) => (
-              <View key={`weight-${tableReps}`} style={styles.setTableCell}>
+              <View key={`weight-${tableReps}`} style={styles.rmTableCell}>
                 <Text style={styles.setTableCellText}>{weightForReps(oneRepMax, tableReps)}</Text>
               </View>
             ))}

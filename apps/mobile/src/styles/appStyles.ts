@@ -272,6 +272,17 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     fontWeight: '600',
   },
+  // RM 換算表のセル。列数ぶんを画面幅で割る。
+  // setTableCell の固定幅（52px）だと 76 + 52×6 = 388px となり、端末幅からはみ出す。
+  rmTableCell: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xxs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: hairlineWidth,
+    borderRightColor: colors.hairline,
+  },
   setTableCell: {
     width: 52,
     paddingVertical: spacing.sm,

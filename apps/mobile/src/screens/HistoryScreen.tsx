@@ -1,21 +1,35 @@
-import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
-import { MonthCalendar } from '../components/MonthCalendar';
+import { BodyLogSection } from '../components/BodyLogSection';
 import { StatSummary } from '../components/StatSummary';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
 import { styles } from '../styles/appStyles';
-import type { Exercise, SetPatch, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import { bodyPartColor } from '../styles/theme';
+import type {
+  BodyLog,
+  Exercise,
+  SetPatch,
+  WeeklyStats,
+  Workout,
+  WorkoutExercise,
+  WorkoutSet,
+} from '../types/domain';
+import type { BodyPartSummary } from '../utils/aggregate';
 import { summarizeSets } from '../utils/aggregate';
 import { formatJapaneseDate } from '../utils/datetime';
 import { formatCount, formatVolume, formatWeight } from '../utils/number';
 
+// 履歴は「振り返り」の画面。日々の実績の入口はホームのカレンダーが持ち、
+// ここは週次の集計・体組成の推移と、過去の記録の一覧・編集を担う。
 export function HistoryScreen({
   workouts,
   workoutExercises,
   visibleSets,
   deletedSets,
   exerciseById,
+  stats,
+  bodyPartSummaries,
+  bodyLogs,
   editingWorkoutId,
   onEdit,
   onStopEdit,
@@ -26,12 +40,16 @@ export function HistoryScreen({
   onOpenRestPicker,
   onDeleteWorkout,
   onSelectExercise,
+  onSaveBodyLog,
 }: {
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
   deletedSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
+  stats: WeeklyStats;
+  bodyPartSummaries: BodyPartSummary[];
+  bodyLogs: BodyLog[];
   editingWorkoutId: string | null;
   onEdit: (workoutId: string) => void;
   onStopEdit: () => void;
@@ -42,9 +60,12 @@ export function HistoryScreen({
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onDeleteWorkout: (workoutId: string) => void;
   onSelectExercise: (exerciseId: string) => void;
+  onSaveBodyLog: (bodyWeightKg: number, bodyFatPercentage: number | null) => void;
 }) {
-  // カレンダーで選択中の日付。選択中はその日の記録だけを表示する。
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const maxBodyPartVolume = bodyPartSummaries.reduce(
+    (max, summary) => Math.max(max, summary.totalVolume),
+    0,
+  );
 
   const confirmDelete = (workoutId: string, label: string) => {
     Alert.alert('記録を削除', `${label} の記録を削除します。元に戻せません。`, [
@@ -53,42 +74,58 @@ export function HistoryScreen({
     ]);
   };
 
-  const workoutCountByDate = new Map<string, number>();
-  for (const workout of workouts) {
-    workoutCountByDate.set(
-      workout.performedAt,
-      (workoutCountByDate.get(workout.performedAt) ?? 0) + 1,
-    );
-  }
-  const visibleWorkouts = selectedDate
-    ? workouts.filter((workout) => workout.performedAt === selectedDate)
-    : workouts;
-
   return (
     <View style={styles.stack}>
       <View style={styles.section}>
-        <MonthCalendar
-          workoutCountByDate={workoutCountByDate}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>今週のトレーニング</Text>
+        </View>
+        <StatSummary
+          primary={{ label: '総ボリューム', value: formatCount(stats.totalVolume), unit: 'kg' }}
+          items={[
+            { label: '記録', value: formatCount(stats.workoutCount), unit: '回' },
+            { label: 'セット', value: formatCount(stats.setCount) },
+            { label: 'レップ', value: formatCount(stats.totalReps) },
+          ]}
         />
+        {bodyPartSummaries.length > 0 ? (
+          <View style={styles.sectionBody}>
+            {bodyPartSummaries.map((summary) => {
+              const ratio = maxBodyPartVolume > 0 ? summary.totalVolume / maxBodyPartVolume : 0;
+              return (
+                <View key={summary.bodyPartId} style={styles.bodyPartRow}>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.panelText}>{summary.name}</Text>
+                    <Text style={styles.muted}>
+                      {summary.setCount} セット ・ {formatVolume(summary.totalVolume)}
+                    </Text>
+                  </View>
+                  <View style={styles.bodyPartBarTrack}>
+                    <View
+                      style={[
+                        styles.bodyPartBarFill,
+                        {
+                          width: `${ratio * 100}%`,
+                          backgroundColor: bodyPartColor(summary.bodyPartId),
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
-      {selectedDate ? (
-        <View style={styles.rowBetween}>
-          <Text style={styles.accentNote}>{formatJapaneseDate(selectedDate)} の記録</Text>
-          <Pressable style={styles.ghostButton} onPress={() => setSelectedDate(null)}>
-            <Text style={styles.ghostButtonText}>すべて表示</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      <BodyLogSection bodyLogs={bodyLogs} onSave={onSaveBodyLog} />
 
       {workouts.length === 0 ? (
         <Text style={styles.muted}>
           完了した記録はまだありません。ワークアウトを完了すると、ここに履歴が並びます。
         </Text>
       ) : null}
-      {visibleWorkouts.map((workout) => {
+      {workouts.map((workout) => {
         const items = workoutExercises
           .filter((item) => item.workoutId === workout.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);
@@ -152,7 +189,12 @@ export function HistoryScreen({
                     onPress={() => onSelectExercise(item.exerciseId)}
                   >
                     <View style={styles.exerciseRowHeader}>
-                      <View style={styles.exerciseDot} />
+                      <View
+                        style={[
+                          styles.exerciseDot,
+                          { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
+                        ]}
+                      />
                       <Text style={styles.exerciseRowName}>{exercise?.name ?? '種目'}</Text>
                       <Text style={styles.chevron}>›</Text>
                     </View>

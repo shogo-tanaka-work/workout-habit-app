@@ -24,6 +24,25 @@ export const colors = {
   chartSecondary: '#6f9fd8',
 };
 
+// 部位の識別色（カテゴリ色）。強弱ではなく「どの部位か」だけを表す。
+// 暖色ダーク地の上で色相を見分けられる範囲に彩度を落としてある。
+// 詳細は .agents/DESIGN.md「カテゴリ色（部位）」。
+export const bodyPartColors: Record<string, string> = {
+  chest: '#e07a5f',
+  back: '#6f9fd8',
+  legs: '#a082cc',
+  shoulders: '#77b98a',
+  arms: '#c9b458',
+  core: '#5fb8b0',
+  cardio: '#c97fa8',
+};
+
+// 未知・未分類の部位。色で意味を主張しないよう微文字色に寄せる。
+export const unknownBodyPartColor = '#7b7163';
+
+export const bodyPartColor = (bodyPartId: string | null | undefined): string =>
+  (bodyPartId ? bodyPartColors[bodyPartId] : undefined) ?? unknownBodyPartColor;
+
 export const spacing = {
   // ラベルと値のような、密着させたい組み合わせにだけ使う最小の間隔。
   xxs: 2,

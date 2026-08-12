@@ -1,6 +1,6 @@
 import { formatDate } from './datetime';
 
-// 月間カレンダー（履歴タブ）用の純粋関数群。週は参考UIに合わせて月曜はじまり。
+// 月間カレンダー（ホーム）用の純粋関数群。週は参考UIに合わせて月曜はじまり。
 
 export type YearMonth = {
   year: number;
@@ -11,6 +11,16 @@ export type YearMonth = {
 export const currentYearMonth = (today: Date): YearMonth => ({
   year: today.getFullYear(),
   month: today.getMonth() + 1,
+});
+
+const ISO_YEAR_END = 4;
+const ISO_MONTH_START = 5;
+const ISO_MONTH_END = 7;
+
+// ISO 日付（YYYY-MM-DD）が属する年月。文字列から切り出すのでタイムゾーンの影響を受けない。
+export const yearMonthOf = (isoDate: string): YearMonth => ({
+  year: Number(isoDate.slice(0, ISO_YEAR_END)),
+  month: Number(isoDate.slice(ISO_MONTH_START, ISO_MONTH_END)),
 });
 
 export const shiftMonth = ({ year, month }: YearMonth, delta: number): YearMonth => {

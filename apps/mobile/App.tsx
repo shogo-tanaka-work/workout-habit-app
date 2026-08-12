@@ -123,6 +123,8 @@ export default function App() {
     setTab('home');
   };
 
+  const isHomeTab = tab === 'home' && selectedExerciseId === null;
+
   const editingExercise = editingExerciseId
     ? (data.exerciseById.get(editingExerciseId) ?? null)
     : null;
@@ -137,6 +139,21 @@ export default function App() {
     if (added) {
       setNewExerciseName('');
     }
+  };
+
+  // ホームで選んだ日の記録を直す。編集の実装は履歴タブが持つので、そこへ送る。
+  const handleEditWorkoutFromHome = (workoutId: string) => {
+    setEditingWorkoutId(workoutId);
+    setTab('history');
+  };
+
+  // ホーム右下の主操作。記録中なら続きへ、なければ新しく始める。
+  const handleFabPress = () => {
+    if (data.activeWorkout) {
+      setTab('workout');
+      return;
+    }
+    void handleStart();
   };
 
   const handleDeleteWorkout = async (workoutId: string) => {
@@ -205,16 +222,16 @@ export default function App() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <View style={styles.header}>
-          {selectedExercise ? (
+        {/* アプリ名の固定表示は置かない（狭い画面を1行ぶん取られるため）。
+            ヘッダーは、戻る導線が要る種目詳細のときだけ出す。 */}
+        {selectedExercise ? (
+          <View style={styles.header}>
             <Pressable style={styles.headerBackButton} onPress={() => setSelectedExerciseId(null)}>
               <Text style={styles.headerBackText}>‹</Text>
               <Text style={styles.appName}>{selectedExercise.name}</Text>
             </Pressable>
-          ) : (
-            <Text style={styles.appName}>Workout Habit</Text>
-          )}
-        </View>
+          </View>
+        ) : null}
 
         {timer ? <TimerBanner timer={timer} setTimer={setTimer} /> : null}
 
@@ -239,115 +256,134 @@ export default function App() {
           </View>
         )}
 
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          {selectedExercise ? (
-            <ExerciseDetailScreen exercise={selectedExercise} sessions={selectedExerciseSessions} />
-          ) : (
-            <>
-              {tab === 'home' ? (
-                <HomeScreen
-                  activeWorkout={data.activeWorkout}
-                  completedWorkouts={data.completedWorkouts}
-                  plannedWorkouts={data.plannedWorkouts}
-                  workoutExercises={data.workoutExercises}
-                  visibleSets={data.visibleSets}
-                  exerciseById={data.exerciseById}
-                  stats={data.stats}
-                  bodyPartSummaries={data.weeklyBodyPartSummary}
-                  bodyLogs={data.bodyLogs}
-                  onStart={handleStart}
-                  onResume={() => setTab('workout')}
-                  onBeginPlanned={(workoutId) => {
-                    void data.beginPlannedWorkout(workoutId).then(() => setTab('workout'));
-                  }}
-                  onSaveBodyLog={(weightKg, fatPercentage) =>
-                    void data.saveBodyLog(weightKg, fatPercentage)
-                  }
-                />
-              ) : null}
+        {isHomeTab ? (
+          // ホームだけは画面全体をスクロールさせない。カレンダーを固定して、
+          // 下半分（選んだ日の内容）だけがスクロールする構成にしている。
+          <View style={styles.homeContent}>
+            <HomeScreen
+              activeWorkout={data.activeWorkout}
+              completedWorkouts={data.completedWorkouts}
+              plannedWorkouts={data.plannedWorkouts}
+              workoutExercises={data.workoutExercises}
+              visibleSets={data.visibleSets}
+              exerciseById={data.exerciseById}
+              onResume={() => setTab('workout')}
+              onBeginPlanned={(workoutId) => {
+                void data.beginPlannedWorkout(workoutId).then(() => setTab('workout'));
+              }}
+              onEditWorkout={handleEditWorkoutFromHome}
+              onSelectExercise={setSelectedExerciseId}
+            />
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.contentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            {selectedExercise ? (
+              <ExerciseDetailScreen
+                exercise={selectedExercise}
+                sessions={selectedExerciseSessions}
+              />
+            ) : (
+              <>
+                {tab === 'workout' ? (
+                  <WorkoutScreen
+                    activeWorkout={data.activeWorkout}
+                    workoutExercises={data.activeWorkoutExercises}
+                    visibleSets={data.visibleSets}
+                    deletedSets={data.deletedSets}
+                    exercises={data.exercisesByUsage}
+                    exerciseById={data.exerciseById}
+                    bodyPartById={data.bodyPartById}
+                    previousSessionByExerciseId={previousSessionByExerciseId}
+                    templates={data.templates}
+                    templateExercises={data.templateExercises}
+                    onStart={handleStart}
+                    onStartFromTemplate={data.startWorkoutFromTemplate}
+                    onSaveTemplate={(name) => void data.saveActiveWorkoutAsTemplate(name)}
+                    onDeleteTemplate={data.deleteTemplate}
+                    onComplete={handleComplete}
+                    onPause={handlePause}
+                    onAddExercise={data.addExerciseToWorkout}
+                    onAddSet={data.addSet}
+                    onPatchSet={data.patchSet}
+                    onRestoreSets={data.restoreSets}
+                    onStartRestTimer={handleStartRestTimer}
+                    onOpenRestPicker={openRestPicker}
+                  />
+                ) : null}
 
-              {tab === 'workout' ? (
-                <WorkoutScreen
-                  activeWorkout={data.activeWorkout}
-                  workoutExercises={data.activeWorkoutExercises}
-                  visibleSets={data.visibleSets}
-                  deletedSets={data.deletedSets}
-                  exercises={data.exercisesByUsage}
-                  exerciseById={data.exerciseById}
-                  bodyPartById={data.bodyPartById}
-                  previousSessionByExerciseId={previousSessionByExerciseId}
-                  templates={data.templates}
-                  templateExercises={data.templateExercises}
-                  onStart={handleStart}
-                  onStartFromTemplate={data.startWorkoutFromTemplate}
-                  onSaveTemplate={(name) => void data.saveActiveWorkoutAsTemplate(name)}
-                  onDeleteTemplate={data.deleteTemplate}
-                  onComplete={handleComplete}
-                  onPause={handlePause}
-                  onAddExercise={data.addExerciseToWorkout}
-                  onAddSet={data.addSet}
-                  onPatchSet={data.patchSet}
-                  onRestoreSets={data.restoreSets}
-                  onStartRestTimer={handleStartRestTimer}
-                  onOpenRestPicker={openRestPicker}
-                />
-              ) : null}
+                {tab === 'history' ? (
+                  <HistoryScreen
+                    workouts={data.completedWorkouts}
+                    workoutExercises={data.workoutExercises}
+                    visibleSets={data.visibleSets}
+                    deletedSets={data.deletedSets}
+                    exerciseById={data.exerciseById}
+                    stats={data.stats}
+                    bodyPartSummaries={data.weeklyBodyPartSummary}
+                    bodyLogs={data.bodyLogs}
+                    editingWorkoutId={editingWorkoutId}
+                    onEdit={setEditingWorkoutId}
+                    onStopEdit={() => setEditingWorkoutId(null)}
+                    onAddSet={data.addSet}
+                    onPatchSet={data.patchSet}
+                    onRestoreSets={data.restoreSets}
+                    onStartRestTimer={handleStartRestTimer}
+                    onOpenRestPicker={openRestPicker}
+                    onDeleteWorkout={handleDeleteWorkout}
+                    onSelectExercise={setSelectedExerciseId}
+                    onSaveBodyLog={(weightKg, fatPercentage) =>
+                      void data.saveBodyLog(weightKg, fatPercentage)
+                    }
+                  />
+                ) : null}
 
-              {tab === 'history' ? (
-                <HistoryScreen
-                  workouts={data.completedWorkouts}
-                  workoutExercises={data.workoutExercises}
-                  visibleSets={data.visibleSets}
-                  deletedSets={data.deletedSets}
-                  exerciseById={data.exerciseById}
-                  editingWorkoutId={editingWorkoutId}
-                  onEdit={setEditingWorkoutId}
-                  onStopEdit={() => setEditingWorkoutId(null)}
-                  onAddSet={data.addSet}
-                  onPatchSet={data.patchSet}
-                  onRestoreSets={data.restoreSets}
-                  onStartRestTimer={handleStartRestTimer}
-                  onOpenRestPicker={openRestPicker}
-                  onDeleteWorkout={handleDeleteWorkout}
-                  onSelectExercise={setSelectedExerciseId}
-                />
-              ) : null}
-
-              {tab === 'exercises' ? (
-                <ExerciseScreen
-                  bodyParts={data.bodyParts}
-                  exercises={data.exercises}
-                  bodyPartById={data.bodyPartById}
-                  newExerciseName={newExerciseName}
-                  timerSettings={data.timerSettings}
-                  onChangeNewExerciseName={setNewExerciseName}
-                  onAddCustomExercise={handleAddCustomExercise}
-                  onEditExercise={setEditingExerciseId}
-                  onOpenRestPicker={openRestPicker}
-                  onSelectExercise={setSelectedExerciseId}
-                  onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
-                  onExportCsv={() => void handleExportCsv()}
-                  syncSettings={data.syncSettings}
-                  pendingSyncCount={data.pendingSyncCount}
-                  account={data.account}
-                  isGoogleSignInAvailable={data.isGoogleSignInAvailable}
-                  onSaveSyncConnection={data.updateSyncConnection}
-                  onSignIn={data.signInToGoogle}
-                  onSignOut={data.signOutOfGoogle}
-                  onSyncNow={data.syncNow}
-                  onImportPlans={data.importPlans}
-                  onTogglePaused={data.updateSyncPaused}
-                  onRestore={data.restoreFromCloud}
-                />
-              ) : null}
-            </>
-          )}
-        </ScrollView>
+                {tab === 'exercises' ? (
+                  <ExerciseScreen
+                    bodyParts={data.bodyParts}
+                    exercises={data.exercises}
+                    bodyPartById={data.bodyPartById}
+                    newExerciseName={newExerciseName}
+                    timerSettings={data.timerSettings}
+                    onChangeNewExerciseName={setNewExerciseName}
+                    onAddCustomExercise={handleAddCustomExercise}
+                    onEditExercise={setEditingExerciseId}
+                    onOpenRestPicker={openRestPicker}
+                    onSelectExercise={setSelectedExerciseId}
+                    onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
+                    onExportCsv={() => void handleExportCsv()}
+                    syncSettings={data.syncSettings}
+                    pendingSyncCount={data.pendingSyncCount}
+                    account={data.account}
+                    isGoogleSignInAvailable={data.isGoogleSignInAvailable}
+                    onSaveSyncConnection={data.updateSyncConnection}
+                    onSignIn={data.signInToGoogle}
+                    onSignOut={data.signOutOfGoogle}
+                    onSyncNow={data.syncNow}
+                    onImportPlans={data.importPlans}
+                    onTogglePaused={data.updateSyncPaused}
+                    onRestore={data.restoreFromCloud}
+                  />
+                ) : null}
+              </>
+            )}
+          </ScrollView>
+        )}
       </KeyboardAvoidingView>
+
+      {isHomeTab ? (
+        <Pressable
+          style={styles.fab}
+          onPress={handleFabPress}
+          accessibilityRole="button"
+          accessibilityLabel={data.activeWorkout ? '記録の続きへ' : '今日のトレーニングを記録する'}
+        >
+          <Text style={styles.fabText}>＋</Text>
+        </Pressable>
+      ) : null}
 
       {editingExercise ? (
         <ExerciseEditModal

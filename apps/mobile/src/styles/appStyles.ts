@@ -82,6 +82,35 @@ export const styles = StyleSheet.create({
     gap: spacing.lg,
   },
 
+  // ホームの上下分割（上はカレンダー固定、下だけスクロール）
+  homeContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  homeLayout: {
+    flex: 1,
+  },
+  // カレンダーを詰めたときは下の週から隠れる。週単位でスナップさせて途中で切らない。
+  homeCalendarPane: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  homeDetailScroll: {
+    paddingBottom: spacing.xxl,
+  },
+  // 上下の配分を変えるグラバー。高さは HomeScreen の HANDLE_HEIGHT と揃える。
+  dragHandle: {
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dragHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.hairlineStrong,
+  },
+
   // タイポグラフィ
   title: {
     color: colors.textPrimary,
@@ -152,6 +181,11 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     alignItems: 'center',
+  },
+  inlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   headerActions: {
     flexDirection: 'row',
@@ -710,6 +744,13 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 8, 5, 0.74)',
     justifyContent: 'flex-end',
   },
+  // モーダル下部の操作列。確定操作を親指の届く右側へ寄せる。
+  modalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
   modalCard: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.md,
@@ -771,7 +812,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // 月間カレンダー（履歴）
+  // 月間カレンダー（ホーム）
   calendarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -792,10 +833,22 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.xl,
     fontWeight: '700',
   },
+  // 年月はタップで日付選択（離れた月へ一度で飛ぶ）。押せることを ▾ で示す。
+  calendarTitleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+  },
   calendarTitle: {
     color: colors.textPrimary,
     fontSize: fontSize.md,
     fontWeight: '700',
+  },
+  calendarTitleCaret: {
+    color: colors.accentText,
+    fontSize: fontSize.sm,
   },
   calendarWeekdayRow: {
     flexDirection: 'row',
@@ -815,9 +868,14 @@ export const styles = StyleSheet.create({
     borderBottomWidth: hairlineWidth,
     borderBottomColor: colors.hairline,
   },
+  calendarHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   calendarDayCell: {
     flex: 1,
-    minHeight: 46,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xxs,
@@ -840,15 +898,56 @@ export const styles = StyleSheet.create({
   calendarSundayText: {
     color: colors.danger,
   },
-  calendarDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
+  calendarTodayText: {
+    color: colors.accentText,
+    fontWeight: '700',
   },
-  calendarDotPlaceholder: {
-    width: 5,
-    height: 5,
+  // 日セルのマーク列。マークが無い日も高さを確保して、セルの高さを揃える。
+  calendarMarkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    minHeight: 14,
+  },
+  // 「部位色 × その日の種目数」のマーク。実績は塗り、予定だけの日は輪郭で描く。
+  calendarMark: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: hairlineWidth,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarMarkText: {
+    color: colors.onAccent,
+    fontSize: fontSize.xs,
+    lineHeight: 14,
+    fontWeight: '700',
+  },
+  calendarMarkOverflow: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+  },
+
+  // 日付選択シートの月グリッド（罫線は引かず、余白と選択色だけで区切る）
+  datePickerWeekRow: {
+    flexDirection: 'row',
+  },
+  datePickerDayCell: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerDayCellSelected: {
+    backgroundColor: colors.accentSurfaceStrong,
+    borderRadius: radius.sm,
+  },
+  datePickerDayTextSelected: {
+    color: colors.textPrimary,
+    fontWeight: '700',
   },
 
   // 部位別ボリュームバー（ホーム）
@@ -865,5 +964,29 @@ export const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: colors.accent,
+  },
+
+  // ホームの主操作ボタン（右下固定）。実際に画面手前へ浮くので影を許す。
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    bottom: spacing.xl,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  fabText: {
+    color: colors.onAccent,
+    fontSize: fontSize.display,
+    lineHeight: 30,
+    fontWeight: '700',
   },
 });

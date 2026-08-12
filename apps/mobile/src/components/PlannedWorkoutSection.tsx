@@ -1,12 +1,14 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
+import { bodyPartColor } from '../styles/theme';
 import type { Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { formatSetsInline } from '../utils/aggregate';
-import { formatJapaneseDate } from '../utils/datetime';
 
-// Claude Code が立てた予定の一覧。予定が無いときは何も出さない
+// Claude Code が立てた、その日の予定メニュー。予定が無いときは何も出さない
 // （空状態を置くと、使っていない人にまで機能を見せることになる）。
+//
+// ホームの「選んだ日」パネルの中に置くので、自前の箱は持たず罫線で区切るだけにする。
 //
 // 予定は下書きであり、開始した後は普通の記録として扱う。
 // 実施しながら重量やレップを直すことは想定内で、予定値は残らない。
@@ -31,10 +33,7 @@ export function PlannedWorkoutSection({
   }
 
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionHeaderText}>予定しているメニュー</Text>
-      </View>
+    <>
       {plannedWorkouts.map((workout) => {
         const items = workoutExercises
           .filter((item) => item.workoutId === workout.id)
@@ -42,20 +41,26 @@ export function PlannedWorkoutSection({
         return (
           <View key={workout.id} style={styles.exerciseRow}>
             <View style={styles.exerciseRowHeader}>
-              <View style={styles.exerciseDot} />
-              <Text style={styles.exerciseRowName}>{formatJapaneseDate(workout.performedAt)}</Text>
+              <Text style={styles.exerciseRowName}>予定しているメニュー</Text>
               <Text style={styles.faint}>{items.length} 種目</Text>
             </View>
             <View style={styles.sectionBody}>
               {items.map((item) => {
+                const exercise = exerciseById.get(item.exerciseId);
                 const itemSets = visibleSets
                   .filter((set) => set.workoutExerciseId === item.id)
                   .sort((a, b) => a.orderIndex - b.orderIndex);
                 return (
                   <View key={item.id} style={styles.rowBetween}>
-                    <Text style={styles.panelText}>
-                      {exerciseById.get(item.exerciseId)?.name ?? '種目'}
-                    </Text>
+                    <View style={styles.inlineRow}>
+                      <View
+                        style={[
+                          styles.exerciseDot,
+                          { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
+                        ]}
+                      />
+                      <Text style={styles.panelText}>{exercise?.name ?? '種目'}</Text>
+                    </View>
                     <Text style={styles.muted}>{formatSetsInline(itemSets)}</Text>
                   </View>
                 );
@@ -75,6 +80,6 @@ export function PlannedWorkoutSection({
           </View>
         );
       })}
-    </View>
+    </>
   );
 }

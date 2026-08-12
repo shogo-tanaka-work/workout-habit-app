@@ -138,9 +138,7 @@ export const listPendingOperations = async (
   }));
 };
 
-export const countPendingOperations = async (
-  database: SQLite.SQLiteDatabase,
-): Promise<number> => {
+export const countPendingOperations = async (database: SQLite.SQLiteDatabase): Promise<number> => {
   const row = await database.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) AS count FROM sync_outbox',
   );
@@ -156,10 +154,7 @@ export const removeOperations = async (
     return;
   }
   const placeholders = operationIds.map(() => '?').join(', ');
-  await database.runAsync(
-    `DELETE FROM sync_outbox WHERE id IN (${placeholders})`,
-    ...operationIds,
-  );
+  await database.runAsync(`DELETE FROM sync_outbox WHERE id IN (${placeholders})`, ...operationIds);
 };
 
 /** 失敗した操作に理由を残す。次回の送信でも再挑戦する。 */

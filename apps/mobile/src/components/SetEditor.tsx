@@ -31,11 +31,11 @@ export function SetEditor({
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   showTimer: boolean;
 }) {
-  // 記録は消えると取り返しがつかない。論理削除で戻せるとはいえ、まず一拍置く。
+  // 記録は消えると取り返しがつかない。まず一拍置く。
   const confirmDelete = () => {
     Alert.alert(
       `セット ${setNumber} を削除`,
-      `${set.weightKg}kg × ${set.reps} 回 の記録を削除します。あとで戻せます。`,
+      `${set.weightKg}kg × ${set.reps} 回 の記録を削除します。`,
       [
         { text: 'キャンセル', style: 'cancel' },
         {

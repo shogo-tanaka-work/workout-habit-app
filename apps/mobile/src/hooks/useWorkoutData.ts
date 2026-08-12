@@ -17,7 +17,6 @@ import {
   insertWorkoutSet,
   loadWorkoutData,
   markLastBackupAt,
-  restoreWorkoutSets,
   setExerciseRest,
   updateExercise,
   setSyncPaused,
@@ -43,6 +42,7 @@ import { isCustomExerciseId } from '../db/syncTables';
 import { fetchPlansFromCloud, replacePlannedWorkouts } from '../db/plans';
 import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
 import { pushPendingOperations } from '../sync/pusher';
+import { DEFAULT_REST_PRESETS } from '../types/domain';
 import type {
   BodyLog,
   BodyPart,
@@ -95,6 +95,7 @@ export function useWorkoutData() {
   const [timerSettings, setTimerSettings] = useState<TimerSettings>({
     soundEnabled: true,
     vibrationEnabled: true,
+    restPresets: DEFAULT_REST_PRESETS,
   });
   const [userExerciseSettings, setUserExerciseSettings] = useState<UserExerciseSetting[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
@@ -115,12 +116,6 @@ export function useWorkoutData() {
 
   const visibleSets = useMemo(
     () => workoutSets.filter((set) => set.deletedAt === null),
-    [workoutSets],
-  );
-
-  // 論理削除済みのセット。戻す導線に使う（削除しても取り返しがつくようにするため）。
-  const deletedSets = useMemo(
-    () => workoutSets.filter((set) => set.deletedAt !== null),
     [workoutSets],
   );
 
@@ -393,25 +388,6 @@ export function useWorkoutData() {
     if (exerciseFinished) {
       void syncInBackground();
     }
-  };
-
-  // 削除したセットをまとめて戻す。**1操作として扱う**（1件ずつ patchSet を呼ぶと
-  // トランザクションが重なって失敗する）。
-  const restoreSets = async (workoutExerciseId: string) => {
-    const database = ensureDb();
-    const targets = deletedSets.filter((set) => set.workoutExerciseId === workoutExerciseId);
-    if (targets.length === 0) {
-      return;
-    }
-    await restoreWorkoutSets(
-      database,
-      targets.map((set) => set.id),
-    );
-    const owningWorkoutId = workoutExerciseById.get(workoutExerciseId)?.workoutId;
-    if (owningWorkoutId) {
-      await touchWorkout(database, owningWorkoutId);
-    }
-    await reloadData(database);
   };
 
   // 休憩タイマーの開始。セットを完了扱いにし timer_events を記録、TimerState を返す。
@@ -749,7 +725,6 @@ export function useWorkoutData() {
     workoutSets,
     activeWorkout,
     visibleSets,
-    deletedSets,
     exerciseById,
     bodyPartById,
     activeWorkoutExercises,
@@ -788,7 +763,6 @@ export function useWorkoutData() {
     addExerciseToWorkout,
     addSet,
     patchSet,
-    restoreSets,
     beginRestTimer,
     addCustomExercise,
     saveExercise,

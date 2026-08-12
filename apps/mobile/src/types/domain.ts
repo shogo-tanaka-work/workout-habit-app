@@ -74,11 +74,19 @@ export type TemplateExercise = {
   orderIndex: number;
 };
 
-// 休憩タイマー終了時の通知方法の設定。
+// 休憩タイマー終了時の通知方法と、共通で使い回す休憩時間の設定。
 export type TimerSettings = {
   soundEnabled: boolean;
   vibrationEnabled: boolean;
+  /** 種目をまたいで使い回す休憩時間（秒）。最大 REST_PRESET_LIMIT 件。 */
+  restPresets: number[];
 };
+
+/** 共通タイマーとして持てるプリセットの上限。 */
+export const REST_PRESET_LIMIT = 3;
+
+/** プリセット未設定（初回起動）のときの共通タイマー。 */
+export const DEFAULT_REST_PRESETS = [120, 180, 240];
 
 // クラウドバックアップの接続設定（app_settings に保存。端末ローカル・同期対象外）。
 // サーバとの接続設定。認証は Google サインイン（src/auth/googleAuth.ts）が担うため、

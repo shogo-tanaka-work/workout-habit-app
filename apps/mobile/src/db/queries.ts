@@ -1,5 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 
+import { DEFAULT_REST_PRESETS, REST_PRESET_LIMIT } from '../types/domain';
 import type {
   BodyLog,
   BodyPart,
@@ -95,6 +96,27 @@ const SYNC_API_URL_KEY = 'sync_api_url';
 const SYNC_LAST_BACKUP_AT_KEY = 'sync_last_backup_at';
 const SYNC_PAUSED_KEY = 'sync_paused';
 const REST_TIMER_KEY = 'rest_timer';
+const TIMER_REST_PRESETS_KEY = 'timer_rest_presets';
+
+// 共通タイマーは JSON 配列（秒）で持つ。壊れた値・空配列は既定へ落とす。
+const toRestPresets = (raw: string | undefined): number[] => {
+  if (!raw) {
+    return DEFAULT_REST_PRESETS;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return DEFAULT_REST_PRESETS;
+    }
+    const presets = parsed
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      .map((value) => Math.max(0, Math.round(value)))
+      .slice(0, REST_PRESET_LIMIT);
+    return presets.length > 0 ? presets : DEFAULT_REST_PRESETS;
+  } catch {
+    return DEFAULT_REST_PRESETS;
+  }
+};
 
 const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
@@ -102,6 +124,7 @@ const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   return {
     soundEnabled: valueByKey.get(TIMER_SOUND_KEY) !== '0',
     vibrationEnabled: valueByKey.get(TIMER_VIBRATION_KEY) !== '0',
+    restPresets: toRestPresets(valueByKey.get(TIMER_REST_PRESETS_KEY)),
   };
 };
 
@@ -357,7 +380,7 @@ export const deleteTemplateDeep = async (
   });
 };
 
-// タイマー設定（音・振動）を app_settings に保存する。
+// タイマー設定（音・振動・共通タイマー）を app_settings に保存する。
 export const upsertTimerSettings = async (
   database: SQLite.SQLiteDatabase,
   settings: TimerSettings,
@@ -376,6 +399,11 @@ export const upsertTimerSettings = async (
       timestamp,
     );
   }
+  await upsertAppSetting(
+    database,
+    TIMER_REST_PRESETS_KEY,
+    JSON.stringify(settings.restPresets.slice(0, REST_PRESET_LIMIT)),
+  );
 };
 
 // ワークアウトの最終保存時刻を更新する（記録の都度保存）。
@@ -568,33 +596,6 @@ export const updateWorkoutSet = async (
     );
     // セットの削除は deleted_at による論理削除なので、削除も upsert として送る。
     await enqueueUpsert(database, 'workout_sets', set.id);
-  });
-};
-
-/**
- * 論理削除したセットをまとめて戻す。
- *
- * **1トランザクションで処理する。** 1件ずつ updateWorkoutSet を呼ぶと、
- * 同じ接続でトランザクションが重なって失敗する（expo-sqlite はネストを許さない）。
- */
-export const restoreWorkoutSets = async (
-  database: SQLite.SQLiteDatabase,
-  setIds: readonly string[],
-): Promise<void> => {
-  if (setIds.length === 0) {
-    return;
-  }
-  const timestamp = nowIso();
-  await writeWithOutbox(database, 'restoreWorkoutSets', async () => {
-    for (const setId of setIds) {
-      await database.runAsync(
-        'UPDATE workout_sets SET deleted_at = NULL, updated_at = ? WHERE id = ?',
-        timestamp,
-        setId,
-      );
-      // 復元も「その行の最新状態」を送るだけでよい（後勝ち）。
-      await enqueueUpsert(database, 'workout_sets', setId);
-    }
   });
 };
 

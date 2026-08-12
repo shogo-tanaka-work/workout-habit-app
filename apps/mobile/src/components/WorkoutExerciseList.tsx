@@ -12,11 +12,9 @@ import { SetEditor } from './SetEditor';
 export function WorkoutExerciseList({
   workoutExercises,
   visibleSets,
-  deletedSets,
   exerciseById,
   onAddSet,
   onPatchSet,
-  onRestoreSets,
   onStartRestTimer,
   onOpenRestPicker,
   showTimer,
@@ -24,12 +22,9 @@ export function WorkoutExerciseList({
 }: {
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
-  /** 論理削除済みのセット。戻す導線を出すために受け取る。 */
-  deletedSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
-  onRestoreSets: (workoutExerciseId: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   showTimer: boolean;
@@ -48,9 +43,6 @@ export function WorkoutExerciseList({
         const restSeconds =
           workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120;
         const previousSession = previousSessionByExerciseId?.get(workoutExercise.exerciseId);
-        const removedSets = deletedSets.filter(
-          (set) => set.workoutExerciseId === workoutExercise.id,
-        );
         return (
           <View key={workoutExercise.id} style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -104,16 +96,6 @@ export function WorkoutExerciseList({
                   showTimer={showTimer}
                 />
               ))}
-              {/* 削除は論理削除なので戻せる。戻す手段が無いと、消した時点で実質失われる。 */}
-              {removedSets.length > 0 ? (
-                <Pressable
-                  style={styles.restRow}
-                  onPress={() => onRestoreSets(workoutExercise.id)}
-                >
-                  <Text style={styles.faint}>削除したセット {removedSets.length} 件</Text>
-                  <Text style={styles.restValue}>戻す ›</Text>
-                </Pressable>
-              ) : null}
             </View>
           </View>
         );

@@ -540,6 +540,162 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  // 記録中の1種目のセット表（セットを列に並べる。触るのは重量・回数・完了だけ）
+  setLogRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  setLogRowLast: {
+    borderBottomWidth: hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  setLogLabelCell: {
+    width: 72,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderRightWidth: hairlineWidth,
+    borderRightColor: colors.hairline,
+  },
+  setLogLabelText: {
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+  },
+  // 1セットぶんの列。4列までは画面幅に収まり、それ以上は横スクロールで逃がす。
+  setLogCell: {
+    width: 74,
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xxs,
+    borderRightWidth: hairlineWidth,
+    borderRightColor: colors.hairline,
+  },
+  setLogNumberText: {
+    color: colors.accentText,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  setLogWarmupText: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+  },
+  setLogInput: {
+    flex: 1,
+    minHeight: 52,
+    padding: 0,
+    textAlign: 'center',
+    color: colors.textPrimary,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+  setLogUnit: {
+    color: colors.textFaint,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    paddingRight: spacing.xs,
+  },
+  setLogCheckText: {
+    color: colors.textFaint,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+  setLogCheckTextDone: {
+    color: colors.accentText,
+  },
+
+  // シートの操作行（コピー・ウォームアップなど、1行1操作）
+  sheetAction: {
+    borderTopWidth: hairlineWidth,
+    borderTopColor: colors.hairline,
+    paddingVertical: spacing.sm + 2,
+    gap: spacing.xxs,
+  },
+  sheetActionText: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+
+  // 種目選択の部位タブ（横スクロール）
+  bodyPartTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm + 2,
+  },
+  bodyPartTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    borderColor: colors.hairlineStrong,
+    borderWidth: hairlineWidth,
+    borderRadius: radius.sm,
+  },
+  bodyPartTabText: {
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
+  bodyPartTabDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+
+  // 記録中の種目名と、その下の集計・前回実績。
+  // 種目選択の行と同じ大きさに揃え、汗をかいた状態でも読めるようにする。
+  logExerciseName: {
+    color: colors.textPrimary,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+  logExerciseSummary: {
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
+  },
+  logNote: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    lineHeight: 22,
+  },
+
+  // 種目選択の行。ジムで見て押す前提で、名前を大きめに取る。
+  exercisePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 56,
+  },
+  exercisePickerName: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+
+  // 一段戻る導線（記録中の種目 → 種目選択）
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 44,
+  },
+  backRowText: {
+    color: colors.accentText,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+
   // キーボード上部のアクセサリ。decimal-pad にリターンキーが無いための「完了」だけを置く。
   keyboardAccessory: {
     alignItems: 'flex-end',
@@ -735,6 +891,10 @@ export const styles = StyleSheet.create({
   restValue: {
     color: colors.accentText,
     fontWeight: '700',
+    fontSize: fontSize.lg,
+  },
+  restLabel: {
+    color: colors.textSecondary,
     fontSize: fontSize.md,
   },
 
@@ -760,6 +920,73 @@ export const styles = StyleSheet.create({
     padding: spacing.lg + 2,
     gap: spacing.md,
   },
+  // 画面中央に出すポップアップ（休憩タイマーなど、その場で決める設定）。
+  // 下から出るシートと違い、記録の文脈を隠しすぎない大きさに留める。
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 8, 5, 0.74)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  dialogCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderColor: colors.hairline,
+    borderWidth: hairlineWidth,
+    padding: spacing.lg + 2,
+    gap: spacing.md,
+  },
+
+  // 共通タイマーのプリセット（最大3件）＋増減ボタン
+  presetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  presetChips: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  presetChip: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    borderWidth: hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.surfaceRaised,
+  },
+  presetChipActive: {
+    backgroundColor: colors.accentSurface,
+    borderColor: colors.accent,
+  },
+  presetChipText: {
+    color: colors.textSecondary,
+    fontWeight: '700',
+  },
+  presetChipTextActive: {
+    color: colors.accentText,
+  },
+  presetIconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    borderWidth: hairlineWidth,
+    borderColor: colors.hairlineStrong,
+  },
+  presetIconButtonDisabled: {
+    opacity: 0.35,
+  },
+  presetIconText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+
   pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -907,13 +1134,14 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxs,
-    minHeight: 14,
+    minHeight: 15,
   },
   // 「部位色 × その日の種目数」のマーク。実績は塗り、予定だけの日は輪郭で描く。
+  // 3つ並べても日セルの幅（画面幅 ÷ 7）に収まる大きさに留める。
   calendarMark: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
     borderWidth: hairlineWidth,
     borderColor: 'transparent',
     alignItems: 'center',
@@ -922,7 +1150,7 @@ export const styles = StyleSheet.create({
   calendarMarkText: {
     color: colors.onAccent,
     fontSize: fontSize.xs,
-    lineHeight: 14,
+    lineHeight: 15,
     fontWeight: '700',
   },
   calendarMarkOverflow: {

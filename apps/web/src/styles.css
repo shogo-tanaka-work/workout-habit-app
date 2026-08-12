@@ -31,13 +31,14 @@
   --space-xl: 24px;
   --space-xxl: 48px;
 
-  /* 文字サイズ。display は1画面で1つだけ使う主役の数値に限る。 */
-  --font-xs: 11px;
-  --font-sm: 13px;
-  --font-md: 15px;
-  --font-lg: 18px;
-  --font-xl: 22px;
-  --font-display: 26px;
+  /* 文字サイズ。display は1画面で1つだけ使う主役の数値に限る。
+     モバイル（ジムで腕を伸ばした距離から読む）に合わせて一段大きいスケールを採る。 */
+  --font-xs: 12px;
+  --font-sm: 15px;
+  --font-md: 17px;
+  --font-lg: 20px;
+  --font-xl: 24px;
+  --font-display: 30px;
 
   /* 角丸は操作要素だけに使う。 */
   --radius-sm: 6px;

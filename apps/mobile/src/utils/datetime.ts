@@ -5,6 +5,14 @@ export const formatDate = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const MS_PER_DAY = 86_400_000;
+
+// ISO 日付どうしの日数差。時刻を持たない文字列から作るのでタイムゾーンの影響を受けない。
+export const daysBetween = (fromIsoDate: string, toIsoDate: string): number =>
+  Math.round(
+    (Date.parse(`${toIsoDate}T00:00:00Z`) - Date.parse(`${fromIsoDate}T00:00:00Z`)) / MS_PER_DAY,
+  );
+
 export const nowIso = (): string => new Date().toISOString();
 
 /** 現在時刻のエポックミリ秒。タイマーの終了時刻の計算に使う。 */

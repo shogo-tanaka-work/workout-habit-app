@@ -26,8 +26,11 @@ import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
 import type { Tab, WorkoutExercise, WorkoutSet } from './src/types/domain';
 import type { ExerciseSession } from './src/utils/aggregate';
-import { buildExerciseSessions, findPreviousSession } from './src/utils/aggregate';
+import { buildExerciseSessions } from './src/utils/aggregate';
 import { buildWorkoutCsv } from './src/utils/csv';
+
+// 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
+const RECENT_SESSION_COUNT = 5;
 
 export default function App() {
   const data = useWorkoutData();
@@ -66,22 +69,22 @@ export default function App() {
     void importPlansInBackground();
   }, [importPlansInBackground]);
 
-  // 記録中の各種目について、直近の完了済み実施記録（前回実績）を引く。
-  const previousSessionByExerciseId = useMemo(() => {
-    const map = new Map<string, ExerciseSession | null>();
+  // 記録中の各種目について、直近の完了済み実施記録を新しい順に引く。
+  // 記録画面で「過去 n 回分の記録」として並べる（1回だけだと調子の良し悪しが分からない）。
+  const recentSessionsByExerciseId = useMemo(() => {
+    const map = new Map<string, ExerciseSession[]>();
     if (!data.activeWorkout) {
       return map;
     }
     for (const workoutExercise of data.activeWorkoutExercises) {
       map.set(
         workoutExercise.exerciseId,
-        findPreviousSession(
+        buildExerciseSessions(
           workoutExercise.exerciseId,
-          data.activeWorkout.id,
           data.completedWorkouts,
           data.workoutExercises,
           data.visibleSets,
-        ),
+        ).slice(0, RECENT_SESSION_COUNT),
       );
     }
     return map;
@@ -92,6 +95,25 @@ export default function App() {
     data.workoutExercises,
     data.visibleSets,
   ]);
+
+  // 種目ごとの直近の実施日。種目選択で「何日前にやったか」を出すために使う。
+  const lastPerformedByExerciseId = useMemo(() => {
+    const performedAtByWorkoutId = new Map(
+      data.completedWorkouts.map((workout) => [workout.id, workout.performedAt]),
+    );
+    const map = new Map<string, string>();
+    for (const item of data.workoutExercises) {
+      const performedAt = performedAtByWorkoutId.get(item.workoutId);
+      if (!performedAt) {
+        continue;
+      }
+      const current = map.get(item.exerciseId);
+      if (!current || current < performedAt) {
+        map.set(item.exerciseId, performedAt);
+      }
+    }
+    return map;
+  }, [data.completedWorkouts, data.workoutExercises]);
 
   const selectedExercise = selectedExerciseId
     ? (data.exerciseById.get(selectedExerciseId) ?? null)
@@ -183,13 +205,15 @@ export default function App() {
     }
   };
 
-  const confirmRestPicker = async (seconds: number) => {
+  // 決めた秒数はこの種目へ、共通タイマーのプリセットは全体設定へ保存する。
+  const confirmRestPicker = async (seconds: number, presets: number[]) => {
     if (restPicker) {
       const exercise = data.exerciseById.get(restPicker.exerciseId);
       if (exercise) {
         await data.updateExerciseRest(exercise, Math.max(0, seconds));
       }
     }
+    await data.updateTimerSettings({ ...data.timerSettings, restPresets: presets });
     setRestPicker(null);
   };
 
@@ -293,11 +317,11 @@ export default function App() {
                     activeWorkout={data.activeWorkout}
                     workoutExercises={data.activeWorkoutExercises}
                     visibleSets={data.visibleSets}
-                    deletedSets={data.deletedSets}
                     exercises={data.exercisesByUsage}
                     exerciseById={data.exerciseById}
-                    bodyPartById={data.bodyPartById}
-                    previousSessionByExerciseId={previousSessionByExerciseId}
+                    bodyParts={data.bodyParts}
+                    recentSessionsByExerciseId={recentSessionsByExerciseId}
+                    lastPerformedByExerciseId={lastPerformedByExerciseId}
                     templates={data.templates}
                     templateExercises={data.templateExercises}
                     onStart={handleStart}
@@ -307,9 +331,11 @@ export default function App() {
                     onComplete={handleComplete}
                     onPause={handlePause}
                     onAddExercise={data.addExerciseToWorkout}
+                    onAddCustomExercise={(name, bodyPartId) =>
+                      void data.addCustomExercise(name, bodyPartId)
+                    }
                     onAddSet={data.addSet}
                     onPatchSet={data.patchSet}
-                    onRestoreSets={data.restoreSets}
                     onStartRestTimer={handleStartRestTimer}
                     onOpenRestPicker={openRestPicker}
                   />
@@ -320,7 +346,6 @@ export default function App() {
                     workouts={data.completedWorkouts}
                     workoutExercises={data.workoutExercises}
                     visibleSets={data.visibleSets}
-                    deletedSets={data.deletedSets}
                     exerciseById={data.exerciseById}
                     stats={data.stats}
                     bodyPartSummaries={data.weeklyBodyPartSummary}
@@ -330,7 +355,6 @@ export default function App() {
                     onStopEdit={() => setEditingWorkoutId(null)}
                     onAddSet={data.addSet}
                     onPatchSet={data.patchSet}
-                    onRestoreSets={data.restoreSets}
                     onStartRestTimer={handleStartRestTimer}
                     onOpenRestPicker={openRestPicker}
                     onDeleteWorkout={handleDeleteWorkout}
@@ -400,7 +424,8 @@ export default function App() {
       {restPicker ? (
         <RestPickerModal
           value={restPicker.seconds}
-          onConfirm={confirmRestPicker}
+          presets={data.timerSettings.restPresets}
+          onConfirm={(seconds, presets) => void confirmRestPicker(seconds, presets)}
           onCancel={() => setRestPicker(null)}
         />
       ) : null}

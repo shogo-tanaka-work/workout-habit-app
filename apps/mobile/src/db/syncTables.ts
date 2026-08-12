@@ -30,15 +30,7 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
     'created_at',
     'updated_at',
   ],
-  workouts: [
-    'id',
-    'performed_at',
-    'status',
-    'memo',
-    'last_saved_at',
-    'created_at',
-    'updated_at',
-  ],
+  workouts: ['id', 'performed_at', 'status', 'memo', 'last_saved_at', 'created_at', 'updated_at'],
   workout_exercises: [
     'id',
     'workout_id',

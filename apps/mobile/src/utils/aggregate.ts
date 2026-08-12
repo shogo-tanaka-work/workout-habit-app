@@ -75,26 +75,6 @@ export const buildExerciseSessions = (
   return sessions;
 };
 
-// 記録中の参照用に、現在のワークアウトを除いた直近の実施記録を返す。
-export const findPreviousSession = (
-  exerciseId: string,
-  currentWorkoutId: string,
-  completedWorkouts: Workout[],
-  workoutExercises: WorkoutExercise[],
-  visibleSets: WorkoutSet[],
-): ExerciseSession | null => {
-  for (const workout of completedWorkouts) {
-    if (workout.id === currentWorkoutId) {
-      continue;
-    }
-    const sessions = buildExerciseSessions(exerciseId, [workout], workoutExercises, visibleSets);
-    if (sessions[0]) {
-      return sessions[0];
-    }
-  }
-  return null;
-};
-
 // 「70kg×8 / 70kg×8」のようなセット内容の短い表記。
 export const formatSetsInline = (sets: WorkoutSet[]): string =>
   sets.map((set) => `${set.weightKg}kg×${set.reps}`).join(' / ');

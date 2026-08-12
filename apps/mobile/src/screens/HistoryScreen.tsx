@@ -25,7 +25,6 @@ export function HistoryScreen({
   workouts,
   workoutExercises,
   visibleSets,
-  deletedSets,
   exerciseById,
   stats,
   bodyPartSummaries,
@@ -35,7 +34,6 @@ export function HistoryScreen({
   onStopEdit,
   onAddSet,
   onPatchSet,
-  onRestoreSets,
   onStartRestTimer,
   onOpenRestPicker,
   onDeleteWorkout,
@@ -45,7 +43,6 @@ export function HistoryScreen({
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
-  deletedSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
   stats: WeeklyStats;
   bodyPartSummaries: BodyPartSummary[];
@@ -55,7 +52,6 @@ export function HistoryScreen({
   onStopEdit: () => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
-  onRestoreSets: (workoutExerciseId: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onDeleteWorkout: (workoutId: string) => void;
@@ -161,11 +157,9 @@ export function HistoryScreen({
                 <WorkoutExerciseList
                   workoutExercises={items}
                   visibleSets={visibleSets}
-                  deletedSets={deletedSets}
                   exerciseById={exerciseById}
                   onAddSet={onAddSet}
                   onPatchSet={onPatchSet}
-                  onRestoreSets={onRestoreSets}
                   onStartRestTimer={onStartRestTimer}
                   onOpenRestPicker={onOpenRestPicker}
                   showTimer={false}

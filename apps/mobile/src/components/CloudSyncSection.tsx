@@ -64,9 +64,7 @@ export function CloudSyncSection({
     );
   };
 
-  const lastSyncLabel = syncSettings.lastBackupAt
-    ? formatDateTime(syncSettings.lastBackupAt)
-    : '—';
+  const lastSyncLabel = syncSettings.lastBackupAt ? formatDateTime(syncSettings.lastBackupAt) : '—';
 
   return (
     <View style={styles.section}>
@@ -85,9 +83,7 @@ export function CloudSyncSection({
               style={styles.ghostButton}
               disabled={isBusy}
               onPress={() =>
-                account
-                  ? void run('ログアウト', onSignOut)
-                  : void run('ログイン', onSignIn)
+                account ? void run('ログアウト', onSignOut) : void run('ログイン', onSignIn)
               }
             >
               <Text style={styles.ghostButtonText}>

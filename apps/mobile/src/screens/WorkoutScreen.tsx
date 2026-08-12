@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
-import { StatSummary } from '../components/StatSummary';
-import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
+import { ExerciseLogPanel } from '../components/ExerciseLogPanel';
+import { ExercisePicker } from '../components/ExercisePicker';
 import { styles } from '../styles/appStyles';
-import { colors } from '../styles/theme';
 import type {
   BodyPart,
   Exercise,
@@ -16,20 +15,20 @@ import type {
   WorkoutSet,
 } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
-import { summarizeSets } from '../utils/aggregate';
-import { formatClockTime } from '../utils/datetime';
-import { formatTimer } from '../utils/format';
-import { formatCount } from '../utils/number';
 
+// 記録タブは2段構え。「種目を選ぶ」→「その種目だけ記録する」。
+//
+// 今日やった全種目を1画面に積み上げない。実施中に見たいのは今の種目だけで、
+// 一日の全体像はホームのカレンダー、過去の編集は履歴タブが受け持つ。
 export function WorkoutScreen({
   activeWorkout,
   workoutExercises,
   visibleSets,
-  deletedSets,
   exercises,
   exerciseById,
-  bodyPartById,
-  previousSessionByExerciseId,
+  bodyParts,
+  recentSessionsByExerciseId,
+  lastPerformedByExerciseId,
   templates,
   templateExercises,
   onStart,
@@ -39,20 +38,23 @@ export function WorkoutScreen({
   onComplete,
   onPause,
   onAddExercise,
+  onAddCustomExercise,
   onAddSet,
   onPatchSet,
-  onRestoreSets,
   onStartRestTimer,
   onOpenRestPicker,
 }: {
   activeWorkout: Workout | null;
+  /** 記録中のワークアウトに入っている種目。 */
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
-  deletedSets: WorkoutSet[];
   exercises: Exercise[];
   exerciseById: Map<string, Exercise>;
-  bodyPartById: Map<string, BodyPart>;
-  previousSessionByExerciseId: Map<string, ExerciseSession | null>;
+  bodyParts: BodyPart[];
+  /** 種目IDごとの、直近の実施記録（新しい順）。 */
+  recentSessionsByExerciseId: Map<string, ExerciseSession[]>;
+  /** 種目IDごとの、直近で実施した日（ISO 日付）。 */
+  lastPerformedByExerciseId: Map<string, string>;
   templates: Template[];
   templateExercises: TemplateExercise[];
   onStart: () => void;
@@ -61,36 +63,22 @@ export function WorkoutScreen({
   onDeleteTemplate: (templateId: string) => void;
   onComplete: () => void;
   onPause: () => void;
-  onAddExercise: (exercise: Exercise) => void;
+  onAddExercise: (exercise: Exercise) => Promise<void>;
+  onAddCustomExercise: (name: string, bodyPartId: string) => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
-  onRestoreSets: (workoutExerciseId: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
-  // 種目を探すための絞り込み。種目が増えるほどチップの壁を縦に辿ることになる。
-  const [keyword, setKeyword] = useState('');
-  const [filterBodyPartId, setFilterBodyPartId] = useState<string | null>(null);
+  // 記録中の種目。workoutExercise の ID ではなく種目 ID で持つ。
+  // 追加直後は workoutExercise がまだ手元に無く、再読み込み後に解決するため。
+  const [focusedExerciseId, setFocusedExerciseId] = useState<string | null>(null);
 
+  // テンプレートからの開始は、記録中でないときだけ（ワークアウトは同時に1つ）。
   const confirmDeleteTemplate = (template: Template) => {
     Alert.alert('テンプレートを削除', `「${template.name}」を削除します。`, [
       { text: 'キャンセル', style: 'cancel' },
       { text: '削除', style: 'destructive', onPress: () => onDeleteTemplate(template.id) },
-    ]);
-  };
-
-  // iOS 専用の Alert.prompt で名前を入力させる（このアプリは iOS を主対象とする）。
-  const promptSaveTemplate = () => {
-    Alert.prompt('テンプレートとして保存', '今日の種目の並びを保存します。', [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '保存',
-        onPress: (name?: string) => {
-          if (name?.trim()) {
-            onSaveTemplate(name);
-          }
-        },
-      },
     ]);
   };
 
@@ -123,7 +111,6 @@ export function WorkoutScreen({
                     style={styles.exerciseRowHeader}
                     onPress={() => onStartFromTemplate(template)}
                   >
-                    <View style={styles.exerciseDot} />
                     <View style={styles.flex}>
                       <Text style={styles.exerciseRowName}>{template.name}</Text>
                       <Text style={styles.faint}>{exerciseNames.join(' ・ ')}</Text>
@@ -145,117 +132,61 @@ export function WorkoutScreen({
     );
   }
 
-  // 並び順は使用頻度順のまま（親が exercisesByUsage を渡す）。絞り込みだけを重ねる。
-  const normalizedKeyword = keyword.trim().toLowerCase();
-  const visibleExercises = exercises.filter(
-    (exercise) =>
-      (filterBodyPartId === null || exercise.primaryBodyPartId === filterBodyPartId) &&
-      (normalizedKeyword === '' || exercise.name.toLowerCase().includes(normalizedKeyword)),
-  );
+  const focused = focusedExerciseId
+    ? (workoutExercises.find((item) => item.exerciseId === focusedExerciseId) ?? null)
+    : null;
 
-  const activeSets = visibleSets.filter((set) =>
-    workoutExercises.some((item) => item.id === set.workoutExerciseId),
-  );
-  const summary = summarizeSets(activeSets);
-
-  return (
-    <View style={styles.stack}>
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionHeaderText}>今日のワークアウト</Text>
-            <Text style={styles.faint}>最終保存 {formatClockTime(activeWorkout.lastSavedAt)}</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable style={styles.ghostButton} onPress={onPause}>
-              <Text style={styles.ghostButtonText}>一時保存</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={onComplete}>
-              <Text style={styles.secondaryButtonText}>完了</Text>
-            </Pressable>
-          </View>
-        </View>
-        <StatSummary
-          primary={{ label: '総ボリューム', value: formatCount(summary.totalVolume), unit: 'kg' }}
-          items={[
-            { label: '種目', value: formatCount(workoutExercises.length) },
-            { label: 'セット', value: formatCount(summary.setCount) },
-            { label: 'レップ', value: formatCount(summary.totalReps) },
-          ]}
-        />
-      </View>
-
-      <WorkoutExerciseList
-        workoutExercises={workoutExercises}
-        visibleSets={visibleSets}
-        deletedSets={deletedSets}
-        exerciseById={exerciseById}
+  if (focused) {
+    const exercise = exerciseById.get(focused.exerciseId);
+    const sets = visibleSets
+      .filter((set) => set.workoutExerciseId === focused.id)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+    return (
+      <ExerciseLogPanel
+        workoutExercise={focused}
+        exercise={exercise}
+        sets={sets}
+        recentSessions={recentSessionsByExerciseId.get(focused.exerciseId) ?? []}
+        restSeconds={focused.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
-        onRestoreSets={onRestoreSets}
         onStartRestTimer={onStartRestTimer}
         onOpenRestPicker={onOpenRestPicker}
-        showTimer
-        previousSessionByExerciseId={previousSessionByExerciseId}
+        onBack={() => setFocusedExerciseId(null)}
       />
+    );
+  }
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>種目を追加</Text>
-        </View>
-        <View style={styles.sectionBody}>
-          <TextInput
-            value={keyword}
-            onChangeText={setKeyword}
-            placeholder="種目名で絞り込む"
-            placeholderTextColor={colors.textFaint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.textInput}
-          />
-          <View style={styles.chipWrap}>
-            {[...bodyPartById.values()].map((part) => (
-              <Pressable
-                key={part.id}
-                style={[styles.pill, filterBodyPartId === part.id && styles.activePill]}
-                onPress={() => setFilterBodyPartId(filterBodyPartId === part.id ? null : part.id)}
-              >
-                <Text
-                  style={[styles.pillText, filterBodyPartId === part.id && styles.activePillText]}
-                >
-                  {part.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.chipWrap}>
-            {visibleExercises.map((exercise) => {
-              const bodyPart = bodyPartById.get(exercise.primaryBodyPartId);
-              return (
-                <Pressable
-                  key={exercise.id}
-                  style={styles.exerciseChip}
-                  onPress={() => onAddExercise(exercise)}
-                >
-                  <Text style={styles.exerciseChipText}>{exercise.name}</Text>
-                  <Text style={styles.exerciseChipSub}>
-                    {bodyPart?.name ?? '未分類'} ・ 休憩 {formatTimer(exercise.defaultRestSeconds)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {visibleExercises.length === 0 ? (
-            <Text style={styles.muted}>条件に合う種目がありません。</Text>
-          ) : null}
-        </View>
-      </View>
+  const todaySetCountByExerciseId = new Map<string, number>();
+  for (const item of workoutExercises) {
+    const count = visibleSets.filter((set) => set.workoutExerciseId === item.id).length;
+    todaySetCountByExerciseId.set(
+      item.exerciseId,
+      (todaySetCountByExerciseId.get(item.exerciseId) ?? 0) + count,
+    );
+  }
 
-      {workoutExercises.length > 0 ? (
-        <Pressable style={styles.ghostButton} onPress={promptSaveTemplate}>
-          <Text style={styles.ghostButtonText}>今日の種目構成をテンプレートとして保存</Text>
-        </Pressable>
-      ) : null}
-    </View>
+  // 未追加の種目はワークアウトへ入れてから開く。追加済みならそのまま開く。
+  const handleSelect = async (exercise: Exercise) => {
+    const alreadyAdded = workoutExercises.some((item) => item.exerciseId === exercise.id);
+    if (!alreadyAdded) {
+      await onAddExercise(exercise);
+    }
+    setFocusedExerciseId(exercise.id);
+  };
+
+  return (
+    <ExercisePicker
+      exercises={exercises}
+      bodyParts={bodyParts}
+      todaySetCountByExerciseId={todaySetCountByExerciseId}
+      lastPerformedByExerciseId={lastPerformedByExerciseId}
+      onSelect={(exercise) => void handleSelect(exercise)}
+      onAddCustomExercise={onAddCustomExercise}
+      onSaveTemplate={onSaveTemplate}
+      canSaveTemplate={workoutExercises.length > 0}
+      onPause={onPause}
+      onComplete={onComplete}
+    />
   );
 }

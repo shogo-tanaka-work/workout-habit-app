@@ -5,6 +5,7 @@ import { isCustomExerciseId } from '../db/syncTables';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import type { BodyPart, Exercise } from '../types/domain';
+import { formatTimer } from '../utils/format';
 import { BodyPartPicker } from './BodyPartPicker';
 import { LabeledNumber } from './LabeledNumber';
 
@@ -13,10 +14,14 @@ import { LabeledNumber } from './LabeledNumber';
 // **プリセット種目は名前と部位を変えられない。** 全ユーザー共有の行で、
 // 変えられると同じ ID が人によって別の種目を指すことになる。入力を無効にして理由を書く。
 //
-// バー重量と非表示は上書きできる（`user_exercise_settings`）。
+// バー重量・休憩・非表示は上書きできる（`user_exercise_settings`）。
 // バーの重さはジムによって違い、28件のプリセットには使わないものも混じるため。
 //
-// レスト時間はこのモーダルでは扱わない（既存の休憩ピッカーが受け持つ）。
+// 休憩はここでも変えられる。種目の設定を1か所に集めるため、よく使う値の
+// チップで選ぶ形にしている（記録中の細かい調整は休憩ピッカーが受け持つ）。
+
+// 種目ごとの既定休憩に選べる値（秒）。ジムで実際に使う範囲に絞る。
+const REST_CHOICES = [30, 60, 90, 120, 150, 180, 240, 300] as const;
 
 export function ExerciseEditModal({
   exercise,
@@ -34,6 +39,7 @@ export function ExerciseEditModal({
   const [name, setName] = useState(exercise.name);
   const [bodyPartId, setBodyPartId] = useState(exercise.primaryBodyPartId);
   const [barWeightKg, setBarWeightKg] = useState(exercise.defaultBarWeightKg);
+  const [restSeconds, setRestSeconds] = useState(exercise.defaultRestSeconds);
   const [isArchived, setIsArchived] = useState(exercise.isArchived);
 
   const canSave = name.trim().length > 0;
@@ -75,12 +81,30 @@ export function ExerciseEditModal({
             suffix="kg"
             onChange={setBarWeightKg}
           />
+          <Text style={styles.inputLabel}>休憩</Text>
+          <View style={styles.chipWrap}>
+            {REST_CHOICES.map((seconds) => {
+              const isActive = seconds === restSeconds;
+              return (
+                <Pressable
+                  key={seconds}
+                  style={[styles.choiceChip, isActive && styles.activePill]}
+                  onPress={() => setRestSeconds(seconds)}
+                >
+                  <Text style={[styles.choiceChipText, isActive && styles.activePillText]}>
+                    {formatTimer(seconds)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {/* アーカイブは削除の代わり。記録が種目を参照しているため消せない。 */}
           <Pressable
-            style={[styles.pill, isArchived && styles.activePill]}
+            style={[styles.choiceChip, styles.choiceChipWide, isArchived && styles.activePill]}
             onPress={() => setIsArchived((current) => !current)}
           >
-            <Text style={[styles.pillText, isArchived && styles.activePillText]}>
+            <Text style={[styles.choiceChipText, isArchived && styles.activePillText]}>
               {isArchived ? 'アーカイブ中（選択肢に出ません）' : 'アーカイブする'}
             </Text>
           </Pressable>
@@ -98,6 +122,7 @@ export function ExerciseEditModal({
                   name: name.trim(),
                   primaryBodyPartId: bodyPartId,
                   defaultBarWeightKg: barWeightKg,
+                  defaultRestSeconds: restSeconds,
                   isArchived,
                 })
               }

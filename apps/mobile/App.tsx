@@ -13,26 +13,42 @@ import {
   View,
 } from 'react-native';
 
+import { CloudSyncSection } from './src/components/CloudSyncSection';
 import { ExerciseEditModal } from './src/components/ExerciseEditModal';
+import { PlateCalculator } from './src/components/PlateCalculator';
 import { RestPickerModal } from './src/components/RestPickerModal';
 import { TimerBanner } from './src/components/TimerBanner';
 import { useRestTimer } from './src/hooks/useRestTimer';
 import { useWorkoutData } from './src/hooks/useWorkoutData';
+import type { CsvExportRequest } from './src/screens/CsvExportScreen';
+import { CsvExportScreen } from './src/screens/CsvExportScreen';
 import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
-import { ExerciseScreen } from './src/screens/ExerciseScreen';
+import { ExerciseListScreen } from './src/screens/ExerciseListScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import type { SettingsRoute } from './src/screens/SettingsScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
+import { TimerSettingsScreen } from './src/screens/TimerSettingsScreen';
 import { WorkoutEditScreen } from './src/screens/WorkoutEditScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
 import type { Tab, WorkoutExercise, WorkoutSet } from './src/types/domain';
 import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions } from './src/utils/aggregate';
-import { buildWorkoutCsv } from './src/utils/csv';
+import { buildBodyLogCsv, buildWorkoutCsv } from './src/utils/csv';
 import { formatJapaneseDate } from './src/utils/datetime';
 
 // 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
 const RECENT_SESSION_COUNT = 5;
+
+// 設定タブのサブ画面のヘッダー名。
+const SETTINGS_TITLES: Record<SettingsRoute, string> = {
+  exercises: 'トレーニング種目',
+  timer: 'タイマー',
+  plates: 'プレート計算機',
+  sync: 'クラウド同期',
+  csv: 'CSV出力',
+};
 
 export default function App() {
   const data = useWorkoutData();
@@ -48,6 +64,8 @@ export default function App() {
   const [restPicker, setRestPicker] = useState<{ exerciseId: string; seconds: number } | null>(
     null,
   );
+  // 設定タブで開いているサブ画面。null なら入口のメニュー。
+  const [settingsRoute, setSettingsRoute] = useState<SettingsRoute | null>(null);
 
   // 送信の補助的な契機。バックグラウンドへ移るとき（記録を終えて画面を閉じたとき）と、
   // 戻ってきたとき（通信が復帰している可能性がある）に、溜まった操作を送る。
@@ -163,7 +181,26 @@ export default function App() {
     [editingWorkoutId, data.workoutExercises],
   );
 
-  const isHomeTab = tab === 'home' && selectedExerciseId === null && editingWorkout === null;
+  // タブの上へ全面でかぶせる画面（戻る導線つき）。3つは同時に開かない。
+  const overlay = selectedExercise
+    ? { title: selectedExercise.name, close: () => setSelectedExerciseId(null) }
+    : editingWorkout
+      ? {
+          title: `${formatJapaneseDate(editingWorkout.performedAt)} の記録`,
+          close: () => setEditingWorkoutId(null),
+        }
+      : settingsRoute
+        ? { title: SETTINGS_TITLES[settingsRoute], close: () => setSettingsRoute(null) }
+        : null;
+
+  const isHomeTab = tab === 'home' && overlay === null;
+
+  // タブを移ったら設定の階層は入口へ戻す。別タブから帰ってきたとき、
+  // 前に見ていた下の階層が出ていると、どこにいるのか分からなくなる。
+  const handleSelectTab = (next: Tab) => {
+    setTab(next);
+    setSettingsRoute(null);
+  };
 
   const editingExercise = editingExerciseId
     ? (data.exerciseById.get(editingExerciseId) ?? null)
@@ -204,16 +241,25 @@ export default function App() {
     setRestPicker({ exerciseId, seconds });
   };
 
-  // 完了済みの全記録をCSVにして共有シートへ渡す（ファイル保存・AirDrop・メール等）。
-  const handleExportCsv = async () => {
+  // 選んだ対象・期間の記録をCSVにして共有シートへ渡す（ファイル保存・AirDrop・メール等）。
+  const handleExportCsv = async (request: CsvExportRequest) => {
     try {
-      const csv = buildWorkoutCsv(
-        data.completedWorkouts,
-        data.workoutExercises,
-        data.visibleSets,
-        data.exerciseById,
-      );
-      await Share.share({ message: csv });
+      const since = request.since;
+      const parts: string[] = [];
+      if (request.targets.includes('workouts')) {
+        const workouts = since
+          ? data.completedWorkouts.filter((workout) => workout.performedAt >= since)
+          : data.completedWorkouts;
+        parts.push(
+          buildWorkoutCsv(workouts, data.workoutExercises, data.visibleSets, data.exerciseById),
+        );
+      }
+      if (request.targets.includes('bodyLogs')) {
+        const logs = since ? data.bodyLogs.filter((log) => log.measuredAt >= since) : data.bodyLogs;
+        parts.push(buildBodyLogCsv(logs));
+      }
+      // 2種類を選んだときは1つのテキストにまとめる。列が違うので空行で区切る。
+      await Share.share({ message: parts.join('\n\n') });
     } catch (error: unknown) {
       Alert.alert(
         'エクスポートに失敗しました',
@@ -264,40 +310,31 @@ export default function App() {
         style={styles.flex}
       >
         {/* アプリ名の固定表示は置かない（狭い画面を1行ぶん取られるため）。
-            ヘッダーは、戻る導線が要る画面（種目詳細・記録の編集）のときだけ出す。 */}
-        {selectedExercise ? (
+            ヘッダーは、戻る導線が要る画面のときだけ出す。 */}
+        {overlay ? (
           <View style={styles.header}>
-            <Pressable style={styles.headerBackButton} onPress={() => setSelectedExerciseId(null)}>
+            <Pressable style={styles.headerBackButton} onPress={overlay.close}>
               <Text style={styles.headerBackText}>‹</Text>
-              <Text style={styles.appName}>{selectedExercise.name}</Text>
-            </Pressable>
-          </View>
-        ) : editingWorkout ? (
-          <View style={styles.header}>
-            <Pressable style={styles.headerBackButton} onPress={() => setEditingWorkoutId(null)}>
-              <Text style={styles.headerBackText}>‹</Text>
-              <Text style={styles.appName}>
-                {formatJapaneseDate(editingWorkout.performedAt)} の記録
-              </Text>
+              <Text style={styles.appName}>{overlay.title}</Text>
             </Pressable>
           </View>
         ) : null}
 
         {timer ? <TimerBanner timer={timer} setTimer={setTimer} /> : null}
 
-        {selectedExercise || editingWorkout ? null : (
+        {overlay ? null : (
           <View style={styles.tabs}>
             {(
               [
                 ['home', 'ホーム'],
                 ['workout', '記録'],
                 ['history', '履歴'],
-                ['exercises', '種目'],
+                ['settings', '設定'],
               ] as const
             ).map(([key, label]) => (
               <Pressable
                 key={key}
-                onPress={() => setTab(key)}
+                onPress={() => handleSelectTab(key)}
                 style={[styles.tab, tab === key && styles.activeTab]}
               >
                 <Text style={[styles.tabText, tab === key && styles.activeTabText]}>{label}</Text>
@@ -352,6 +389,40 @@ export default function App() {
                 onOpenRestPicker={openRestPicker}
                 onDeleteWorkout={handleDeleteWorkout}
               />
+            ) : settingsRoute === 'exercises' ? (
+              <ExerciseListScreen
+                exercises={data.exercises}
+                bodyParts={data.bodyParts}
+                bodyPartById={data.bodyPartById}
+                newExerciseName={newExerciseName}
+                onChangeNewExerciseName={setNewExerciseName}
+                onAddCustomExercise={handleAddCustomExercise}
+                onEditExercise={setEditingExerciseId}
+                onSelectExercise={setSelectedExerciseId}
+              />
+            ) : settingsRoute === 'timer' ? (
+              <TimerSettingsScreen
+                timerSettings={data.timerSettings}
+                onUpdate={(settings) => void data.updateTimerSettings(settings)}
+              />
+            ) : settingsRoute === 'plates' ? (
+              <PlateCalculator />
+            ) : settingsRoute === 'csv' ? (
+              <CsvExportScreen onExport={(request) => void handleExportCsv(request)} />
+            ) : settingsRoute === 'sync' ? (
+              <CloudSyncSection
+                syncSettings={data.syncSettings}
+                pendingCount={data.pendingSyncCount}
+                account={data.account}
+                isGoogleSignInAvailable={data.isGoogleSignInAvailable}
+                onSaveConnection={data.updateSyncConnection}
+                onSignIn={data.signInToGoogle}
+                onSignOut={data.signOutOfGoogle}
+                onSyncNow={data.syncNow}
+                onImportPlans={data.importPlans}
+                onTogglePaused={data.updateSyncPaused}
+                onRestore={data.restoreFromCloud}
+              />
             ) : (
               <>
                 {tab === 'workout' ? (
@@ -395,33 +466,7 @@ export default function App() {
                   />
                 ) : null}
 
-                {tab === 'exercises' ? (
-                  <ExerciseScreen
-                    bodyParts={data.bodyParts}
-                    exercises={data.exercises}
-                    bodyPartById={data.bodyPartById}
-                    newExerciseName={newExerciseName}
-                    timerSettings={data.timerSettings}
-                    onChangeNewExerciseName={setNewExerciseName}
-                    onAddCustomExercise={handleAddCustomExercise}
-                    onEditExercise={setEditingExerciseId}
-                    onOpenRestPicker={openRestPicker}
-                    onSelectExercise={setSelectedExerciseId}
-                    onUpdateTimerSettings={(settings) => void data.updateTimerSettings(settings)}
-                    onExportCsv={() => void handleExportCsv()}
-                    syncSettings={data.syncSettings}
-                    pendingSyncCount={data.pendingSyncCount}
-                    account={data.account}
-                    isGoogleSignInAvailable={data.isGoogleSignInAvailable}
-                    onSaveSyncConnection={data.updateSyncConnection}
-                    onSignIn={data.signInToGoogle}
-                    onSignOut={data.signOutOfGoogle}
-                    onSyncNow={data.syncNow}
-                    onImportPlans={data.importPlans}
-                    onTogglePaused={data.updateSyncPaused}
-                    onRestore={data.restoreFromCloud}
-                  />
-                ) : null}
+                {tab === 'settings' ? <SettingsScreen onOpen={setSettingsRoute} /> : null}
               </>
             )}
           </ScrollView>

@@ -48,10 +48,13 @@
 
 | タブ | 役割 |
 |---|---|
-| Home | きょうのワークアウト開始・進行状況 |
-| Workout | 進行中ワークアウトの種目・セット入力、レストタイマー |
-| History | 完了済みワークアウトの履歴・統計 |
-| Exercise | 種目マスタの管理（カスタム種目追加・レスト設定）と種目別詳細 |
+| Home | カレンダーで「いつ何をやったか」。日を選んでその日の記録・ボディログを見る／入れる |
+| Workout | 種目を選ぶ → その1種目だけ記録する。休憩タイマーもここ |
+| History | 期間 × 種目の集計。日付ごとの一覧は持たない（Home の役目） |
+| Settings | 用途別のメニュー。マスタ管理（種目）／ツール／設定（タイマー・同期）／データ（CSV） |
+
+タブの上へ全面でかぶせる画面（種目詳細・記録の編集・設定のサブ画面）は `App.tsx` の
+`overlay` が1か所で扱う。ヘッダーの戻る導線とタブの出し分けはここに集約する。
 
 ## ディレクトリ構成
 
@@ -66,7 +69,8 @@ apps/mobile/
     hooks/        useWorkoutData / useRestTimer
     utils/        datetime / format / number / aggregate / plates / calendar / csv / id
     components/   TimerBanner / SetEditor / SetTable / TrendChart / PlateCalculator ほか
-    screens/      HomeScreen / WorkoutScreen / HistoryScreen / ExerciseScreen / ExerciseDetailScreen
+    screens/      HomeScreen / WorkoutScreen / HistoryScreen / SettingsScreen
+                  ExerciseListScreen / ExerciseDetailScreen / TimerSettingsScreen / WorkoutEditScreen
     styles/       theme.ts（色・余白・フォント）/ appStyles.ts（共有 StyleSheet）
   App.tsx         DB初期化・タブ切替のみの薄いシェル
 ```

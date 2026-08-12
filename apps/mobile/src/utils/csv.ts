@@ -1,4 +1,4 @@
-import type { Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import type { BodyLog, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 
 // ワークアウト記録のCSVエクスポート（Phase 2）。
 // 共有シート（Share API）でテキストとして書き出す前提のシリアライズ純粋関数。
@@ -44,6 +44,25 @@ export const buildWorkoutCsv = (
         );
       });
     }
+  }
+  return rows.join('\n');
+};
+
+// ボディログのCSV。トレーニング記録とは列が違うため、別のファイル（別の文字列）にする。
+const BODY_LOG_CSV_HEADER = 'date,body_weight_kg,body_fat_percentage,memo';
+
+export const buildBodyLogCsv = (bodyLogs: BodyLog[]): string => {
+  const rows: string[] = [BODY_LOG_CSV_HEADER];
+  const ascending = [...bodyLogs].sort((a, b) => a.measuredAt.localeCompare(b.measuredAt));
+  for (const log of ascending) {
+    rows.push(
+      [
+        log.measuredAt,
+        `${log.bodyWeightKg}`,
+        log.bodyFatPercentage === null ? '' : `${log.bodyFatPercentage}`,
+        escapeCsvValue(log.memo),
+      ].join(','),
+    );
   }
   return rows.join('\n');
 };

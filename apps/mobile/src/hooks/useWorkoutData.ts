@@ -396,10 +396,12 @@ export function useWorkoutData() {
     const database = ensureDb();
     if (isCustomExerciseId(next.id)) {
       await updateExercise(database, next);
+      await setExerciseRest(database, next.id, next.defaultRestSeconds);
     } else {
       // プリセットは名前と部位を変えられない（共有の意味が失われるため）。
-      // 上書きできるのはバー重量と非表示だけ。
+      // 上書きできるのは休憩・バー重量・非表示だけ。
       await writeExerciseOverride(database, next.id, {
+        restSeconds: next.defaultRestSeconds,
         barWeightKg: next.defaultBarWeightKg,
         isArchived: next.isArchived,
       });

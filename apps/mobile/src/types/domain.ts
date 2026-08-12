@@ -1,7 +1,7 @@
 // アプリ内（UI/ロジック）で扱うドメイン型。camelCase。
 // SQLite から取れる行型（snake_case）は ./db.ts に分離している。
 
-export type Tab = 'home' | 'workout' | 'history' | 'exercises';
+export type Tab = 'home' | 'workout' | 'history' | 'settings';
 
 export type BodyPart = {
   id: string;

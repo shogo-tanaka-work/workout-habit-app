@@ -724,6 +724,84 @@ export const styles = StyleSheet.create({
   disabledPill: {
     opacity: 0.4,
   },
+  // チェックボックス（CSV出力の対象選択など、複数選べる行）。
+  checkBox: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    borderWidth: hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBoxChecked: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  checkBoxMark: {
+    color: colors.background,
+    fontSize: fontSize.md,
+    fontWeight: '800',
+  },
+
+  // プレート計算の結果行。ラックの前で数えるので、1枚ぶんを大きく1行に出す。
+  plateRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderTopWidth: hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  plateWeight: {
+    color: colors.textPrimary,
+    fontSize: fontSize.xl,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  plateCount: {
+    color: colors.accentText,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+  plateTotal: {
+    color: colors.textPrimary,
+    fontSize: fontSize.lg,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+
+  // 選択チップ（部位・休憩・期間など、モーダルや設定画面で選ぶもの）。
+  // pill はタップ領域が小さく誤操作しやすいため、指で押す選択肢はこちらを使う。
+  choiceChip: {
+    minHeight: 44,
+    minWidth: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: hairlineWidth,
+    borderColor: colors.hairlineStrong,
+    backgroundColor: colors.surfaceRaised,
+  },
+  choiceChipText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  choiceChipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  // 幅いっぱいに広げる選択肢（アーカイブの切り替えなど）。
+  choiceChipWide: {
+    width: '100%',
+  },
+
   activePill: {
     backgroundColor: colors.accentSurface,
     borderColor: colors.accent,
@@ -749,9 +827,10 @@ export const styles = StyleSheet.create({
     borderWidth: hairlineWidth,
     padding: spacing.sm + 1,
   },
+  // 入力欄の見出し。xs だと何の入力欄か読み取れず、値だけが目に入る。
   inputLabel: {
-    color: colors.textFaint,
-    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
     fontWeight: '600',
   },
   numberRow: {
@@ -761,16 +840,16 @@ export const styles = StyleSheet.create({
   },
   numberInput: {
     color: colors.textPrimary,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.xl,
     fontWeight: '700',
-    minHeight: 34,
+    minHeight: 44,
     flex: 1,
     padding: 0,
     textAlign: 'center',
   },
   stepButton: {
-    width: 30,
-    height: 30,
+    width: 44,
+    height: 44,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -784,9 +863,9 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.md,
   },
   suffix: {
-    color: colors.textFaint,
+    color: colors.textSecondary,
     fontWeight: '600',
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
   },
   memoInput: {
     color: colors.textPrimary,

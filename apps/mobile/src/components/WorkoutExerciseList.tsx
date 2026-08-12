@@ -6,6 +6,7 @@ import type { ExerciseSession } from '../utils/aggregate';
 import { formatSetsInline, summarizeSets } from '../utils/aggregate';
 import { formatMonthDay } from '../utils/datetime';
 import { formatTimer } from '../utils/format';
+import { rmDivisorFor } from '../utils/oneRepMax';
 import { formatVolume, formatWeight } from '../utils/number';
 import { SetEditor } from './SetEditor';
 
@@ -39,7 +40,7 @@ export function WorkoutExerciseList({
           .filter((set) => set.workoutExerciseId === workoutExercise.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);
         // ウォームアップを除いた集計。規則は utils/aggregate.ts に集約している。
-        const summary = summarizeSets(sets);
+        const summary = summarizeSets(sets, rmDivisorFor(workoutExercise.exerciseId));
         const restSeconds =
           workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120;
         const previousSession = previousSessionByExerciseId?.get(workoutExercise.exerciseId);

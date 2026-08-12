@@ -123,11 +123,3 @@ export type SetPatch = Partial<
     'weightKg' | 'reps' | 'rpe' | 'isWarmup' | 'isCompleted' | 'memo' | 'restSeconds' | 'deletedAt'
   >
 >;
-
-// ホームに出す「今週（月曜はじまり）」の集計。
-export type WeeklyStats = {
-  workoutCount: number;
-  setCount: number;
-  totalVolume: number;
-  totalReps: number;
-};

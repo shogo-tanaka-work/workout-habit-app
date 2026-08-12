@@ -72,3 +72,6 @@ export const startOfWeekIso = (date: Date): string => {
   const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - daysSinceMonday);
   return formatDate(monday);
 };
+
+// ISO 日付が属する週（月曜はじまり）の開始日。履歴の推移グラフを週単位でまとめるのに使う。
+export const startOfWeekIsoDate = (isoDate: string): string => startOfWeekIso(parseIsoDate(isoDate));

@@ -1,99 +1,178 @@
-import { Alert, Pressable, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
-import { BodyLogSection } from '../components/BodyLogSection';
 import { StatSummary } from '../components/StatSummary';
-import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
+import { TrendChart } from '../components/TrendChart';
 import { styles } from '../styles/appStyles';
-import { bodyPartColor } from '../styles/theme';
+import { bodyPartColor, colors } from '../styles/theme';
 import type {
   BodyLog,
+  BodyPart,
   Exercise,
-  SetPatch,
-  WeeklyStats,
   Workout,
   WorkoutExercise,
   WorkoutSet,
 } from '../types/domain';
-import type { BodyPartSummary } from '../utils/aggregate';
-import { summarizeSets } from '../utils/aggregate';
-import { formatJapaneseDate } from '../utils/datetime';
+import {
+  buildVolumeSeries,
+  summarizeByBodyPart,
+  summarizeByExercise,
+  summarizePeriod,
+} from '../utils/aggregate';
+import {
+  formatMonthDay,
+  isoDateMonthsAgo,
+  startOfWeekIso,
+  startOfWeekIsoDate,
+} from '../utils/datetime';
 import { formatCount, formatVolume, formatWeight } from '../utils/number';
 
-// 履歴は「振り返り」の画面。日々の実績の入口はホームのカレンダーが持ち、
-// ここは週次の集計・体組成の推移と、過去の記録の一覧・編集を担う。
+// グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
+const TREND_POINT_LIMIT = 30;
+
+const PERIODS = [
+  { key: 'week', label: '今週', months: 0 },
+  { key: '1m', label: '1ヶ月', months: 1 },
+  { key: '3m', label: '3ヶ月', months: 3 },
+  { key: '6m', label: '6ヶ月', months: 6 },
+] as const;
+
+type PeriodKey = (typeof PERIODS)[number]['key'];
+
+// 3ヶ月以上は1点＝1日だと読めないので、週単位へまとめる。
+const WEEKLY_BUCKET_FROM_MONTHS = 3;
+
+// 履歴は「どれだけ積んで、どう伸びたか」を見る画面。期間 × 種目で集計する。
+//
+// 日付ごとの記録一覧はここに置かない。「いつ何をやったか」はホームのカレンダーが持ち、
+// 二重に置くと同じ内容を2画面で保守することになる。記録の編集もホームから入る。
 export function HistoryScreen({
   workouts,
   workoutExercises,
   visibleSets,
   exerciseById,
-  stats,
-  bodyPartSummaries,
+  bodyPartById,
   bodyLogs,
-  editingWorkoutId,
-  onEdit,
-  onStopEdit,
-  onAddSet,
-  onPatchSet,
-  onStartRestTimer,
-  onOpenRestPicker,
-  onDeleteWorkout,
   onSelectExercise,
-  onSaveBodyLog,
 }: {
+  /** 実施済みのワークアウト（performedAt 降順）。 */
   workouts: Workout[];
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
-  stats: WeeklyStats;
-  bodyPartSummaries: BodyPartSummary[];
+  bodyPartById: Map<string, BodyPart>;
+  /** ボディログ（measuredAt 降順）。 */
   bodyLogs: BodyLog[];
-  editingWorkoutId: string | null;
-  onEdit: (workoutId: string) => void;
-  onStopEdit: () => void;
-  onAddSet: (workoutExercise: WorkoutExercise) => void;
-  onPatchSet: (setId: string, patch: SetPatch) => void;
-  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
-  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
-  onDeleteWorkout: (workoutId: string) => void;
   onSelectExercise: (exerciseId: string) => void;
-  onSaveBodyLog: (bodyWeightKg: number, bodyFatPercentage: number | null) => void;
 }) {
+  const [periodKey, setPeriodKey] = useState<PeriodKey>('week');
+  const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[0];
+
+  // 期間の起点。「今週」だけは月曜はじまりで、ほかは n ヶ月前の同日。
+  const cutoff = useMemo(
+    () =>
+      period.months === 0
+        ? startOfWeekIso(new Date())
+        : isoDateMonthsAgo(period.months, new Date()),
+    [period.months],
+  );
+
+  const periodWorkouts = useMemo(
+    () => workouts.filter((workout) => workout.performedAt >= cutoff),
+    [workouts, cutoff],
+  );
+
+  const summary = useMemo(
+    () => summarizePeriod(periodWorkouts, workoutExercises, visibleSets),
+    [periodWorkouts, workoutExercises, visibleSets],
+  );
+
+  const bodyPartSummaries = useMemo(() => {
+    const workoutIds = new Set(periodWorkouts.map((workout) => workout.id));
+    const items = workoutExercises.filter((item) => workoutIds.has(item.workoutId));
+    const itemIds = new Set(items.map((item) => item.id));
+    const sets = visibleSets.filter((set) => itemIds.has(set.workoutExerciseId));
+    return summarizeByBodyPart(items, sets, exerciseById, bodyPartById);
+  }, [periodWorkouts, workoutExercises, visibleSets, exerciseById, bodyPartById]);
+
+  const exerciseTotals = useMemo(
+    () => summarizeByExercise(periodWorkouts, workoutExercises, visibleSets, exerciseById),
+    [periodWorkouts, workoutExercises, visibleSets, exerciseById],
+  );
+
+  const volumePoints = useMemo(() => {
+    const isWeekly = period.months >= WEEKLY_BUCKET_FROM_MONTHS;
+    const series = buildVolumeSeries(
+      periodWorkouts,
+      workoutExercises,
+      visibleSets,
+      isWeekly ? startOfWeekIsoDate : (isoDate) => isoDate,
+    );
+    return series
+      .slice(-TREND_POINT_LIMIT)
+      .map((point) => ({ label: formatMonthDay(point.date), value: point.value }));
+  }, [periodWorkouts, workoutExercises, visibleSets, period.months]);
+
+  const bodyWeightPoints = useMemo(
+    () =>
+      bodyLogs
+        .filter((log) => log.measuredAt >= cutoff)
+        .slice(0, TREND_POINT_LIMIT)
+        .reverse()
+        .map((log) => ({ label: formatMonthDay(log.measuredAt), value: log.bodyWeightKg })),
+    [bodyLogs, cutoff],
+  );
+
   const maxBodyPartVolume = bodyPartSummaries.reduce(
-    (max, summary) => Math.max(max, summary.totalVolume),
+    (max, item) => Math.max(max, item.totalVolume),
     0,
   );
 
-  const confirmDelete = (workoutId: string, label: string) => {
-    Alert.alert('記録を削除', `${label} の記録を削除します。元に戻せません。`, [
-      { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: () => onDeleteWorkout(workoutId) },
-    ]);
-  };
-
   return (
     <View style={styles.stack}>
+      <View style={styles.segmentRow}>
+        {PERIODS.map((candidate, index) => {
+          const isActive = candidate.key === periodKey;
+          return (
+            <Pressable
+              key={candidate.key}
+              style={[
+                styles.segment,
+                index === PERIODS.length - 1 && styles.segmentLast,
+                isActive && styles.segmentActive,
+              ]}
+              onPress={() => setPeriodKey(candidate.key)}
+            >
+              <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
+                {candidate.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>今週のトレーニング</Text>
+          <Text style={styles.sectionHeaderText}>{period.label}のトレーニング</Text>
         </View>
         <StatSummary
-          primary={{ label: '総ボリューム', value: formatCount(stats.totalVolume), unit: 'kg' }}
+          primary={{ label: '総ボリューム', value: formatCount(summary.totalVolume), unit: 'kg' }}
           items={[
-            { label: '記録', value: formatCount(stats.workoutCount), unit: '回' },
-            { label: 'セット', value: formatCount(stats.setCount) },
-            { label: 'レップ', value: formatCount(stats.totalReps) },
+            { label: '記録', value: formatCount(summary.workoutCount), unit: '回' },
+            { label: 'セット', value: formatCount(summary.setCount) },
+            { label: 'レップ', value: formatCount(summary.totalReps) },
           ]}
         />
         {bodyPartSummaries.length > 0 ? (
           <View style={styles.sectionBody}>
-            {bodyPartSummaries.map((summary) => {
-              const ratio = maxBodyPartVolume > 0 ? summary.totalVolume / maxBodyPartVolume : 0;
+            {bodyPartSummaries.map((item) => {
+              const ratio = maxBodyPartVolume > 0 ? item.totalVolume / maxBodyPartVolume : 0;
               return (
-                <View key={summary.bodyPartId} style={styles.bodyPartRow}>
+                <View key={item.bodyPartId} style={styles.bodyPartRow}>
                   <View style={styles.rowBetween}>
-                    <Text style={styles.panelText}>{summary.name}</Text>
+                    <Text style={styles.panelText}>{item.name}</Text>
                     <Text style={styles.muted}>
-                      {summary.setCount} セット ・ {formatVolume(summary.totalVolume)}
+                      {item.setCount} セット ・ {formatVolume(item.totalVolume)}
                     </Text>
                   </View>
                   <View style={styles.bodyPartBarTrack}>
@@ -102,7 +181,7 @@ export function HistoryScreen({
                         styles.bodyPartBarFill,
                         {
                           width: `${ratio * 100}%`,
-                          backgroundColor: bodyPartColor(summary.bodyPartId),
+                          backgroundColor: bodyPartColor(item.bodyPartId),
                         },
                       ]}
                     />
@@ -114,103 +193,73 @@ export function HistoryScreen({
         ) : null}
       </View>
 
-      <BodyLogSection bodyLogs={bodyLogs} onSave={onSaveBodyLog} />
-
-      {workouts.length === 0 ? (
-        <Text style={styles.muted}>
-          完了した記録はまだありません。ワークアウトを完了すると、ここに履歴が並びます。
-        </Text>
+      {volumePoints.length >= 2 ? (
+        <TrendChart
+          title={
+            period.months >= WEEKLY_BUCKET_FROM_MONTHS
+              ? '総ボリューム推移（週）'
+              : '総ボリューム推移'
+          }
+          unit="kg"
+          points={volumePoints}
+          color={colors.chartPrimary}
+        />
       ) : null}
-      {workouts.map((workout) => {
-        const items = workoutExercises
-          .filter((item) => item.workoutId === workout.id)
-          .sort((a, b) => a.orderIndex - b.orderIndex);
-        const workoutSets = visibleSets.filter((set) =>
-          items.some((item) => item.id === set.workoutExerciseId),
-        );
-        const workoutSummary = summarizeSets(workoutSets);
-        const isEditing = editingWorkoutId === workout.id;
-        return (
-          <View key={workout.id} style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionHeaderText}>
-                  {formatJapaneseDate(workout.performedAt)}
-                </Text>
-                <Text style={styles.faint}>
-                  総ボリューム {formatVolume(workoutSummary.totalVolume)} ・{' '}
-                  {workoutSummary.setCount} セット
-                </Text>
-              </View>
-              {isEditing ? (
-                <Pressable style={styles.secondaryButton} onPress={onStopEdit}>
-                  <Text style={styles.secondaryButtonText}>編集を終了</Text>
-                </Pressable>
-              ) : (
-                <Pressable style={styles.ghostButton} onPress={() => onEdit(workout.id)}>
-                  <Text style={styles.ghostButtonText}>編集</Text>
-                </Pressable>
-              )}
-            </View>
-            {isEditing ? (
-              <View style={styles.sectionBody}>
-                <WorkoutExerciseList
-                  workoutExercises={items}
-                  visibleSets={visibleSets}
-                  exerciseById={exerciseById}
-                  onAddSet={onAddSet}
-                  onPatchSet={onPatchSet}
-                  onStartRestTimer={onStartRestTimer}
-                  onOpenRestPicker={onOpenRestPicker}
-                  showTimer={false}
-                />
-                <Pressable
-                  style={styles.dangerButton}
-                  onPress={() => confirmDelete(workout.id, workout.performedAt)}
-                >
-                  <Text style={styles.dangerButtonText}>この記録を削除</Text>
-                </Pressable>
-              </View>
-            ) : (
-              items.map((item) => {
-                const exercise = exerciseById.get(item.exerciseId);
-                const itemSets = workoutSets.filter((set) => set.workoutExerciseId === item.id);
-                const itemSummary = summarizeSets(itemSets);
-                return (
-                  <Pressable
-                    key={item.id}
-                    style={styles.exerciseRow}
-                    onPress={() => onSelectExercise(item.exerciseId)}
-                  >
-                    <View style={styles.exerciseRowHeader}>
-                      <View
-                        style={[
-                          styles.exerciseDot,
-                          { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
-                        ]}
-                      />
-                      <Text style={styles.exerciseRowName}>{exercise?.name ?? '種目'}</Text>
-                      <Text style={styles.chevron}>›</Text>
-                    </View>
-                    <StatSummary
-                      primary={{
-                        label: 'ボリューム',
-                        value: formatCount(itemSummary.totalVolume),
-                        unit: 'kg',
-                      }}
-                      items={[
-                        { label: 'セット', value: formatCount(itemSummary.setCount) },
-                        { label: '推定1RM', value: formatWeight(itemSummary.bestOneRepMax) },
-                        { label: 'レップ', value: formatCount(itemSummary.totalReps) },
-                      ]}
-                    />
-                  </Pressable>
-                );
-              })
-            )}
+
+      {bodyWeightPoints.length >= 2 ? (
+        <TrendChart
+          title="体重推移"
+          unit="kg"
+          points={bodyWeightPoints}
+          color={colors.chartSecondary}
+        />
+      ) : null}
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeaderText}>種目別</Text>
+          <Text style={styles.faint}>{exerciseTotals.length} 種目</Text>
+        </View>
+        {exerciseTotals.length === 0 ? (
+          <View style={styles.sectionBody}>
+            <Text style={styles.muted}>
+              この期間の記録はまだありません。ワークアウトを完了すると、種目ごとの積み上げが並びます。
+            </Text>
           </View>
-        );
-      })}
+        ) : null}
+        {exerciseTotals.map((item) => (
+          <Pressable
+            key={item.exerciseId}
+            style={styles.exerciseRow}
+            onPress={() => onSelectExercise(item.exerciseId)}
+          >
+            <View style={styles.exerciseRowHeader}>
+              <View
+                style={[styles.exerciseDot, { backgroundColor: bodyPartColor(item.bodyPartId) }]}
+              />
+              <View style={styles.flex}>
+                <Text style={styles.exerciseRowName}>{item.name}</Text>
+                <Text style={styles.faint}>
+                  {item.sessionCount} 回 ・ {item.summary.setCount} セット
+                </Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </View>
+            <StatSummary
+              primary={{
+                label: 'ボリューム',
+                value: formatCount(item.summary.totalVolume),
+                unit: 'kg',
+              }}
+              items={[
+                { label: '推定1RM', value: formatWeight(item.summary.bestOneRepMax) },
+                { label: 'レップ', value: formatCount(item.summary.totalReps) },
+                { label: '最大レップ', value: formatCount(item.summary.maxReps) },
+              ]}
+            />
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }

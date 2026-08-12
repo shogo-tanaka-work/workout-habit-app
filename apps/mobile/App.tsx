@@ -22,12 +22,14 @@ import { ExerciseDetailScreen } from './src/screens/ExerciseDetailScreen';
 import { ExerciseScreen } from './src/screens/ExerciseScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { WorkoutEditScreen } from './src/screens/WorkoutEditScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
 import type { Tab, WorkoutExercise, WorkoutSet } from './src/types/domain';
 import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions } from './src/utils/aggregate';
 import { buildWorkoutCsv } from './src/utils/csv';
+import { formatJapaneseDate } from './src/utils/datetime';
 
 // 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
 const RECENT_SESSION_COUNT = 5;
@@ -135,9 +137,11 @@ export default function App() {
     setTab('workout');
   };
 
+  // 完了したらホームへ戻す。直後に見たいのは「今日の記録が入ったカレンダー」で、
+  // 期間の集計（履歴）ではない。
   const handleComplete = async () => {
     await data.completeWorkout();
-    setTab('history');
+    setTab('home');
   };
 
   const handlePause = async () => {
@@ -145,7 +149,21 @@ export default function App() {
     setTab('home');
   };
 
-  const isHomeTab = tab === 'home' && selectedExerciseId === null;
+  // 過去の記録の編集は、タブとは別レイヤの画面として全面に出す。
+  const editingWorkout = editingWorkoutId
+    ? (data.completedWorkouts.find((workout) => workout.id === editingWorkoutId) ?? null)
+    : null;
+  const editingWorkoutExercises = useMemo(
+    () =>
+      editingWorkoutId
+        ? data.workoutExercises
+            .filter((item) => item.workoutId === editingWorkoutId)
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+        : [],
+    [editingWorkoutId, data.workoutExercises],
+  );
+
+  const isHomeTab = tab === 'home' && selectedExerciseId === null && editingWorkout === null;
 
   const editingExercise = editingExerciseId
     ? (data.exerciseById.get(editingExerciseId) ?? null)
@@ -163,10 +181,9 @@ export default function App() {
     }
   };
 
-  // ホームで選んだ日の記録を直す。編集の実装は履歴タブが持つので、そこへ送る。
+  // ホームで選んだ日の記録を直す。タブの上へ編集画面をかぶせる。
   const handleEditWorkoutFromHome = (workoutId: string) => {
     setEditingWorkoutId(workoutId);
-    setTab('history');
   };
 
   // ホーム右下の主操作。記録中なら続きへ、なければ新しく始める。
@@ -247,7 +264,7 @@ export default function App() {
         style={styles.flex}
       >
         {/* アプリ名の固定表示は置かない（狭い画面を1行ぶん取られるため）。
-            ヘッダーは、戻る導線が要る種目詳細のときだけ出す。 */}
+            ヘッダーは、戻る導線が要る画面（種目詳細・記録の編集）のときだけ出す。 */}
         {selectedExercise ? (
           <View style={styles.header}>
             <Pressable style={styles.headerBackButton} onPress={() => setSelectedExerciseId(null)}>
@@ -255,11 +272,20 @@ export default function App() {
               <Text style={styles.appName}>{selectedExercise.name}</Text>
             </Pressable>
           </View>
+        ) : editingWorkout ? (
+          <View style={styles.header}>
+            <Pressable style={styles.headerBackButton} onPress={() => setEditingWorkoutId(null)}>
+              <Text style={styles.headerBackText}>‹</Text>
+              <Text style={styles.appName}>
+                {formatJapaneseDate(editingWorkout.performedAt)} の記録
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {timer ? <TimerBanner timer={timer} setTimer={setTimer} /> : null}
 
-        {selectedExercise ? null : (
+        {selectedExercise || editingWorkout ? null : (
           <View style={styles.tabs}>
             {(
               [
@@ -291,12 +317,16 @@ export default function App() {
               workoutExercises={data.workoutExercises}
               visibleSets={data.visibleSets}
               exerciseById={data.exerciseById}
+              bodyLogs={data.bodyLogs}
               onResume={() => setTab('workout')}
               onBeginPlanned={(workoutId) => {
                 void data.beginPlannedWorkout(workoutId).then(() => setTab('workout'));
               }}
               onEditWorkout={handleEditWorkoutFromHome}
               onSelectExercise={setSelectedExerciseId}
+              onSaveBodyLog={(measuredAt, weightKg, fatPercentage) =>
+                void data.saveBodyLog(measuredAt, weightKg, fatPercentage)
+              }
             />
           </View>
         ) : (
@@ -309,6 +339,18 @@ export default function App() {
               <ExerciseDetailScreen
                 exercise={selectedExercise}
                 sessions={selectedExerciseSessions}
+              />
+            ) : editingWorkout ? (
+              <WorkoutEditScreen
+                workout={editingWorkout}
+                workoutExercises={editingWorkoutExercises}
+                visibleSets={data.visibleSets}
+                exerciseById={data.exerciseById}
+                onAddSet={data.addSet}
+                onPatchSet={data.patchSet}
+                onStartRestTimer={handleStartRestTimer}
+                onOpenRestPicker={openRestPicker}
+                onDeleteWorkout={handleDeleteWorkout}
               />
             ) : (
               <>
@@ -347,21 +389,9 @@ export default function App() {
                     workoutExercises={data.workoutExercises}
                     visibleSets={data.visibleSets}
                     exerciseById={data.exerciseById}
-                    stats={data.stats}
-                    bodyPartSummaries={data.weeklyBodyPartSummary}
+                    bodyPartById={data.bodyPartById}
                     bodyLogs={data.bodyLogs}
-                    editingWorkoutId={editingWorkoutId}
-                    onEdit={setEditingWorkoutId}
-                    onStopEdit={() => setEditingWorkoutId(null)}
-                    onAddSet={data.addSet}
-                    onPatchSet={data.patchSet}
-                    onStartRestTimer={handleStartRestTimer}
-                    onOpenRestPicker={openRestPicker}
-                    onDeleteWorkout={handleDeleteWorkout}
                     onSelectExercise={setSelectedExerciseId}
-                    onSaveBodyLog={(weightKg, fatPercentage) =>
-                      void data.saveBodyLog(weightKg, fatPercentage)
-                    }
                   />
                 ) : null}
 

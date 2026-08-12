@@ -5,6 +5,7 @@ import { colors } from '../styles/theme';
 import type { SetPatch, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { nowIso } from '../utils/datetime';
 import { estimateOneRepMax } from '../utils/number';
+import { rmDivisorFor } from '../utils/oneRepMax';
 import { LabeledNumber } from './LabeledNumber';
 
 // 1セットの編集行。
@@ -97,7 +98,7 @@ export function SetEditor({
         <Text style={styles.muted}>
           {set.isWarmup
             ? 'ウォームアップ（集計に入りません）'
-            : `推定1RM ${estimateOneRepMax(set.weightKg, set.reps)} kg`}
+            : `推定1RM ${estimateOneRepMax(set.weightKg, set.reps, rmDivisorFor(workoutExercise.exerciseId))} kg`}
         </Text>
         {showTimer ? (
           <Pressable

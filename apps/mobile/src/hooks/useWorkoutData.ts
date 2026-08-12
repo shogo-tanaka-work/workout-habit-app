@@ -54,14 +54,11 @@ import type {
   TimerSettings,
   TimerState,
   UserExerciseSetting,
-  WeeklyStats,
   Workout,
   WorkoutExercise,
   WorkoutSet,
 } from '../types/domain';
-import type { BodyPartSummary } from '../utils/aggregate';
-import { summarizeByBodyPart } from '../utils/aggregate';
-import { formatDate, isoDatePlusDays, nowIso, nowMs, startOfWeekIso } from '../utils/datetime';
+import { formatDate, isoDatePlusDays, nowIso, nowMs } from '../utils/datetime';
 import { newId } from '../utils/id';
 
 // 未送信が残っているときの再送間隔。短すぎると圏外で無駄な試行を繰り返す。
@@ -164,50 +161,6 @@ export function useWorkoutData() {
         .sort((a, b) => a.performedAt.localeCompare(b.performedAt)),
     [workouts],
   );
-
-  // 実績だけを集計対象にする。予定のセットは「やっていない記録」なので、
-  // 混ぜるとボリュームも回数も水増しされる。
-  const performedWorkouts = useMemo(
-    () => workouts.filter((workout) => workout.status !== 'planned'),
-    [workouts],
-  );
-
-  // ホーム表示用の「今週（月曜はじまり）」の集計。
-  const stats = useMemo((): WeeklyStats => {
-    const weekStart = startOfWeekIso(new Date());
-    const weekWorkouts = performedWorkouts.filter((workout) => workout.performedAt >= weekStart);
-    const weekWorkoutIds = new Set(weekWorkouts.map((workout) => workout.id));
-    const weekExerciseIds = new Set(
-      workoutExercises.filter((item) => weekWorkoutIds.has(item.workoutId)).map((item) => item.id),
-    );
-    let setCount = 0;
-    let totalVolume = 0;
-    let totalReps = 0;
-    for (const set of visibleSets) {
-      // ウォームアップは集計に入れない（utils/aggregate.ts と同じ規則）。
-      if (set.isWarmup || !weekExerciseIds.has(set.workoutExerciseId)) {
-        continue;
-      }
-      setCount += 1;
-      totalVolume += set.weightKg * set.reps;
-      totalReps += set.reps;
-    }
-    return { workoutCount: weekWorkouts.length, setCount, totalVolume, totalReps };
-  }, [performedWorkouts, workoutExercises, visibleSets]);
-
-  // ホーム表示用の「今週の部位別」集計（ボリューム降順）。
-  const weeklyBodyPartSummary = useMemo((): BodyPartSummary[] => {
-    const weekStart = startOfWeekIso(new Date());
-    const weekWorkoutIds = new Set(
-      performedWorkouts
-        .filter((workout) => workout.performedAt >= weekStart)
-        .map((workout) => workout.id),
-    );
-    const weekExercises = workoutExercises.filter((item) => weekWorkoutIds.has(item.workoutId));
-    const weekExerciseIds = new Set(weekExercises.map((item) => item.id));
-    const weekSets = visibleSets.filter((set) => weekExerciseIds.has(set.workoutExerciseId));
-    return summarizeByBodyPart(weekExercises, weekSets, exerciseById, bodyPartById);
-  }, [performedWorkouts, workoutExercises, visibleSets, exerciseById, bodyPartById]);
 
   // 記録画面の種目追加用に、使用回数の多い順（同数は名前順）へ並べ替えた種目一覧。
   const exercisesByUsage = useMemo(() => {
@@ -695,7 +648,9 @@ export function useWorkoutData() {
   };
 
   // 今日のボディログを保存する（同日があれば上書き）。体重 0 以下は無効として false。
+  // measuredAt はホームのカレンダーで選んだ日。1日1件で、既存の日は上書きされる。
   const saveBodyLog = async (
+    measuredAt: string,
     bodyWeightKg: number,
     bodyFatPercentage: number | null,
   ): Promise<boolean> => {
@@ -705,7 +660,7 @@ export function useWorkoutData() {
     const database = ensureDb();
     await upsertBodyLog(database, {
       id: newId('body-log'),
-      measuredAt: formatDate(new Date()),
+      measuredAt,
       bodyWeightKg,
       bodyFatPercentage: bodyFatPercentage && bodyFatPercentage > 0 ? bodyFatPercentage : null,
     });
@@ -730,8 +685,6 @@ export function useWorkoutData() {
     activeWorkoutExercises,
     completedWorkouts,
     plannedWorkouts,
-    stats,
-    weeklyBodyPartSummary,
     exercisesByUsage,
     templates,
     templateExercises,

@@ -10,6 +10,7 @@ import type { Exercise, SetPatch, WorkoutExercise, WorkoutSet } from '../types/d
 import type { ExerciseSession } from '../utils/aggregate';
 import { summarizeSets } from '../utils/aggregate';
 import { formatTimer } from '../utils/format';
+import { rmDivisorFor } from '../utils/oneRepMax';
 import { formatVolume, formatWeight } from '../utils/number';
 
 // いま実施している1種目だけを見せる記録画面。
@@ -44,7 +45,7 @@ export function ExerciseLogPanel({
   const [actionTarget, setActionTarget] = useState<{ set: WorkoutSet; setNumber: number } | null>(
     null,
   );
-  const summary = summarizeSets(sets);
+  const summary = summarizeSets(sets, rmDivisorFor(exercise?.id));
 
   // 完了を付けると、そのまま休憩に入る（beginRestTimer が完了も立てる）。
   // ボタンを2つ置かず、ジムでの一手を減らすため。止めたいときはタイマーバナーから止める。

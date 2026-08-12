@@ -15,6 +15,17 @@ import type { AppEnv } from './env';
 // 基準日をクライアントから `?today=YYYY-MM-DD` で渡せるようにする（省略時はUTC今日）。
 
 const EPLEY_DIVISOR = 30;
+
+// 推定1RM は「weight * (1 + reps / 除数)」で、除数だけが種目で変わる。
+// BIG3 は FWJ の RM換算表（ベンチ ÷40、スクワット・デッドリフト ÷33.3）、それ以外は Epley 式。
+// **モバイル側 src/utils/oneRepMax.ts と同じ値を保つ。片方だけ変えない。**
+const rmDivisorSql = (exerciseIdColumn: string): string =>
+  `CASE ${exerciseIdColumn}
+     WHEN 'bench-press' THEN 40.0
+     WHEN 'squat' THEN 33.3
+     WHEN 'deadlift' THEN 33.3
+     ELSE ${EPLEY_DIVISOR}.0
+   END`;
 const DAYS_PER_WEEK = 7;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -316,7 +327,7 @@ analytics.get('/exercises', async (context) => {
             COALESCE(bp.name, '未分類') AS body_part_name,
             COUNT(DISTINCT w.id) AS session_count,
             MAX(w.performed_at) AS last_performed_at,
-            ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${EPLEY_DIVISOR}.0)), 1) AS best_one_rep_max
+            ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${rmDivisorSql('e.id')})), 1) AS best_one_rep_max
      FROM exercises e
      LEFT JOIN body_parts bp ON bp.id = e.primary_body_part_id
      LEFT JOIN workout_exercises we ON we.exercise_id = e.id
@@ -377,7 +388,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
             SUM(s.reps) AS total_reps,
             MAX(s.reps) AS max_reps,
             MAX(s.weight_kg) AS top_weight,
-            ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${EPLEY_DIVISOR}.0)), 1) AS best_one_rep_max
+            ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${rmDivisorSql('we.exercise_id')})), 1) AS best_one_rep_max
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id AND we.exercise_id = ?
      JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0

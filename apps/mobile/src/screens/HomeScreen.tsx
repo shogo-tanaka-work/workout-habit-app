@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { BodyLogInput } from '../components/BodyLogInput';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { PlannedWorkoutSection } from '../components/PlannedWorkoutSection';
 import { StatSummary } from '../components/StatSummary';
 import { styles } from '../styles/appStyles';
 import { bodyPartColor } from '../styles/theme';
-import type { Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import type { BodyLog, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { formatSetsInline, summarizeSets } from '../utils/aggregate';
 import { buildDayMarks } from '../utils/calendarMarks';
 import { formatDate, formatJapaneseDate } from '../utils/datetime';
@@ -64,10 +65,12 @@ export function HomeScreen({
   workoutExercises,
   visibleSets,
   exerciseById,
+  bodyLogs,
   onResume,
   onBeginPlanned,
   onEditWorkout,
   onSelectExercise,
+  onSaveBodyLog,
 }: {
   activeWorkout: Workout | null;
   completedWorkouts: Workout[];
@@ -75,10 +78,17 @@ export function HomeScreen({
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
+  /** ボディログ（measuredAt 降順）。 */
+  bodyLogs: BodyLog[];
   onResume: () => void;
   onBeginPlanned: (workoutId: string) => void;
   onEditWorkout: (workoutId: string) => void;
   onSelectExercise: (exerciseId: string) => void;
+  onSaveBodyLog: (
+    measuredAt: string,
+    bodyWeightKg: number,
+    bodyFatPercentage: number | null,
+  ) => void;
 }) {
   const today = formatDate(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
@@ -243,6 +253,15 @@ export function HomeScreen({
               </Text>
             </View>
           )}
+
+          {/* 日を切り替えたら入力もその日の値に差し替わるよう、key に日付を渡す。 */}
+          <BodyLogInput
+            key={selectedDate}
+            date={selectedDate}
+            log={bodyLogs.find((log) => log.measuredAt === selectedDate) ?? null}
+            latestLog={bodyLogs[0] ?? null}
+            onSave={onSaveBodyLog}
+          />
 
           <PlannedWorkoutSection
             plannedWorkouts={dayPlannedWorkouts}

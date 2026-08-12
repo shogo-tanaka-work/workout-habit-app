@@ -12,21 +12,30 @@ export const formatVolume = (volumeKg: number): string => `${formatCount(volumeK
 // 重量は小数1桁まで（80 / 72.5 のように末尾ゼロは省く）。
 export const formatWeight = (weightKg: number): string => `${Number(weightKg.toFixed(1))}kg`;
 
-// Epley 式の係数。1RM = weight * (1 + reps / EPLEY_DIVISOR)。
-const EPLEY_DIVISOR = 30;
+// 推定1RM は「1RM = weight * (1 + reps / 除数)」の形で、除数だけが種目で変わる。
+// どの除数を使うかは utils/oneRepMax.ts が決める（BIG3 は FWJ の換算表に合わせる）。
+export const EPLEY_DIVISOR = 30;
 
-// Epley 式による推定1RM（1 rep max）。
-export const estimateOneRepMax = (weightKg: number, reps: number): number => {
+// 推定1RM（1 rep max）。除数の既定は Epley 式。
+export const estimateOneRepMax = (
+  weightKg: number,
+  reps: number,
+  divisor: number = EPLEY_DIVISOR,
+): number => {
   if (weightKg <= 0 || reps <= 0) {
     return 0;
   }
-  return Math.round(weightKg * (1 + reps / EPLEY_DIVISOR) * 10) / 10;
+  return Math.round(weightKg * (1 + reps / divisor) * 10) / 10;
 };
 
-// Epley 式の逆算。1RM から「指定レップ数を挙げられる目安重量」を求める（0.5kg 刻み）。
-export const weightForReps = (oneRepMax: number, reps: number): number => {
+// 逆算。1RM から「指定レップ数を挙げられる目安重量」を求める（0.5kg 刻み）。
+export const weightForReps = (
+  oneRepMax: number,
+  reps: number,
+  divisor: number = EPLEY_DIVISOR,
+): number => {
   if (oneRepMax <= 0 || reps <= 0) {
     return 0;
   }
-  return Math.round((oneRepMax / (1 + reps / EPLEY_DIVISOR)) * 2) / 2;
+  return Math.round((oneRepMax / (1 + reps / divisor)) * 2) / 2;
 };

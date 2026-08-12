@@ -73,7 +73,6 @@ export function BodyLogSection({
           unit="kg"
           points={trendPoints}
           color={colors.chartSecondary}
-          scaleFromZero={false}
         />
       ) : null}
     </View>

@@ -11,6 +11,7 @@ import type { Exercise } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { formatJapaneseDate, formatMonthDay, isoDateMonthsAgo } from '../utils/datetime';
 import { estimateOneRepMax, formatCount, formatWeight, weightForReps } from '../utils/number';
+import { rmDivisorFor, rmFormulaNote } from '../utils/oneRepMax';
 
 const RECENT_SESSION_COUNT = 5;
 // グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
@@ -49,7 +50,11 @@ export function ExerciseDetailScreen({
             </Text>
           </View>
         </View>
-        <RmCalculator initialWeightKg={exercise.defaultBarWeightKg} initialReps={8} />
+        <RmCalculator
+          initialWeightKg={exercise.defaultBarWeightKg}
+          initialReps={8}
+          exerciseId={exercise.id}
+        />
       </View>
     );
   }
@@ -58,8 +63,10 @@ export function ExerciseDetailScreen({
   const recentPastSessions = pastSessions.slice(0, RECENT_SESSION_COUNT);
 
   // RM計算機の初期値に使う、直近セッションのベストセット（推定1RM最大）。
+  const rmDivisor = rmDivisorFor(exercise.id);
   const bestRecentSet = latestSession.sets.reduce((best, set) =>
-    estimateOneRepMax(set.weightKg, set.reps) > estimateOneRepMax(best.weightKg, best.reps)
+    estimateOneRepMax(set.weightKg, set.reps, rmDivisor) >
+    estimateOneRepMax(best.weightKg, best.reps, rmDivisor)
       ? set
       : best,
   );
@@ -166,24 +173,32 @@ export function ExerciseDetailScreen({
         color={colors.chartSecondary}
       />
 
-      <RmCalculator initialWeightKg={bestRecentSet.weightKg} initialReps={bestRecentSet.reps} />
+      <RmCalculator
+        initialWeightKg={bestRecentSet.weightKg}
+        initialReps={bestRecentSet.reps}
+        exerciseId={exercise.id}
+      />
     </View>
   );
 }
 
 const RM_TABLE_REPS = [1, 2, 3, 5, 8, 10] as const;
 
-// Epley 式ベースの RM 計算機。重量と回数から推定1RMと、レップ数別の目安重量を出す。
+// RM 計算機。重量と回数から推定1RMと、レップ数別の目安重量を出す。
+// 換算式は種目で変わる（BIG3 は FWJ の換算表、それ以外は Epley 式）。
 function RmCalculator({
   initialWeightKg,
   initialReps,
+  exerciseId,
 }: {
   initialWeightKg: number;
   initialReps: number;
+  exerciseId: string;
 }) {
   const [weightKg, setWeightKg] = useState(initialWeightKg);
   const [reps, setReps] = useState(initialReps);
-  const oneRepMax = estimateOneRepMax(weightKg, reps);
+  const divisor = rmDivisorFor(exerciseId);
+  const oneRepMax = estimateOneRepMax(weightKg, reps, divisor);
 
   return (
     <View style={styles.section}>
@@ -218,12 +233,14 @@ function RmCalculator({
             </View>
             {RM_TABLE_REPS.map((tableReps) => (
               <View key={`weight-${tableReps}`} style={styles.rmTableCell}>
-                <Text style={styles.setTableCellText}>{weightForReps(oneRepMax, tableReps)}</Text>
+                <Text style={styles.setTableCellText}>
+                  {weightForReps(oneRepMax, tableReps, divisor)}
+                </Text>
               </View>
             ))}
           </View>
         </View>
-        <Text style={styles.faint}>Epley式（1RM = 重量 × (1 + 回数 ÷ 30)）による推定値です。</Text>
+        <Text style={styles.faint}>{rmFormulaNote(exerciseId)}</Text>
       </View>
     </View>
   );

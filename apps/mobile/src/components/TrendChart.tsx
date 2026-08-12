@@ -29,26 +29,58 @@ const niceCeil = (value: number): number => {
   return niceNormalized * magnitude;
 };
 
-const formatAxisValue = (value: number): string => formatCount(value);
+// 目盛りの刻みを切りのよい数字へ丸める。
+const niceStep = (rough: number): number => {
+  if (rough <= 0) {
+    return 1;
+  }
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  const normalized = rough / magnitude;
+  return (NICE_STEPS.find((step) => step >= normalized) ?? 10) * magnitude;
+};
 
-// 値域に対する上下の余白比率（非ゼロ基準スケール時）。
+// 刻みが整数でないときは小数まで出す。丸めるとラベルと目盛り線の位置が食い違う
+// （刻み1.5で 16.5 を「17」と書くと、線が指す値と読めた値がずれる）。
+const formatAxisValue = (value: number, step: number): string =>
+  Number.isInteger(step) ? formatCount(value) : Number(value.toFixed(1)).toString();
+
+// 値域に対する上下の余白比率。
 const RANGE_PADDING_RATIO = 0.15;
+
+const GRID_INTERVALS = GRID_FRACTIONS.length - 1;
+
+// 実際の値域に合わせて目盛りの下限・上限を決める。
+//
+// **0 を基準にしない。** 90〜100kg の推移を 0〜100kg のスケールで描くと、
+// 伸びているかどうかが読めない一直線になる。下限を持ち上げて変化を拡大する。
+const buildScale = (rawMin: number, rawMax: number): { minValue: number; step: number } => {
+  const span = rawMax - rawMin;
+  // 全点が同じ値でも線を中央付近に置けるよう、最低限の幅を作る。
+  const margin = span > 0 ? span * RANGE_PADDING_RATIO : Math.max(Math.abs(rawMax) * 0.1, 1);
+  let step = niceStep((span + margin * 2) / GRID_INTERVALS);
+  // 刻みを切りのよい値へ丸めた結果、上端が最大値に届かないことがある。届くまで広げる。
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const minValue = Math.max(0, Math.floor((rawMin - margin) / step) * step);
+    if (minValue + step * GRID_INTERVALS >= rawMax) {
+      return { minValue, step };
+    }
+    step = niceStep(step * 1.5);
+  }
+  return { minValue: 0, step: niceCeil(rawMax) / GRID_INTERVALS };
+};
 
 // 外部チャートライブラリを使わず、View の絶対配置で折れ線を描く簡易推移グラフ。
 // points は古い→新しい順で渡す。
-// scaleFromZero を false にすると最小値付近を基準にスケールする（体重など変化幅が小さい系列向け）。
 export function TrendChart({
   title,
   unit,
   points,
   color,
-  scaleFromZero = true,
 }: {
   title: string;
   unit: string;
   points: TrendPoint[];
   color: string;
-  scaleFromZero?: boolean;
 }) {
   const [canvasWidth, setCanvasWidth] = useState(0);
 
@@ -61,16 +93,8 @@ export function TrendChart({
 
   const rawMax = points.reduce((max, point) => Math.max(max, point.value), 0);
   const rawMin = points.reduce((min, point) => Math.min(min, point.value), rawMax);
-  let maxValue: number;
-  let minValue: number;
-  if (scaleFromZero) {
-    maxValue = niceCeil(rawMax);
-    minValue = 0;
-  } else {
-    const padding = Math.max((rawMax - rawMin) * RANGE_PADDING_RATIO, 0.5);
-    maxValue = rawMax + padding;
-    minValue = Math.max(0, rawMin - padding);
-  }
+  const { minValue, step } = buildScale(rawMin, rawMax);
+  const maxValue = minValue + step * GRID_INTERVALS;
   const valueRange = maxValue - minValue || 1;
 
   const positions = points.map((point, index) => {
@@ -118,7 +142,7 @@ export function TrendChart({
                   <Text
                     style={[styles.chartGridLabel, { top: PLOT_TOP + fraction * plotHeight - 7 }]}
                   >
-                    {formatAxisValue(maxValue - fraction * valueRange)}
+                    {formatAxisValue(maxValue - fraction * valueRange, step)}
                   </Text>
                 </View>
               ))}

@@ -2,7 +2,12 @@ import { Hono } from 'hono';
 
 import { scopeForExercise, scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
-import { loadWorkoutAggregates, roundToOneDecimal, summarizeByPeriod } from '../analytics/aggregate';
+import {
+  loadBodyPartTotals,
+  loadWorkoutAggregates,
+  roundToOneDecimal,
+  summarizeByPeriod,
+} from '../analytics/aggregate';
 import { monthlyPeriod, weeklyPeriod } from '../analytics/period';
 import { countedSetsCondition, COMPLETED_WORKOUT_STATUS, rmDivisorSql } from '../analytics/sql';
 import { DAYS_PER_WEEK, monthOf, shiftIsoDate, weekStartIso } from '../utils/isoDate';
@@ -42,69 +47,12 @@ analytics.get('/monthly', async (context) => {
   return context.json({ today, since, months: series });
 });
 
-// 部位別ボリューム: 直近 N 週の週ごと×部位ごとの集計。
+// 部位別ボリューム: 直近 N 週の期間合計を部位ごとに返す（ボリューム降順）。
+// 週ごとの内訳は返さない（クライアントに期間合算を再実装させない）。
 analytics.get('/body-parts', async (context) => {
   const { today, since } = weeklyPeriod(context.req.query(), 8);
-  type BodyPartRow = {
-    date: string;
-    body_part_id: string;
-    body_part_name: string;
-    sets: number;
-    volume: number | null;
-    reps: number | null;
-  };
-  const scope = scopeForUser(context.get('user'), 'w.user_id');
-  const result = await context.env.DB.prepare(
-    `SELECT w.performed_at AS date,
-            COALESCE(bp.id, 'unknown') AS body_part_id,
-            COALESCE(bp.name, '未分類') AS body_part_name,
-            COUNT(s.id) AS sets,
-            SUM(s.weight_kg * s.reps) AS volume,
-            SUM(s.reps) AS reps
-     FROM workout_sets s
-     JOIN workout_exercises we ON s.workout_exercise_id = we.id
-     JOIN workouts w ON we.workout_id = w.id
-     JOIN exercises e ON we.exercise_id = e.id
-     LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
-     WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND ${countedSetsCondition('s')} AND w.performed_at >= ?
-       AND ${scope.condition}
-     GROUP BY w.performed_at, bp.id
-     ORDER BY w.performed_at`,
-  )
-    .bind(since, ...scope.params)
-    .all<BodyPartRow>();
-
-  type BodyPartSummary = {
-    bodyPartId: string;
-    name: string;
-    setCount: number;
-    totalVolume: number;
-    totalReps: number;
-  };
-  const byWeek = new Map<string, Map<string, BodyPartSummary>>();
-  for (const row of result.results) {
-    const weekStart = weekStartIso(row.date);
-    const weekEntry = byWeek.get(weekStart) ?? new Map<string, BodyPartSummary>();
-    const summary = weekEntry.get(row.body_part_id) ?? {
-      bodyPartId: row.body_part_id,
-      name: row.body_part_name,
-      setCount: 0,
-      totalVolume: 0,
-      totalReps: 0,
-    };
-    summary.setCount += row.sets;
-    summary.totalVolume += row.volume ?? 0;
-    summary.totalReps += row.reps ?? 0;
-    weekEntry.set(row.body_part_id, summary);
-    byWeek.set(weekStart, weekEntry);
-  }
-  const series = [...byWeek.entries()]
-    .map(([weekStart, parts]) => ({
-      weekStart,
-      bodyParts: [...parts.values()].sort((a, b) => b.totalVolume - a.totalVolume),
-    }))
-    .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
-  return context.json({ today, since, weeks: series });
+  const bodyParts = await loadBodyPartTotals(context.env.DB, since, context.get('user'));
+  return context.json({ today, since, bodyParts });
 });
 
 // 日別サマリ: 直近 N 週の日ごとの記録回数・セット数・ボリューム（ヒートマップ用）と全期間の累計回数。

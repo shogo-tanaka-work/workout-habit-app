@@ -9,36 +9,14 @@ import type { BodyPartsResponse } from '../types/api';
 import { formatDateKey } from '../utils/datetime';
 import { formatVolume, safeDivide } from '../utils/number';
 
-// 部位別ボリューム。/analytics/body-parts の週単位集計を期間で合算して横バー表示する。
+// 部位別ボリューム。/analytics/body-parts が返す期間合計（ボリューム降順）を横バー表示する。
+// 期間の合算は API 側の責務（集計をクライアントで再実装しない）。
 
 const RANGE_OPTIONS: readonly ToggleOption<number>[] = [
   { value: 4, label: '4週' },
   { value: 12, label: '12週' },
   { value: 52, label: '52週' }, // API の weeks 上限（53）の範囲内
 ];
-
-type BodyPartTotal = {
-  bodyPartId: string;
-  name: string;
-  setCount: number;
-  totalVolume: number;
-};
-
-const sumByBodyPart = (response: BodyPartsResponse): BodyPartTotal[] => {
-  const totalByBodyPartId = new Map<string, BodyPartTotal>();
-  for (const week of response.weeks) {
-    for (const part of week.bodyParts) {
-      const current = totalByBodyPartId.get(part.bodyPartId);
-      totalByBodyPartId.set(part.bodyPartId, {
-        bodyPartId: part.bodyPartId,
-        name: part.name,
-        setCount: (current?.setCount ?? 0) + part.setCount,
-        totalVolume: (current?.totalVolume ?? 0) + part.totalVolume,
-      });
-    }
-  }
-  return [...totalByBodyPartId.values()].sort((a, b) => b.totalVolume - a.totalVolume);
-};
 
 export const BodyPartSection = () => {
   const [rangeWeeks, setRangeWeeks] = useState(RANGE_OPTIONS[0].value);
@@ -57,7 +35,7 @@ export const BodyPartSection = () => {
     >
       <Loadable state={state}>
         {(response) => {
-          const totals = sumByBodyPart(response);
+          const totals = response.bodyParts;
           if (totals.length === 0) {
             return (
               <p className="chart-empty">
@@ -65,7 +43,7 @@ export const BodyPartSection = () => {
               </p>
             );
           }
-          // 降順に並べてあるので先頭が最大。バーの幅はこれを 100% とする。
+          // API がボリューム降順で返すので先頭が最大。バーの幅はこれを 100% とする。
           const maxVolume = totals[0].totalVolume;
           return (
             <ul className="hbar-list">

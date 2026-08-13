@@ -20,7 +20,7 @@ export type MonthlyResponse = {
   months: ({ month: string } & PeriodSummary)[];
 };
 
-export type BodyPartWeekSummary = {
+export type BodyPartTotal = {
   bodyPartId: string;
   name: string;
   setCount: number;
@@ -28,10 +28,11 @@ export type BodyPartWeekSummary = {
   totalReps: number;
 };
 
+/** 部位ごとの期間合計。`bodyParts` はボリューム降順で返る。 */
 export type BodyPartsResponse = {
   today: string;
   since: string;
-  weeks: { weekStart: string; bodyParts: BodyPartWeekSummary[] }[];
+  bodyParts: BodyPartTotal[];
 };
 
 export type ExerciseListItem = {

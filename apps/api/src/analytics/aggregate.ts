@@ -54,6 +54,56 @@ export const loadWorkoutAggregates = async (
   return result.results;
 };
 
+// 部位ごとの期間合計。並びはボリューム降順（同値は部位名順）。
+export type BodyPartTotal = {
+  bodyPartId: string;
+  name: string;
+  setCount: number;
+  totalVolume: number;
+  totalReps: number;
+};
+
+export const loadBodyPartTotals = async (
+  database: D1Database,
+  since: string,
+  user: AuthenticatedUser,
+): Promise<BodyPartTotal[]> => {
+  type BodyPartTotalRow = {
+    body_part_id: string;
+    body_part_name: string;
+    sets: number;
+    volume: number | null;
+    reps: number | null;
+  };
+  const scope = scopeForUser(user, 'w.user_id');
+  const result = await database
+    .prepare(
+      `SELECT COALESCE(bp.id, 'unknown') AS body_part_id,
+              COALESCE(bp.name, '未分類') AS body_part_name,
+              COUNT(s.id) AS sets,
+              SUM(s.weight_kg * s.reps) AS volume,
+              SUM(s.reps) AS reps
+       FROM workout_sets s
+       JOIN workout_exercises we ON s.workout_exercise_id = we.id
+       JOIN workouts w ON we.workout_id = w.id
+       JOIN exercises e ON we.exercise_id = e.id
+       LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
+       WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND ${countedSetsCondition('s')}
+         AND w.performed_at >= ? AND ${scope.condition}
+       GROUP BY bp.id
+       ORDER BY volume DESC, body_part_name`,
+    )
+    .bind(since, ...scope.params)
+    .all<BodyPartTotalRow>();
+  return result.results.map((row) => ({
+    bodyPartId: row.body_part_id,
+    name: row.body_part_name,
+    setCount: row.sets,
+    totalVolume: row.volume ?? 0,
+    totalReps: row.reps ?? 0,
+  }));
+};
+
 // ワークアウト集計行を期間キー（週開始日や月）ごとにまとめる。
 export const summarizeByPeriod = (
   rows: WorkoutAggregateRow[],

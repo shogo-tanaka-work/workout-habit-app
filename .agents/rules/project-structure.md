@@ -77,7 +77,8 @@ paths: "**/*.ts,**/*.tsx"
 |---|---|
 | Hono アプリ本体・ミドルウェアの積み方・route のマウント | `index.ts` |
 | ドメイン単位の route | `routes/`（`sync` / `plans` / `me` / `apiTokens`） |
-| 集計エンドポイント | `analytics.ts` |
+| 集計エンドポイント | `routes/analytics.ts`（route）＋ `analytics/`（SQL・期間・集計） |
+| ISO 日付の計算 | `utils/isoDate.ts` |
 | バックアップ / 復元 | `backup.ts` |
 | 認証の実装（JWT 検証・Google・API トークン・ユーザー解決） | `auth/` |
 | 横断関心（認証の振り分け・ロール判定） | `middleware/` |
@@ -85,8 +86,8 @@ paths: "**/*.ts,**/*.tsx"
 | 同期の形式検証と冪等な適用 | `sync/`（`validate` / `apply`） |
 | 同期対象エンティティの定義（列の型・親参照） | `tables.ts` |
 
-route を追加するときは `routes/` へ置く。`analytics.ts` と `backup.ts` が
-トップレベルにあるのは分割前からの経緯で、新しく倣う形ではない。
+route は `routes/` へ置く。`backup.ts` がトップレベルにあるのは分割前からの経緯で、
+新しく倣う形ではない。
 
 **SQL を route へ散らさない。** 行スコープの条件は `db/scope.ts` の
 `scopeForUser` / `scopeForExercise` を通す（[auth.md](auth.md)）。

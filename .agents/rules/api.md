@@ -8,8 +8,10 @@ paths: "apps/api/src/**/*.ts"
 - 400、401、404、409、422、500 を用途に応じて使い分ける
 - URL パラメータと JSON body を未検証のまま処理へ渡さない
 - 検証は route 層で行い、その先は検証済みの型付き入力だけを受け取る
-- Hono のサブ Router をドメイン単位で構成する。新しい route は `src/routes/` へ置く
-  （`analytics.ts` と `backup.ts` がトップレベルにあるのは分割前からの経緯で、倣う形ではない）
+- Hono のサブ Router をドメイン単位で構成し、`src/routes/` へ置く
+  （`backup.ts` がトップレベルにあるのは分割前からの経緯で、倣う形ではない）
+- **route に SQL と集計を書かない。** 入力の解釈・取得・集計を分け、
+  route には「解釈 → 呼び出し → JSON 化」だけを残す（`analytics/` が実例）
 - ロール制限は router の先頭で積む（`apiTokens.use('*', requireRole('admin'))`）。
   ハンドラごとに判定を書かない
 - **CORS は持たない。** 管理画面は `workout-habit-admin` からの Service Binding 中継で

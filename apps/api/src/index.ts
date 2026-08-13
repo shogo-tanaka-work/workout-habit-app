@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import { analytics } from './analytics';
+import { analytics } from './routes/analytics';
 import { backup } from './backup';
 import type { AppEnv } from './env';
 import { authenticate } from './middleware/authenticate';
@@ -26,7 +26,7 @@ import { sync } from './routes/sync';
 // - POST /sync/operations … 操作（intent）ベースの同期。冪等・部分成功（src/routes/sync.ts）
 // - GET  /me         … 自分の id / 表示名 / ロール（src/routes/me.ts）
 // - GET  /plans       … 期間内の予定（status='planned'）を返す（src/routes/plans.ts）
-// - GET  /analytics/* … 読み取り専用の分析API（src/analytics.ts）
+// - GET  /analytics/* … 読み取り専用の分析API（src/routes/analytics.ts）
 // - /admin/api-tokens … CLI トークンの発行・一覧・失効（admin のみ）
 
 const app = new Hono<AppEnv>();

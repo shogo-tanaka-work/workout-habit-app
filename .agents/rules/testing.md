@@ -55,8 +55,8 @@ CORS の確認は要らない（API に CORS 実装を持たない）。
 
 - `apps/mobile/src/db/schema.ts` と `migrations.ts` ⇔ `apps/api/migrations/`
 - `apps/mobile/src/db/syncTables.ts` の `SYNC_COLUMNS` ⇔ `apps/api/src/tables.ts` の `SYNC_TABLES`
-- `apps/api/src/analytics.ts` のレスポンス ⇔ `apps/web/src/types/api.ts`
-- `apps/mobile/src/utils/oneRepMax.ts` の除数 ⇔ `apps/api/src/analytics.ts` の `rmDivisorSql`
+- `apps/api/src/routes/analytics.ts` のレスポンス ⇔ `apps/web/src/types/api.ts`
+- `apps/mobile/src/utils/oneRepMax.ts` の除数 ⇔ `apps/api/src/analytics/sql.ts` の `rmDivisorSql`
 - `apps/mobile/src/db/seed.ts` の `seedExercises` ⇔ D1 の `exercises`（`owner_user_id IS NULL`）
 
 ## コミット前

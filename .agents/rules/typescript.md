@@ -207,7 +207,7 @@ const summarizeWorkout = (workout: Workout) => ...;
 
 **同じ規則が apps 間に重複していることを忘れない。** 週の起点は
 `apps/mobile/src/utils/datetime.ts` の `startOfWeekIso` と
-`apps/api/src/analytics.ts` の `weekStartIso` に別実装がある。片方だけ変えると、
+`apps/api/src/utils/isoDate.ts` の `weekStartIso` に別実装がある。片方だけ変えると、
 アプリが出す「今週」とサーバが出す「今週」がずれる。
 
 ## 関数設計

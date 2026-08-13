@@ -150,7 +150,7 @@ React Navigation / Expo Router は未導入。`App.tsx` が3層の state で出�
 渡し忘れても既定値（Epley）で動いてしまい、BIG3 の数字だけが静かにずれる。
 種目が特定できない集計（日や期間をまたぐもの）では既定のままでよい。
 
-**`apps/api/src/analytics.ts` の SQL も同じ除数を使う。片方だけ変えない。**
+**`apps/api/src/analytics/sql.ts` の `rmDivisorSql` も同じ除数を使う。片方だけ変えない。**
 
 ## 休憩タイマーは2層
 

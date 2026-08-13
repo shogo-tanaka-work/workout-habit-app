@@ -420,7 +420,7 @@ await addSet(workoutExercise);
 | 内容 | mobile | api |
 |---|---|---|
 | 同期対象のテーブルと列 | `src/db/syncTables.ts` の `SYNC_COLUMNS` | `src/tables.ts` の `SYNC_TABLES` |
-| 推定1RM の除数（BIG3 は FWJ の換算表） | `src/utils/oneRepMax.ts` | `src/analytics.ts` の `rmDivisorSql` |
+| 推定1RM の除数（BIG3 は FWJ の換算表） | `src/utils/oneRepMax.ts` | `src/analytics/sql.ts` の `rmDivisorSql` |
 | 共有プリセット種目 | `src/db/seed.ts` の `seedExercises` | D1 の `exercises`（`owner_user_id IS NULL`） |
 
 ただし片方だけ変えないこと。同期対象・カラム・レスポンス形状・換算式・種目を変えたら、

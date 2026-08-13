@@ -13,18 +13,16 @@ import { Hono } from 'hono';
 
 import { scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
+import { daysBetweenIso, ISO_DATE_PATTERN } from '../utils/isoDate';
 import type { SyncTable } from '../tables';
 import { columnNamesOf, findSyncTable } from '../tables';
 
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /** 1リクエストで取得できる期間の上限。無指定の巨大レンジで D1 を舐めさせない。 */
 const MAX_RANGE_DAYS = 366;
 
 /** IN 句へ並べる ID の数。D1 の1クエリあたりバインド変数上限（100）に収める。 */
 const IDS_PER_QUERY = 90;
-
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** 予定として配る対象。実績のテーブルを混ぜない。 */
 type PlanTableName = 'workouts' | 'workout_exercises' | 'workout_sets';
@@ -38,9 +36,6 @@ const planTableOf = (name: PlanTableName): SyncTable => {
   return table;
 };
 
-const daysBetween = (from: string, to: string): number =>
-  (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / MILLISECONDS_PER_DAY;
-
 export const plans = new Hono<AppEnv>();
 
 plans.get('/', async (context) => {
@@ -52,7 +47,7 @@ plans.get('/', async (context) => {
   if (!from || !ISO_DATE_PATTERN.test(from) || !to || !ISO_DATE_PATTERN.test(to)) {
     return context.json({ error: 'from and to are required (YYYY-MM-DD)' }, 400);
   }
-  const span = daysBetween(from, to);
+  const span = daysBetweenIso(from, to);
   if (span < 0) {
     return context.json({ error: 'from must not be after to' }, 400);
   }

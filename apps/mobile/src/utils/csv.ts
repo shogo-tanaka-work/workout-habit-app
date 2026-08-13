@@ -1,4 +1,5 @@
 import type { BodyLog, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
+import { exercisesInWorkout } from './workoutTree';
 
 // ワークアウト記録のCSVエクスポート（Phase 2）。
 // 共有シート（Share API）でテキストとして書き出す前提のシリアライズ純粋関数。
@@ -21,9 +22,7 @@ export const buildWorkoutCsv = (
     a.performedAt.localeCompare(b.performedAt),
   );
   for (const workout of workoutsAscending) {
-    const items = workoutExercises
-      .filter((item) => item.workoutId === workout.id)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+    const items = exercisesInWorkout(workout.id, workoutExercises);
     for (const item of items) {
       const exerciseName = exerciseById.get(item.exerciseId)?.name ?? item.exerciseId;
       const sets = visibleSets

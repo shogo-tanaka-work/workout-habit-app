@@ -26,6 +26,7 @@ import {
   startOfWeekIsoDate,
 } from '../utils/datetime';
 import { formatCount, formatVolume, formatWeight } from '../utils/number';
+import { setsOfWorkoutExercises } from '../utils/workoutTree';
 
 // グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
 const TREND_POINT_LIMIT = 30;
@@ -90,8 +91,7 @@ export function HistoryScreen({
   const bodyPartSummaries = useMemo(() => {
     const workoutIds = new Set(periodWorkouts.map((workout) => workout.id));
     const items = workoutExercises.filter((item) => workoutIds.has(item.workoutId));
-    const itemIds = new Set(items.map((item) => item.id));
-    const sets = visibleSets.filter((set) => itemIds.has(set.workoutExerciseId));
+    const sets = setsOfWorkoutExercises(items, visibleSets);
     return summarizeByBodyPart(items, sets, exerciseById, bodyPartById);
   }, [periodWorkouts, workoutExercises, visibleSets, exerciseById, bodyPartById]);
 

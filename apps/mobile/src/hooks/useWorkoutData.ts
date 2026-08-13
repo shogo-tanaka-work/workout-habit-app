@@ -60,6 +60,7 @@ import type {
 } from '../types/domain';
 import { formatDate, isoDatePlusDays, nowIso, nowMs } from '../utils/datetime';
 import { newId } from '../utils/id';
+import { exerciseNameOf, exercisesInWorkout } from '../utils/workoutTree';
 
 // 未送信が残っているときの再送間隔。短すぎると圏外で無駄な試行を繰り返す。
 const SYNC_RETRY_INTERVAL_MS = 60_000;
@@ -140,9 +141,7 @@ export function useWorkoutData() {
     if (!activeWorkout) {
       return [];
     }
-    return workoutExercises
-      .filter((item) => item.workoutId === activeWorkout.id)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+    return exercisesInWorkout(activeWorkout.id, workoutExercises);
   }, [activeWorkout, workoutExercises]);
 
   const completedWorkouts = useMemo(
@@ -364,7 +363,7 @@ export function useWorkoutData() {
     });
     return {
       workoutSetId: set.id,
-      exerciseName: exercise?.name ?? '種目',
+      exerciseName: exerciseNameOf(workoutExercise.exerciseId, exerciseById),
       duration,
       remaining: duration,
       running: true,

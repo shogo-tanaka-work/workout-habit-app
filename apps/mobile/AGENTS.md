@@ -67,7 +67,8 @@ apps/mobile/
                   outbox.ts（操作キュー）/ syncTables.ts（同期対象の定義）/ sync.ts（取り込み）
     sync/         pusher.ts（送信役）
     hooks/        useWorkoutData / useRestTimer
-    utils/        datetime / format / number / aggregate / plates / calendar / csv / id
+    utils/        datetime / format / number / workoutTree / aggregate / oneRepMax
+                  plates / calendar / calendarMarks / csv / id
     components/   記録: ExercisePicker / ExerciseLogPanel / SetLogTable / SetActionSheet / RecentSessions
                   編集: WorkoutExerciseList / SetEditor
                   共通: TimerBanner / TrendChart / StatSummary / MonthCalendar / PlateCalculator ほか

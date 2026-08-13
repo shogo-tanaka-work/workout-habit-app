@@ -12,6 +12,7 @@ import { formatSetsInline, summarizeSets } from '../utils/aggregate';
 import { buildDayMarks } from '../utils/calendarMarks';
 import { formatDate, formatJapaneseDate } from '../utils/datetime';
 import { formatCount } from '../utils/number';
+import { exerciseNameOf } from '../utils/workoutTree';
 
 // 下半分（選んだ日の内容）の最小高さ。これ以下だと1種目も読めない。
 const MIN_DETAIL_HEIGHT = 140;
@@ -231,7 +232,9 @@ export function HomeScreen({
                           { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
                         ]}
                       />
-                      <Text style={styles.exerciseRowName}>{exercise?.name ?? '種目'}</Text>
+                      <Text style={styles.exerciseRowName}>
+                        {exerciseNameOf(item.exerciseId, exerciseById)}
+                      </Text>
                       <Text style={styles.faint}>{itemSets.length} セット</Text>
                       <Text style={styles.chevron}>›</Text>
                     </View>

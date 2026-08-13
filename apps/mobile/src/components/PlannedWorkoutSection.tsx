@@ -4,6 +4,7 @@ import { styles } from '../styles/appStyles';
 import { bodyPartColor } from '../styles/theme';
 import type { Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { formatSetsInline } from '../utils/aggregate';
+import { exerciseNameOf, exercisesInWorkout } from '../utils/workoutTree';
 
 // Claude Code が立てた、その日の予定メニュー。予定が無いときは何も出さない
 // （空状態を置くと、使っていない人にまで機能を見せることになる）。
@@ -35,9 +36,7 @@ export function PlannedWorkoutSection({
   return (
     <>
       {plannedWorkouts.map((workout) => {
-        const items = workoutExercises
-          .filter((item) => item.workoutId === workout.id)
-          .sort((a, b) => a.orderIndex - b.orderIndex);
+        const items = exercisesInWorkout(workout.id, workoutExercises);
         return (
           <View key={workout.id} style={styles.exerciseRow}>
             <View style={styles.exerciseRowHeader}>
@@ -59,7 +58,9 @@ export function PlannedWorkoutSection({
                           { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
                         ]}
                       />
-                      <Text style={styles.panelText}>{exercise?.name ?? '種目'}</Text>
+                      <Text style={styles.panelText}>
+                        {exerciseNameOf(item.exerciseId, exerciseById)}
+                      </Text>
                     </View>
                     <Text style={styles.muted}>{formatSetsInline(itemSets)}</Text>
                   </View>

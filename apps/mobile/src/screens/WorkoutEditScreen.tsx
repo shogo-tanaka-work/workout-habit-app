@@ -6,6 +6,7 @@ import { styles } from '../styles/appStyles';
 import type { Exercise, SetPatch, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { summarizeSets } from '../utils/aggregate';
 import { formatCount } from '../utils/number';
+import { setsOfWorkoutExercises } from '../utils/workoutTree';
 
 // 過去の記録を直す画面。ホームのカレンダーで日を選び、「編集」から入る。
 //
@@ -28,8 +29,7 @@ export function WorkoutEditScreen({
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onDeleteWorkout: (workoutId: string) => void;
 }) {
-  const itemIds = new Set(workoutExercises.map((item) => item.id));
-  const workoutSets = visibleSets.filter((set) => itemIds.has(set.workoutExerciseId));
+  const workoutSets = setsOfWorkoutExercises(workoutExercises, visibleSets);
   const summary = summarizeSets(workoutSets);
 
   // 1日ぶんの記録がまとめて消える。ここは確認を挟む。

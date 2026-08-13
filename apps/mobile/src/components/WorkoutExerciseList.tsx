@@ -6,6 +6,7 @@ import { summarizeSets } from '../utils/aggregate';
 import { formatVolume, formatWeight } from '../utils/number';
 import { rmDivisorFor } from '../utils/oneRepMax';
 import { SetEditor } from './SetEditor';
+import { exerciseNameOf } from '../utils/workoutTree';
 
 // 過去の記録を直すときの種目リスト（WorkoutEditScreen 専用）。
 //
@@ -27,7 +28,7 @@ export function WorkoutExerciseList({
   return (
     <>
       {workoutExercises.map((workoutExercise) => {
-        const exercise = exerciseById.get(workoutExercise.exerciseId);
+        const exerciseName = exerciseNameOf(workoutExercise.exerciseId, exerciseById);
         const sets = visibleSets
           .filter((set) => set.workoutExerciseId === workoutExercise.id)
           .sort((a, b) => a.orderIndex - b.orderIndex);
@@ -37,7 +38,7 @@ export function WorkoutExerciseList({
           <View key={workoutExercise.id} style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.flex}>
-                <Text style={styles.exerciseTitle}>{exercise?.name ?? '種目'}</Text>
+                <Text style={styles.exerciseTitle}>{exerciseName}</Text>
                 <Text style={styles.faint}>
                   {summary.setCount} セット
                   {summary.warmupCount > 0 ? `（＋WU ${summary.warmupCount}）` : ''} ・{' '}

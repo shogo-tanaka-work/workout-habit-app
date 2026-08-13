@@ -15,6 +15,7 @@ import type {
   WorkoutSet,
 } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
+import { exerciseNameOf } from '../utils/workoutTree';
 
 // 記録タブは2段構え。「種目を選ぶ」→「その種目だけ記録する」。
 //
@@ -104,7 +105,7 @@ export function WorkoutScreen({
               const exerciseNames = templateExercises
                 .filter((item) => item.templateId === template.id)
                 .sort((a, b) => a.orderIndex - b.orderIndex)
-                .map((item) => exerciseById.get(item.exerciseId)?.name ?? '種目');
+                .map((item) => exerciseNameOf(item.exerciseId, exerciseById));
               return (
                 <View key={template.id} style={styles.exerciseRow}>
                   <Pressable

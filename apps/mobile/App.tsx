@@ -37,6 +37,7 @@ import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions } from './src/utils/aggregate';
 import { buildBodyLogCsv, buildWorkoutCsv } from './src/utils/csv';
 import { formatJapaneseDate } from './src/utils/datetime';
+import { exercisesInWorkout } from './src/utils/workoutTree';
 
 // 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
 const RECENT_SESSION_COUNT = 5;
@@ -174,9 +175,7 @@ export default function App() {
   const editingWorkoutExercises = useMemo(
     () =>
       editingWorkoutId
-        ? data.workoutExercises
-            .filter((item) => item.workoutId === editingWorkoutId)
-            .sort((a, b) => a.orderIndex - b.orderIndex)
+        ? exercisesInWorkout(editingWorkoutId, data.workoutExercises)
         : [],
     [editingWorkoutId, data.workoutExercises],
   );

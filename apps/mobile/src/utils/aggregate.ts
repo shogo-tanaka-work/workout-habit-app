@@ -1,6 +1,7 @@
 import type { BodyPart, Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { estimateOneRepMax } from './number';
 import { rmDivisorFor } from './oneRepMax';
+import { exerciseNameOf } from './workoutTree';
 
 // セット集計とサマリ（日別履歴・種目詳細・前回実績で共用する純粋関数群）。
 //
@@ -52,8 +53,6 @@ export type ExerciseSession = {
   summary: SetSummary;
 };
 
-const sortByOrderIndex = (a: WorkoutSet, b: WorkoutSet): number => a.orderIndex - b.orderIndex;
-
 // 指定種目の実施履歴を新しい順に組み立てる。
 // workouts は performedAt 降順（completedWorkouts）を渡す前提。
 export const buildExerciseSessions = (
@@ -72,7 +71,7 @@ export const buildExerciseSessions = (
     }
     const sets = visibleSets
       .filter((set) => set.workoutExerciseId === workoutExercise.id)
-      .sort(sortByOrderIndex);
+      .sort((a, b) => a.orderIndex - b.orderIndex);
     if (sets.length === 0) {
       continue;
     }
@@ -162,7 +161,7 @@ export const summarizeByExercise = (
   return [...setsByExerciseId.entries()]
     .map(([exerciseId, exerciseSets]) => ({
       exerciseId,
-      name: exerciseById.get(exerciseId)?.name ?? '種目',
+      name: exerciseNameOf(exerciseId, exerciseById),
       bodyPartId: exerciseById.get(exerciseId)?.primaryBodyPartId,
       sessionCount: sessionsByExerciseId.get(exerciseId)?.size ?? 0,
       summary: summarizeSets(exerciseSets, rmDivisorFor(exerciseId)),

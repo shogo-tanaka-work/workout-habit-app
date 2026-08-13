@@ -29,7 +29,8 @@ paths: "**/*.ts,**/*.tsx"
 | Google サインインと ID トークンの調達 | `auth/` |
 | ローカル通知の登録・取り消し | `notifications/` |
 | `use` で始まる状態/副作用ロジック | `hooks/` |
-| 副作用のない純粋関数（整形・計算） | `utils/` |
+| 副作用のない純粋関数（整形・計算） | `utils/`。扱う対象で分ける（[code-design.md](code-design.md) §9） |
+| ワークアウト→種目行→セットの階層を辿る規則 | `utils/workoutTree.ts` |
 | 複数画面で使う表示部品 | `components/` |
 | タブ画面・オーバーレイ画面・設定のサブ画面 | `screens/` |
 | StyleSheet・テーマ定数 | `styles/` |

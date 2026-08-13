@@ -6,6 +6,7 @@ import { Section } from '../components/Section';
 import { useApiData } from '../hooks/useApiData';
 import type { BodyLogsResponse } from '../types/api';
 import { formatShortDate } from '../utils/datetime';
+import { formatBodyFat, formatBodyWeight } from '../utils/number';
 
 // ボディログ: /analytics/body-logs の体重・体脂肪率推移。変化幅が小さいため非ゼロ基準で描く。
 
@@ -16,7 +17,7 @@ export const BodyLogSection = () => {
   const state = useApiData<BodyLogsResponse>('/analytics/body-logs');
 
   const formatValue = (value: number): string =>
-    metricMode === 'weight' ? `${value.toFixed(1)}kg` : `${value.toFixed(1)}%`;
+    metricMode === 'weight' ? formatBodyWeight(value) : formatBodyFat(value);
 
   return (
     <Section

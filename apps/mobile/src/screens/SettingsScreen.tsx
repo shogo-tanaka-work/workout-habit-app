@@ -10,8 +10,20 @@ export type SettingsRoute = 'exercises' | 'timer' | 'plates' | 'sync' | 'csv';
 
 type MenuItem = {
   route: SettingsRoute;
-  label: string;
+  /** 行の下に出す補足。表示名は SETTINGS_TITLES から引く。 */
   description: string;
+};
+
+/**
+ * サブ画面の表示名。**メニュー行とヘッダーで同じ名前を使う。**
+ * 別々に持っていたため、片方だけ変えると行とヘッダーで名前が食い違う状態だった。
+ */
+export const SETTINGS_TITLES: Record<SettingsRoute, string> = {
+  exercises: 'トレーニング種目',
+  plates: 'プレート計算機',
+  timer: 'タイマー',
+  sync: 'クラウド同期',
+  csv: 'CSV出力',
 };
 
 const SECTIONS: { title: string; items: MenuItem[] }[] = [
@@ -20,7 +32,6 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
     items: [
       {
         route: 'exercises',
-        label: 'トレーニング種目',
         description: '種目の追加・休憩・バー重量・アーカイブ',
       },
     ],
@@ -28,19 +39,19 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
   {
     title: 'ツール',
     items: [
-      { route: 'plates', label: 'プレート計算機', description: 'バーに付けるプレートの内訳' },
+      { route: 'plates', description: 'バーに付けるプレートの内訳' },
     ],
   },
   {
     title: '設定',
     items: [
-      { route: 'timer', label: 'タイマー', description: '休憩終了時の音と振動' },
-      { route: 'sync', label: 'クラウド同期', description: 'ログイン・バックアップ・復元' },
+      { route: 'timer', description: '休憩終了時の音と振動' },
+      { route: 'sync', description: 'ログイン・バックアップ・復元' },
     ],
   },
   {
     title: 'データ',
-    items: [{ route: 'csv', label: 'CSV出力', description: '対象と期間を選んで書き出す' }],
+    items: [{ route: 'csv', description: '対象と期間を選んで書き出す' }],
   },
 ];
 
@@ -54,13 +65,15 @@ export function SettingsScreen({ onOpen }: { onOpen: (route: SettingsRoute) => v
           </View>
           {section.items.map((item) => (
             <Pressable
-              key={item.label}
+              key={item.route}
               style={styles.exerciseRow}
               onPress={() => onOpen(item.route)}
             >
               <View style={styles.exercisePickerRow}>
                 <View style={styles.flex}>
-                  <Text style={styles.exercisePickerName}>{item.label}</Text>
+                  <Text style={styles.exercisePickerName}>
+                    {SETTINGS_TITLES[item.route]}
+                  </Text>
                   <Text style={styles.faint}>{item.description}</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>

@@ -12,6 +12,8 @@ import {
   listRecentWeekKeys,
 } from '../utils/datetime';
 import { formatVolume } from '../utils/number';
+import type { ToggleOption } from '../components/ToggleGroup';
+import { ToggleGroup } from '../components/ToggleGroup';
 
 // 週次 / 月次のトレーニング量推移。集計は /analytics/weekly・/analytics/monthly に委ね、
 // クライアントは記録ゼロの週・月の穴埋めと表示だけを行う。
@@ -22,11 +24,16 @@ type MetricMode = 'volume' | 'sets' | 'workouts';
 const WEEK_COUNT = 12;
 const MONTH_COUNT = 6;
 
-const METRIC_LABELS: Record<MetricMode, string> = {
-  volume: '総ボリューム',
-  sets: 'セット数',
-  workouts: '回数',
-};
+const PERIOD_OPTIONS: readonly ToggleOption<PeriodMode>[] = [
+  { value: 'weekly', label: '週次' },
+  { value: 'monthly', label: '月次' },
+];
+
+const METRIC_OPTIONS: readonly ToggleOption<MetricMode>[] = [
+  { value: 'volume', label: 'ボリューム' },
+  { value: 'sets', label: 'セット数' },
+  { value: 'workouts', label: '記録回数' },
+];
 
 const metricValueOf = (summary: PeriodSummary | undefined, metric: MetricMode): number => {
   if (!summary) {
@@ -85,30 +92,8 @@ export const TrendSection = () => {
       }
       actions={
         <div className="toggle-group-row">
-          <div className="toggle-group">
-            {(['weekly', 'monthly'] satisfies PeriodMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={mode === periodMode ? 'toggle toggle-active' : 'toggle'}
-                onClick={() => setPeriodMode(mode)}
-              >
-                {mode === 'weekly' ? '週次' : '月次'}
-              </button>
-            ))}
-          </div>
-          <div className="toggle-group">
-            {(['volume', 'sets', 'workouts'] satisfies MetricMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={mode === metricMode ? 'toggle toggle-active' : 'toggle'}
-                onClick={() => setMetricMode(mode)}
-              >
-                {METRIC_LABELS[mode]}
-              </button>
-            ))}
-          </div>
+          <ToggleGroup options={PERIOD_OPTIONS} selected={periodMode} onSelect={setPeriodMode} />
+          <ToggleGroup options={METRIC_OPTIONS} selected={metricMode} onSelect={setMetricMode} />
         </div>
       }
     >

@@ -4,18 +4,17 @@ import { Pressable, Text, View } from 'react-native';
 import { DatePickerModal } from './DatePickerModal';
 import { styles } from '../styles/appStyles';
 import {
+  WEEKDAY_HEADER,
   buildMonthWeeks,
   currentYearMonth,
   dayOfMonth,
   formatYearMonth,
   shiftMonth,
+  weekdayKindOf,
   yearMonthOf,
 } from '../utils/calendar';
 import type { DayMarks } from '../utils/calendarMarks';
 
-const WEEKDAY_HEADER = ['月', '火', '水', '木', '金', '土', '日'] as const;
-const SATURDAY_INDEX = 5;
-const SUNDAY_INDEX = 6;
 // セル幅に収まる数。超えた分は「+n」でまとめる。
 const MAX_VISIBLE_MARKS = 3;
 
@@ -40,11 +39,13 @@ export function MonthCalendar({
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
   const weeks = buildMonthWeeks(yearMonth);
 
+  // 色の対応。スタイル自体は appStyles で共有しているので、色を変えるならそちらを直す。
   const weekendTextStyle = (weekdayIndex: number) => {
-    if (weekdayIndex === SATURDAY_INDEX) {
+    const kind = weekdayKindOf(weekdayIndex);
+    if (kind === 'saturday') {
       return styles.calendarSaturdayText;
     }
-    if (weekdayIndex === SUNDAY_INDEX) {
+    if (kind === 'sunday') {
       return styles.calendarSundayText;
     }
     return null;

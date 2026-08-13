@@ -3,17 +3,15 @@ import { Modal, Pressable, Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
 import {
+  WEEKDAY_HEADER,
   buildMonthWeeks,
   dayOfMonth,
   formatYearMonth,
   shiftMonth,
+  weekdayKindOf,
   yearMonthOf,
 } from '../utils/calendar';
 import { formatDate } from '../utils/datetime';
-
-const WEEKDAY_HEADER = ['月', '火', '水', '木', '金', '土', '日'] as const;
-const SATURDAY_INDEX = 5;
-const SUNDAY_INDEX = 6;
 
 // 日付を選んでカレンダーを飛ばすためのシート（画面下から出す）。
 // 月送りボタンを何度も押さずに、離れた日付へ一度で移動できるようにする。
@@ -33,11 +31,13 @@ export function DatePickerModal({
   const weeks = buildMonthWeeks(yearMonth);
   const today = formatDate(new Date());
 
+  // 色の対応。スタイル自体は appStyles で共有しているので、色を変えるならそちらを直す。
   const weekendTextStyle = (weekdayIndex: number) => {
-    if (weekdayIndex === SATURDAY_INDEX) {
+    const kind = weekdayKindOf(weekdayIndex);
+    if (kind === 'saturday') {
       return styles.calendarSaturdayText;
     }
-    if (weekdayIndex === SUNDAY_INDEX) {
+    if (kind === 'sunday') {
       return styles.calendarSundayText;
     }
     return null;

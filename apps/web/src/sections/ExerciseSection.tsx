@@ -7,17 +7,19 @@ import { useApiData } from '../hooks/useApiData';
 import type { ExerciseDetailResponse, ExercisesResponse } from '../types/api';
 import { formatDateKey, formatShortDate } from '../utils/datetime';
 import { formatVolume, formatWeight } from '../utils/number';
+import type { ToggleOption } from '../components/ToggleGroup';
+import { ToggleGroup } from '../components/ToggleGroup';
 
 // 種目別グラフ: /analytics/exercises で種目を選び、
 // /analytics/exercises/:id のセッション推移を表示する。
 
 type SeriesMode = 'topWeight' | 'oneRepMax' | 'volume';
 
-const SERIES_LABELS: Record<SeriesMode, string> = {
-  topWeight: 'トップ重量',
-  oneRepMax: '推定1RM',
-  volume: 'ボリューム',
-};
+const SERIES_OPTIONS: readonly ToggleOption<SeriesMode>[] = [
+  { value: 'topWeight', label: 'トップ重量' },
+  { value: 'oneRepMax', label: '推定1RM' },
+  { value: 'volume', label: 'ボリューム' },
+];
 
 const DETAIL_MONTHS = 12;
 
@@ -55,18 +57,7 @@ export const ExerciseSection = () => {
               </option>
             ))}
           </select>
-          <div className="toggle-group">
-            {(['topWeight', 'oneRepMax', 'volume'] satisfies SeriesMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={mode === seriesMode ? 'toggle toggle-active' : 'toggle'}
-                onClick={() => setSeriesMode(mode)}
-              >
-                {SERIES_LABELS[mode]}
-              </button>
-            ))}
-          </div>
+          <ToggleGroup options={SERIES_OPTIONS} selected={seriesMode} onSelect={setSeriesMode} />
         </div>
       }
     >

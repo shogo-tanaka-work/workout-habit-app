@@ -2,6 +2,25 @@ import { formatDate } from './datetime';
 
 // 月間カレンダー（ホーム）用の純粋関数群。週は参考UIに合わせて月曜はじまり。
 
+/** 曜日ヘッダーの並び。**月曜はじまり。** 週の起点を変えるならここと土日の位置を同時に直す。 */
+export const WEEKDAY_HEADER = ['月', '火', '水', '木', '金', '土', '日'] as const;
+
+/** 曜日の種別。色を分けるのは土日だけ（祝日は扱わない）。 */
+export type WeekdayKind = 'weekday' | 'saturday' | 'sunday';
+
+const SATURDAY_INDEX = 5;
+const SUNDAY_INDEX = 6;
+
+export const weekdayKindOf = (weekdayIndex: number): WeekdayKind => {
+  if (weekdayIndex === SATURDAY_INDEX) {
+    return 'saturday';
+  }
+  if (weekdayIndex === SUNDAY_INDEX) {
+    return 'sunday';
+  }
+  return 'weekday';
+};
+
 type YearMonth = {
   year: number;
   // 1〜12。Date の 0 始まりと混同しないようドメイン側は 1 始まりで持つ。

@@ -6,13 +6,15 @@ import { useApiData } from '../hooks/useApiData';
 import type { BodyPartsResponse } from '../types/api';
 import { formatDateKey } from '../utils/datetime';
 import { formatVolume, safeDivide } from '../utils/number';
+import type { ToggleOption } from '../components/ToggleGroup';
+import { ToggleGroup } from '../components/ToggleGroup';
 
 // 部位別ボリューム。/analytics/body-parts の週単位集計を期間で合算して横バー表示する。
 
-const RANGE_CHOICES = [
-  { label: '4週', weeks: 4 },
-  { label: '12週', weeks: 12 },
-  { label: '52週', weeks: 52 }, // API の weeks 上限（53）の範囲内
+const RANGE_OPTIONS: readonly ToggleOption<number>[] = [
+  { value: 4, label: '4週' },
+  { value: 12, label: '12週' },
+  { value: 52, label: '52週' }, // API の weeks 上限（53）の範囲内
 ];
 
 type BodyPartTotal = {
@@ -41,7 +43,7 @@ const sumByBodyPart = (response: BodyPartsResponse): BodyPartTotal[] => {
 };
 
 export const BodyPartSection = () => {
-  const [rangeWeeks, setRangeWeeks] = useState(RANGE_CHOICES[0].weeks);
+  const [rangeWeeks, setRangeWeeks] = useState(RANGE_OPTIONS[0].value);
   const todayKey = formatDateKey(new Date());
   const state = useApiData<BodyPartsResponse>(
     `/analytics/body-parts?weeks=${rangeWeeks}&today=${todayKey}`,
@@ -52,18 +54,7 @@ export const BodyPartSection = () => {
       title="部位別ボリューム"
       subtitle="期間内の 重量×回数 合計"
       actions={
-        <div className="toggle-group">
-          {RANGE_CHOICES.map((choice) => (
-            <button
-              key={choice.weeks}
-              type="button"
-              className={choice.weeks === rangeWeeks ? 'toggle toggle-active' : 'toggle'}
-              onClick={() => setRangeWeeks(choice.weeks)}
-            >
-              {choice.label}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup options={RANGE_OPTIONS} selected={rangeWeeks} onSelect={setRangeWeeks} />
       }
     >
       <Loadable state={state}>

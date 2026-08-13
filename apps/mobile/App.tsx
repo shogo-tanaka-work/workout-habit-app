@@ -27,7 +27,7 @@ import { ExerciseListScreen } from './src/screens/ExerciseListScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import type { SettingsRoute } from './src/screens/SettingsScreen';
-import { SettingsScreen } from './src/screens/SettingsScreen';
+import { SETTINGS_TITLES, SettingsScreen } from './src/screens/SettingsScreen';
 import { TimerSettingsScreen } from './src/screens/TimerSettingsScreen';
 import { WorkoutEditScreen } from './src/screens/WorkoutEditScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
@@ -41,15 +41,6 @@ import { exercisesInWorkout } from './src/utils/workoutTree';
 
 // 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
 const RECENT_SESSION_COUNT = 5;
-
-// 設定タブのサブ画面のヘッダー名。
-const SETTINGS_TITLES: Record<SettingsRoute, string> = {
-  exercises: 'トレーニング種目',
-  timer: 'タイマー',
-  plates: 'プレート計算機',
-  sync: 'クラウド同期',
-  csv: 'CSV出力',
-};
 
 export default function App() {
   const data = useWorkoutData();

@@ -445,7 +445,7 @@ Phase 3 の順序には意味がある。**#7 で作る部位ピッカーを #8 
 再読込の粒度と待ち時間を確認する。再レンダリング回数は React DevTools の
 Profiler（Highlight updates）で見る。
 
-### web の部位別集計を API へ移す（2026-08-13 実装・デプロイ待ち）
+### web の部位別集計を API へ移す（2026-08-13 実装・デプロイ済み）
 
 `BodyPartSection.tsx` の `sumByBodyPart`（クライアント集計）が規約の例外になっていた件。
 
@@ -453,5 +453,28 @@ Profiler（Highlight updates）で見る。
   集計は D1 の `GROUP BY` で行い、route は5行（4層分離に整合）。
   週単位の内訳は消費者が `sumByBodyPart` だけだったため削除した
 - web は `response.bodyParts` の表示整形のみに。`APIリファレンス.md` も更新済み
-- **レスポンス形状の破壊的変更のため、デプロイは api → web の順で連続して行う**（未実施。
-  逆順だと api が出るまで部位別セクションが壊れた画面になる）
+- レスポンス形状の破壊的変更だったため、デプロイは api → web の順で連続実行した
+  （2026-08-13。逆順だと api が出るまで部位別セクションが壊れた画面になる）
+
+## Step 8: パフォーマンスとセキュリティ（2026-08-13 開始）
+
+Step 7（UI 作り直し）とは別軸の改修。進め方は「リサーチ → 規約整備 → 監査 → 修正」。
+
+- リサーチは「モバイル特有」「Web(SPA)特有」「API 特有」のパフォーマンス3軸＋
+  セキュリティ（OWASP Top 10 / API Top 10 / Mobile Top 10）で実施（2026-08-13）
+- 規約は `rules/performance.md` と `rules/security.md` に整備した（2026-08-13）。
+  既存 rules と重複させず、横断の観点と参照で束ねる構成。
+  `d1.md`（ループ内 `.run()` 禁止・`EXPLAIN QUERY PLAN`）、`cloudflare-workers.md`
+  （`waitUntil` の使い分け）、`mobile-react-native.md`（計測は RN DevTools）へも追記
+
+### 実装課題（監査フェーズの入力。未着手）
+
+規約とは別に、リサーチで挙がった「実装が要るもの」。監査で現状を確認してから優先度を決める。
+
+1. **Access JWT の `aud` 検証の確認。** 同一 Cloudflare アカウントの全 Access アプリが
+   同じ鍵を共有するため、`aud` を見ていないと別アプリ向けトークンが通る。
+   `apps/api/src/auth/access.ts` あたりの実装を確認する
+2. 管理画面配信 Worker のセキュリティヘッダ（CSP / HSTS / X-Content-Type-Options）
+3. 書き込み系エンドポイントのレート制限（Workers Rate Limiting API。結果整合であることに注意）
+4. 端末 SQLite の WAL 化（`PRAGMA journal_mode = WAL`）。効果を実測してから
+5. 依存の `npm audit` 実行と lockfile 運用（`npm ci`）の確認

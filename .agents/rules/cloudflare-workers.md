@@ -9,6 +9,9 @@ paths: "apps/api/src/**/*.ts,apps/api/wrangler.jsonc,apps/web/wrangler.jsonc,app
 - Cloudflare のサービスは REST API ではなく Bindings 経由で利用する
 - リクエスト固有の可変状態をモジュールスコープへ置かない（Worker のインスタンスは複数リクエストで再利用される）
 - 外部 fetch と D1 操作の Promise を必ず追跡する
+- `ctx.waitUntil()` に回してよいのは**レスポンス内容に影響しない後処理だけ**（ログ・台帳の更新など）。
+  レスポンスに関わる処理は `await` する
+- `ctx` を分割代入しない（`const { waitUntil } = ctx` は `this` バインドが失われ実行時エラーになる）
 - 大きさが不明なレスポンスを無条件に全件バッファしない
 - 構造化ログを使い、トークン・メールアドレス・トレーニング記録の中身をログへ出さない
 - `compatibility_date` と Observability の設定を維持する

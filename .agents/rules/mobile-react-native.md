@@ -82,7 +82,10 @@ useEffect(() => {
 - **50件を超え得るリストは `FlatList` を使う。** それ以下は `ScrollView` + `map` でよい。
   現状の最大は種目一覧の35件で、全リストが `ScrollView` + `map`。
   履歴が伸びて種目数や実施日数が50件を超えるようになったら切り替える
-- 重い子コンポーネントは `React.memo` を検討する
+- 重い子コンポーネントは `React.memo` を検討する。ただし導入は計測か構造根拠がある場合だけ
+  （[performance.md](performance.md) の判断原則）
+- 計測は **React Native DevTools**（Metro で `j` キー。React Profiler を含む）を使う。
+  **Flipper は RN 0.74 以降非推奨。導入しない**
 
 ## Platform 差異
 - iOS/Android 差は `Platform.OS === 'ios'` の分岐か `Platform.select({ ios, android, default })`

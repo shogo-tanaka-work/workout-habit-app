@@ -64,7 +64,8 @@ export function WorkoutScreen({
   onDeleteTemplate: (templateId: string) => void;
   onComplete: () => void;
   onPause: () => void;
-  onAddExercise: (exercise: Exercise) => Promise<void>;
+  /** 追加できたら true。失敗の報告は呼び出し側が済ませている。 */
+  onAddExercise: (exercise: Exercise) => Promise<boolean>;
   onAddCustomExercise: (name: string, bodyPartId: string) => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
@@ -168,10 +169,14 @@ export function WorkoutScreen({
   }
 
   // 未追加の種目はワークアウトへ入れてから開く。追加済みならそのまま開く。
+  // **追加に失敗したら開かない。** 開いてしまうと、記録できない種目のパネルを操作させることになる。
   const handleSelect = async (exercise: Exercise) => {
     const alreadyAdded = workoutExercises.some((item) => item.exerciseId === exercise.id);
     if (!alreadyAdded) {
-      await onAddExercise(exercise);
+      const added = await onAddExercise(exercise);
+      if (!added) {
+        return;
+      }
     }
     setFocusedExerciseId(exercise.id);
   };

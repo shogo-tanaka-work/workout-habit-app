@@ -229,15 +229,24 @@ export function useWorkoutData() {
     return db;
   };
 
-  const startWorkout = async () => {
+  /**
+   * 今日のワークアウトを開始し、その ID を返す。既に記録中ならその ID を返す。
+   *
+   * **ID を返すのは、開始直後に続けて書き込む呼び出しがあるため。**
+   * `activeWorkout` は state なので、この関数を await した直後にはまだ古い値のままで、
+   * それを見て書き込むと「開始はしたが中身が入らない」状態になる。
+   */
+  const startWorkout = async (): Promise<string> => {
     const database = ensureDb();
     const existingActive = await findActiveWorkoutRow(database);
     if (existingActive) {
       await reloadData(database);
-      return;
+      return existingActive.id;
     }
-    await insertWorkout(database, { id: newId('workout'), performedAt: formatDate(new Date()) });
+    const workoutId = newId('workout');
+    await insertWorkout(database, { id: workoutId, performedAt: formatDate(new Date()) });
     await reloadData(database);
+    return workoutId;
   };
 
   const completeWorkout = async () => {
@@ -267,25 +276,27 @@ export function useWorkoutData() {
     await reloadData(database);
   };
 
+  // 記録中でなければ、まず開始してからその記録へ種目を足す。
+  // かつては開始だけして戻っていたため、呼び出し側が「追加された」前提で画面を進め、
+  // 空のワークアウトに存在しない種目のパネルが開いていた。
   const addExerciseToWorkout = async (exercise: Exercise) => {
     const database = ensureDb();
-    const workout = activeWorkout;
-    if (!workout) {
-      await startWorkout();
-      return;
-    }
-    const alreadyAdded = activeWorkoutExercises.some((item) => item.exerciseId === exercise.id);
-    if (alreadyAdded) {
-      Alert.alert('追加済み', `${exercise.name} は今日の記録に入っています。`);
-      return;
+    const workoutId = activeWorkout?.id ?? (await startWorkout());
+    // 開始直後は activeWorkoutExercises がまだ空なので、既存の記録のときだけ重複を見る。
+    if (activeWorkout) {
+      const alreadyAdded = activeWorkoutExercises.some((item) => item.exerciseId === exercise.id);
+      if (alreadyAdded) {
+        Alert.alert('追加済み', `${exercise.name} は今日の記録に入っています。`);
+        return;
+      }
     }
     await insertWorkoutExercise(database, {
       id: newId('workout-exercise'),
-      workoutId: workout.id,
+      workoutId,
       exerciseId: exercise.id,
       orderIndex: activeWorkoutExercises.length + 1,
     });
-    await touchWorkout(database, workout.id);
+    await touchWorkout(database, workoutId);
     await reloadData(database);
   };
 

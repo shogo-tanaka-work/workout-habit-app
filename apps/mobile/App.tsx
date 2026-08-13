@@ -210,11 +210,24 @@ export default function App() {
   // `void data.addSet(...)` のように捨てると、保存の失敗が誰にも伝わらないまま消える
   // （記録できていないのに気づけないのが一番困る）。必ずここを通して報告する。
   // 文脈つきのメッセージは db/queries.ts の writeWithOutbox が付けている。
+  const reportFailure = (error: unknown): void => {
+    console.error('[App] 操作に失敗', error);
+    Alert.alert('操作に失敗しました', error instanceof Error ? error.message : String(error));
+  };
+
   const runAction = (action: () => Promise<unknown>): void => {
-    action().catch((error: unknown) => {
-      console.error('[App] 操作に失敗', error);
-      Alert.alert('操作に失敗しました', error instanceof Error ? error.message : String(error));
-    });
+    action().catch(reportFailure);
+  };
+
+  // 成否で画面を進めるか決めたいときに使う。失敗の報告は runAction と同じ。
+  const runActionForResult = async (action: () => Promise<unknown>): Promise<boolean> => {
+    try {
+      await action();
+      return true;
+    } catch (error: unknown) {
+      reportFailure(error);
+      return false;
+    }
   };
 
   const handleStartRestTimer = async (set: WorkoutSet, workoutExercise: WorkoutExercise) => {
@@ -456,7 +469,9 @@ export default function App() {
                     onDeleteTemplate={(templateId) => runAction(() => data.deleteTemplate(templateId))}
                     onComplete={() => runAction(handleComplete)}
                     onPause={() => runAction(handlePause)}
-                    onAddExercise={data.addExerciseToWorkout}
+                    onAddExercise={(exercise) =>
+                      runActionForResult(() => data.addExerciseToWorkout(exercise))
+                    }
                     onAddCustomExercise={(name, bodyPartId) =>
                       runAction(() => data.addCustomExercise(name, bodyPartId))
                     }
@@ -513,7 +528,9 @@ export default function App() {
         <RestPickerModal
           value={restPicker.seconds}
           presets={data.timerSettings.restPresets}
-          onConfirm={(seconds, presets) => void confirmRestPicker(seconds, presets)}
+          onConfirm={(seconds, presets) =>
+            runAction(() => confirmRestPicker(seconds, presets))
+          }
           onCancel={() => setRestPicker(null)}
         />
       ) : null}

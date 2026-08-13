@@ -3,12 +3,12 @@
 // ジムにある標準的なプレートの重量（kg）。重い順。
 const STANDARD_PLATES_KG = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
 
-export type PlateCount = {
+type PlateCount = {
   weightKg: number;
   count: number;
 };
 
-export type PlateResult = {
+type PlateResult = {
   // 片側に付けるプレートの組み合わせ（重い順）。
   perSide: PlateCount[];
   // 標準プレートで組めない端数（片側あたり、kg）。0なら過不足なし。
@@ -26,11 +26,4 @@ export const calculatePlates = (targetWeightKg: number, barWeightKg: number): Pl
     }
   }
   return { perSide, remainderKg: remaining };
-};
-
-export const formatPlateResult = (result: PlateResult): string => {
-  if (result.perSide.length === 0) {
-    return 'プレートなし（バーのみ）';
-  }
-  return result.perSide.map((plate) => `${plate.weightKg}kg×${plate.count}`).join(' ・ ');
 };

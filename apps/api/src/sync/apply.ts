@@ -14,7 +14,7 @@ import type { SyncOperation } from './validate';
 /** D1 のバインド変数上限（100）を超えないための IN 句のチャンクサイズ。 */
 const MAX_IN_CLAUSE_ITEMS = 90;
 
-export type OperationStatus = 'applied' | 'duplicate' | 'stale' | 'rejected';
+type OperationStatus = 'applied' | 'duplicate' | 'stale' | 'rejected';
 
 export type OperationResult = {
   id: string;

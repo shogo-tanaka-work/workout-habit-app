@@ -3,6 +3,6 @@
 
 import type { AuthBindings, AuthVariables } from './auth/types';
 
-export type Bindings = Env & AuthBindings;
+type Bindings = Env & AuthBindings;
 
 export type AppEnv = { Bindings: Bindings; Variables: AuthVariables };

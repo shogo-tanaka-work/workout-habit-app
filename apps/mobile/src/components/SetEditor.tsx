@@ -13,24 +13,20 @@ import { LabeledNumber } from './LabeledNumber';
 // RPE は入力欄に出さない。列とデータは残しているが、実績は全行 0 で使われておらず、
 // トレーニング中の一等地を使わない値に割いていた（重量と回数だけが常に要る）。
 //
-// 完了はタイマーと切り離す。「完了＋タイマー」しか無かったころは、
-// タイマーが要らないときに完了を付けられず、履歴の編集画面では操作すらできなかった。
+// この行は過去の記録を直すときだけ使う（記録中の入力は SetLogTable が受け持つ）。
+// そのため休憩タイマーの開始ボタンは置かない。
 
 export function SetEditor({
   set,
   setNumber,
   workoutExercise,
   onPatchSet,
-  onStartRestTimer,
-  showTimer,
 }: {
   set: WorkoutSet;
   // 表示上の連番（削除を除いた並び順）。orderIndex は欠番が出るため使わない。
   setNumber: number;
   workoutExercise: WorkoutExercise;
   onPatchSet: (setId: string, patch: SetPatch) => void;
-  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
-  showTimer: boolean;
 }) {
   // 記録は消えると取り返しがつかない。まず一拍置く。
   const confirmDelete = () => {
@@ -94,23 +90,11 @@ export function SetEditor({
         placeholderTextColor={colors.textFaint}
         style={styles.memoInput}
       />
-      <View style={styles.rowBetween}>
-        <Text style={styles.muted}>
-          {set.isWarmup
-            ? 'ウォームアップ（集計に入りません）'
-            : `推定1RM ${estimateOneRepMax(set.weightKg, set.reps, rmDivisorFor(workoutExercise.exerciseId))} kg`}
-        </Text>
-        {showTimer ? (
-          <Pressable
-            style={[styles.timerButton, set.isCompleted && styles.doneButton]}
-            onPress={() => onStartRestTimer(set, workoutExercise)}
-          >
-            <Text style={styles.timerButtonText}>
-              {set.isCompleted ? '再タイマー' : '完了＋タイマー'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <Text style={styles.muted}>
+        {set.isWarmup
+          ? 'ウォームアップ（集計に入りません）'
+          : `推定1RM ${estimateOneRepMax(set.weightKg, set.reps, rmDivisorFor(workoutExercise.exerciseId))} kg`}
+      </Text>
     </View>
   );
 }

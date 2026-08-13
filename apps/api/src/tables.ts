@@ -9,7 +9,7 @@
 // columns はクライアントとやり取りする列。所有者の列（ownerColumn）は含めない。
 // 所有者はサーバが認証結果から決めるものであり、クライアントの申告を信用しない。
 
-export type ColumnType = 'text' | 'integer' | 'real';
+type ColumnType = 'text' | 'integer' | 'real';
 
 export type SyncColumn = {
   name: string;
@@ -21,7 +21,7 @@ export type SyncColumn = {
 };
 
 /** 親テーブルへの参照。存在と所有者の一致を検証する。 */
-export type ParentReference = {
+type ParentReference = {
   column: string;
   table: string;
 };

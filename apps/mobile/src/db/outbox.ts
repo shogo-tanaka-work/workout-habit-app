@@ -11,7 +11,7 @@ import { newId } from '../utils/id';
 import type { SyncEntity } from './syncTables';
 import { SYNC_COLUMNS } from './syncTables';
 
-export type OutboxOperation = 'upsert' | 'delete';
+type OutboxOperation = 'upsert' | 'delete';
 
 export type OutboxEntry = {
   id: string;
@@ -35,7 +35,7 @@ type OutboxRow = {
 };
 
 /** 1回の送信で運ぶ操作の上限。サーバ側の上限（200）に合わせる。 */
-export const MAX_OPERATIONS_PER_PUSH = 200;
+const MAX_OPERATIONS_PER_PUSH = 200;
 
 const insertEntry = async (
   database: SQLite.SQLiteDatabase,

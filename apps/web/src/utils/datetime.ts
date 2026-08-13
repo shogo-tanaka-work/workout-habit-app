@@ -7,7 +7,8 @@ const DAYS_PER_WEEK = 7;
 // getDay() は日曜=0。週の起点を月曜にするためのオフセット。
 const MONDAY_INDEX = 1;
 
-export const parseDateKey = (dateKey: string): Date => new Date(`${dateKey}T00:00:00`);
+// 同ファイル内の mondayOf からのみ使う。
+const parseDateKey = (dateKey: string): Date => new Date(`${dateKey}T00:00:00`);
 
 export const formatDateKey = (date: Date): string => {
   const year = date.getFullYear();

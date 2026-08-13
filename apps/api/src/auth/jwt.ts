@@ -27,7 +27,7 @@ type JwtHeader = {
   kid?: string;
 };
 
-export type JwtClaims = {
+type JwtClaims = {
   iss?: string;
   aud?: string | string[];
   sub?: string;
@@ -37,7 +37,7 @@ export type JwtClaims = {
   nbf?: number;
 };
 
-export type JwtVerifyOptions = {
+type JwtVerifyOptions = {
   jwksUrl: string;
   /** 許可する発行元。完全一致で照合する。 */
   issuers: readonly string[];

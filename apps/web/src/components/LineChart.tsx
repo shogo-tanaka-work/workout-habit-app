@@ -37,8 +37,9 @@ export const LineChart = ({
 
   const innerWidth = VIEW_WIDTH - PADDING_X * 2;
   const innerHeight = VIEW_HEIGHT - PADDING_Y * 2;
+  // 上で points.length < 2 を弾いているため、除数が 0 になることはない。
   const xAt = (index: number): number =>
-    PADDING_X + (points.length === 1 ? 0 : (index / (points.length - 1)) * innerWidth);
+    PADDING_X + (index / (points.length - 1)) * innerWidth;
   const yAt = (value: number): number =>
     PADDING_Y + innerHeight - ((value - minValue) / valueRange) * innerHeight;
 

@@ -117,11 +117,6 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.xl,
     fontWeight: '700',
   },
-  pageTitle: {
-    color: colors.textPrimary,
-    fontSize: fontSize.xl,
-    fontWeight: '700',
-  },
   sectionTitle: {
     color: colors.textPrimary,
     fontSize: fontSize.lg,
@@ -485,39 +480,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  exerciseChip: {
-    width: '48%',
-    minHeight: 54,
-    borderWidth: hairlineWidth,
-    borderColor: colors.hairlineStrong,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm + 2,
-    justifyContent: 'center',
-    gap: spacing.xxs,
-  },
-  exerciseChipText: {
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: fontSize.sm,
-  },
-  exerciseChipSub: {
-    color: colors.textFaint,
-    fontSize: fontSize.xs,
-  },
-  staticChip: {
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: hairlineWidth,
-    borderColor: colors.hairline,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  staticChipText: {
-    color: colors.textSecondary,
-    fontWeight: '600',
-    fontSize: fontSize.sm,
   },
 
   // セット入力（記録中）
@@ -888,25 +850,6 @@ export const styles = StyleSheet.create({
   },
 
   // 休憩タイマー
-  timerButton: {
-    backgroundColor: colors.accentSurface,
-    minHeight: 38,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  doneButton: {
-    backgroundColor: colors.surfaceRaised,
-    borderColor: colors.hairlineStrong,
-  },
-  timerButtonText: {
-    color: colors.accentText,
-    fontWeight: '700',
-    fontSize: fontSize.sm,
-  },
   timerBanner: {
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,

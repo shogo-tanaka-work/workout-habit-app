@@ -7,7 +7,7 @@
 
 import type { AuthenticatedUser } from '../auth/types';
 
-export type Scope = {
+type Scope = {
   /** WHERE へ AND で連結できる条件式。 */
   condition: string;
   /** condition 中の ? に対応するバインド値。SQL の先頭側に置く前提で使う。 */

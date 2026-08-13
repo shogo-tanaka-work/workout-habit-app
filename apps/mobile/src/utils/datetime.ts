@@ -40,7 +40,7 @@ export const formatMonthDay = (isoDate: string): string => {
 };
 
 // 「14:32」表記。記録中ワークアウトの最終保存時刻に使う。
-export const formatClockTime = (isoDateTime: string): string => {
+const formatClockTime = (isoDateTime: string): string => {
   const date = new Date(isoDateTime);
   const hours = `${date.getHours()}`.padStart(2, '0');
   const minutes = `${date.getMinutes()}`.padStart(2, '0');

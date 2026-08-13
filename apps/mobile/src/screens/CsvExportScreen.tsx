@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { styles } from '../styles/appStyles';
 import { formatDate, isoDateMonthsAgo, startOfWeekIso } from '../utils/datetime';
 
-export type CsvTarget = 'workouts' | 'bodyLogs';
+type CsvTarget = 'workouts' | 'bodyLogs';
 
 export type CsvExportRequest = {
   targets: CsvTarget[];

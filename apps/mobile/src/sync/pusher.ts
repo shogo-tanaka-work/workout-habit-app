@@ -18,9 +18,9 @@ const MAX_ATTEMPTS = 5;
 
 // 認証は Google ID トークン。期限が1時間と短いため、送信のたびに調達する
 // （src/auth/googleAuth.ts の getIdToken が必要なら silent sign-in で取り直す）。
-export type SyncConnection = { apiUrl: string; getIdToken: () => Promise<string> };
+type SyncConnection = { apiUrl: string; getIdToken: () => Promise<string> };
 
-export type PushResult = {
+type PushResult = {
   /** 送信した操作数。 */
   sent: number;
   /** サーバが受け付けた操作数（適用済み・重複・後勝ちで負けたものを含む）。 */

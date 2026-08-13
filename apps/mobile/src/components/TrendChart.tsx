@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { styles } from '../styles/appStyles';
 import { formatCount } from '../utils/number';
 
-export type TrendPoint = {
+type TrendPoint = {
   label: string;
   value: number;
 };

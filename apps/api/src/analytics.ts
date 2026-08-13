@@ -10,7 +10,7 @@ import type { AppEnv } from './env';
 // 総ボリュームへ算入されると、軽い準備セットを足すほど数字が実態から離れる。
 // モバイル側 utils/aggregate.ts も同じ規則。片方だけ変えない。
 // 認証は親アプリ（src/index.ts）のミドルウェアが担い、ここでは行スコープだけを適用する。
-// member は自分の記録のみ、admin は全件（src/db/scope.ts）。
+// 行スコープはロールに関わらず本人の記録だけ（src/db/scope.ts）。
 // 日付はモバイル側が端末ローカル日付（YYYY-MM-DD）で保存しているため、
 // 基準日をクライアントから `?today=YYYY-MM-DD` で渡せるようにする（省略時はUTC今日）。
 

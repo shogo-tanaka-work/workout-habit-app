@@ -8,7 +8,7 @@ import { rmDivisorFor } from './oneRepMax';
 // 総ボリュームへ算入されると、軽い準備セットを足すほど数字が実態から離れる。
 // API 側 apps/api/src/analytics.ts も同じ規則。片方だけ変えない。
 
-export type SetSummary = {
+type SetSummary = {
   /** ワーキングセットの数。ウォームアップは含めない。 */
   setCount: number;
   /** ウォームアップの数。集計からは外すが、やったこと自体は見せられるように持つ。 */
@@ -94,7 +94,7 @@ export const formatSetsInline = (sets: WorkoutSet[]): string =>
 const buildWorkoutIdBySetOwner = (workoutExercises: WorkoutExercise[]): Map<string, string> =>
   new Map(workoutExercises.map((item) => [item.id, item.workoutId]));
 
-export type PeriodSummary = SetSummary & {
+type PeriodSummary = SetSummary & {
   /** 期間内に実施したワークアウトの数。 */
   workoutCount: number;
 };
@@ -115,7 +115,7 @@ export const summarizePeriod = (
 
 // 期間内の種目別の積み上げ。行数が日数ではなく種目数で頭打ちになるので、
 // 記録が増えても履歴のスクロール量が伸び続けない。
-export type ExerciseTotals = {
+type ExerciseTotals = {
   exerciseId: string;
   name: string;
   bodyPartId: string | undefined;
@@ -198,7 +198,7 @@ export const buildVolumeSeries = (
 };
 
 // 部位別の集計（週間部位別集計などに使う）。
-export type BodyPartSummary = {
+type BodyPartSummary = {
   bodyPartId: string;
   name: string;
   setCount: number;

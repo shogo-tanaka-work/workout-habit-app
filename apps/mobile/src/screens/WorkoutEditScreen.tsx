@@ -17,8 +17,6 @@ export function WorkoutEditScreen({
   exerciseById,
   onAddSet,
   onPatchSet,
-  onStartRestTimer,
-  onOpenRestPicker,
   onDeleteWorkout,
 }: {
   workout: Workout;
@@ -28,8 +26,6 @@ export function WorkoutEditScreen({
   exerciseById: Map<string, Exercise>;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
-  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
-  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onDeleteWorkout: (workoutId: string) => void;
 }) {
   const itemIds = new Set(workoutExercises.map((item) => item.id));
@@ -71,9 +67,6 @@ export function WorkoutEditScreen({
         exerciseById={exerciseById}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
-        onStartRestTimer={onStartRestTimer}
-        onOpenRestPicker={onOpenRestPicker}
-        showTimer={false}
       />
 
       <View style={styles.section}>

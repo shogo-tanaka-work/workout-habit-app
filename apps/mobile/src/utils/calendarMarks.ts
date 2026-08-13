@@ -4,7 +4,7 @@ import type { Exercise, Workout, WorkoutExercise } from '../types/domain';
 // 月間カレンダーの日セルに出すマーク。「どの部位を何種目やったか」を色と数で表す。
 // 色だけに情報を持たせない（.agents/DESIGN.md「カテゴリ色（部位）」）。
 
-export type DayMark = {
+type DayMark = {
   bodyPartId: string;
   color: string;
   /** その日にその部位で行った種目数。 */

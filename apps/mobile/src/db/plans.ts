@@ -16,14 +16,14 @@ const PLAN_ENTITIES = ['workouts', 'workout_exercises', 'workout_sets'] as const
 
 type PlanEntity = (typeof PLAN_ENTITIES)[number];
 
-export type PlansPayload = {
+type PlansPayload = {
   from: string;
   to: string;
   fetchedAt: string;
   tables: Record<PlanEntity, Record<string, unknown>[]>;
 };
 
-export type ImportPlansResult = {
+type ImportPlansResult = {
   /** 端末へ入れた予定のワークアウト数。 */
   imported: number;
   /** すでに開始・完了していたため取り込まなかったワークアウト数。 */

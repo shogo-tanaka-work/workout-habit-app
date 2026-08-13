@@ -4,7 +4,7 @@ import { styles } from '../styles/appStyles';
 
 // 値と単位を分けて持つ。単位は「回」「kg」のような計測単位のときだけ付け、
 // 「セット」のようにラベルが数える対象そのものを表す場合は省く。
-export type StatItem = {
+type StatItem = {
   label: string;
   value: string;
   unit?: string;

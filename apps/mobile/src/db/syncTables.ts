@@ -106,7 +106,7 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
  * サーバ側では全ユーザー共有の行になっている。プリセットの変更は送っても拒否されるため、
  * 種目の同期はカスタム種目だけを対象にする。
  */
-export const CUSTOM_EXERCISE_ID_PREFIX = 'exercise-';
+const CUSTOM_EXERCISE_ID_PREFIX = 'exercise-';
 
 export const isCustomExerciseId = (exerciseId: string): boolean =>
   exerciseId.startsWith(CUSTOM_EXERCISE_ID_PREFIX);

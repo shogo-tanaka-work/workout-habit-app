@@ -385,8 +385,6 @@ export default function App() {
                 exerciseById={data.exerciseById}
                 onAddSet={data.addSet}
                 onPatchSet={data.patchSet}
-                onStartRestTimer={handleStartRestTimer}
-                onOpenRestPicker={openRestPicker}
                 onDeleteWorkout={handleDeleteWorkout}
               />
             ) : settingsRoute === 'exercises' ? (

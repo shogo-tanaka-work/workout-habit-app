@@ -7,7 +7,7 @@ import type { SyncColumn, SyncTable } from '../tables';
 import { findSyncTable } from '../tables';
 
 /** 1リクエストで受け付ける操作の上限。 */
-export const MAX_OPERATIONS_PER_REQUEST = 200;
+const MAX_OPERATIONS_PER_REQUEST = 200;
 
 const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
@@ -147,7 +147,7 @@ export const parseOperations = (
   const seenIds = new Set<string>();
   const operations = body.operations.map((item): ParsedOperation => {
     const parsed = parseOperation(item);
-    if (!parsed.ok || !parsed.operation) {
+    if (!parsed.ok) {
       return parsed;
     }
     if (seenIds.has(parsed.operation.id)) {

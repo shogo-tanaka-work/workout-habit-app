@@ -12,7 +12,7 @@ import { SYNC_COLUMNS } from './syncTables';
 // body_parts は全ユーザー共有のマスタで seed が投入するため、取り込み対象に含めない。
 // app_settings と sync_outbox は端末ローカルのため対象外。
 
-export type BackupPayload = {
+type BackupPayload = {
   exportedAt: string;
   tables: Record<string, Record<string, unknown>[]>;
 };

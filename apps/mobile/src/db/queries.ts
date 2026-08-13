@@ -60,7 +60,7 @@ const writeWithOutbox = async (
   }
 };
 
-export type WorkoutData = {
+type WorkoutData = {
   bodyParts: BodyPart[];
   /** 上書きを反映した実効値。生の行が要る場面は無いため、こちらだけを配る。 */
   exercises: Exercise[];

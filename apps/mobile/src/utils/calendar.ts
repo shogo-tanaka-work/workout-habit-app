@@ -2,7 +2,7 @@ import { formatDate } from './datetime';
 
 // 月間カレンダー（ホーム）用の純粋関数群。週は参考UIに合わせて月曜はじまり。
 
-export type YearMonth = {
+type YearMonth = {
   year: number;
   // 1〜12。Date の 0 始まりと混同しないようドメイン側は 1 始まりで持つ。
   month: number;

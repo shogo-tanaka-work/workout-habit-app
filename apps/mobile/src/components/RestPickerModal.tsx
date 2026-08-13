@@ -6,6 +6,7 @@ import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import { REST_PRESET_LIMIT } from '../types/domain';
 import { formatTimer } from '../utils/format';
+import { addRestPreset, removeRestPreset } from '../utils/restPresets';
 
 type Mode = 'exercise' | 'shared';
 
@@ -54,22 +55,17 @@ export function RestPickerModal({
     );
   };
 
-  // 共通タイマーは上限まで。いまの値を複製して足し、そのまま編集対象にする。
+  // 追加・削除の規則は utils/restPresets.ts が持つ（設定画面と同じ挙動にするため）。
   const addPreset = () => {
-    if (draftPresets.length >= REST_PRESET_LIMIT) {
-      return;
-    }
-    setDraftPresets((previous) => [...previous, currentSeconds]);
-    setPresetIndex(draftPresets.length);
+    const next = addRestPreset(draftPresets, presetIndex);
+    setDraftPresets(next.presets);
+    setPresetIndex(next.selectedIndex);
   };
 
-  // 最後の1件は残す（共通タイマーが空になると選ぶものが無くなる）。
   const removePreset = () => {
-    if (draftPresets.length <= 1) {
-      return;
-    }
-    setDraftPresets((previous) => previous.filter((_, index) => index !== presetIndex));
-    setPresetIndex((previous) => Math.max(0, previous - 1));
+    const next = removeRestPreset(draftPresets, presetIndex);
+    setDraftPresets(next.presets);
+    setPresetIndex(next.selectedIndex);
   };
 
   return (

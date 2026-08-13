@@ -60,6 +60,7 @@ import type {
 } from '../types/domain';
 import { formatDate, isoDatePlusDays, nowIso, nowMs } from '../utils/datetime';
 import { newId } from '../utils/id';
+import { restSecondsFor } from '../utils/restPresets';
 import { exerciseNameOf, exercisesInWorkout } from '../utils/workoutTree';
 
 // 未送信が残っているときの再送間隔。短すぎると圏外で無駄な試行を繰り返す。
@@ -313,7 +314,7 @@ export function useWorkoutData() {
       reps: previousSet?.reps ?? 8,
       // RPE は入力欄から外している。既定は 0（実績データもすべて 0）。
       rpe: previousSet?.rpe ?? 0,
-      restSeconds: workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120,
+      restSeconds: restSecondsFor(workoutExercise, exercise),
     });
     if (workoutExercise.workoutId) {
       await touchWorkout(database, workoutExercise.workoutId);
@@ -358,7 +359,8 @@ export function useWorkoutData() {
     const exercise = exerciseById.get(workoutExercise.exerciseId);
     const duration = Math.max(
       1,
-      workoutExercise.restSecondsOverride ?? exercise?.defaultRestSeconds ?? set.restSeconds ?? 120,
+      // このセットに保存済みの秒数があればそれを優先する（過去のセットを再開する場合）。
+      set.restSeconds ?? restSecondsFor(workoutExercise, exercise),
     );
     await patchSet(set.id, { isCompleted: true, restSeconds: duration });
     await insertTimerEvent(database, {

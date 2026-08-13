@@ -19,12 +19,7 @@ import {
   summarizeByExercise,
   summarizePeriod,
 } from '../utils/aggregate';
-import {
-  formatMonthDay,
-  isoDateMonthsAgo,
-  startOfWeekIso,
-  startOfWeekIsoDate,
-} from '../utils/datetime';
+import { formatMonthDay, periodStartIso, startOfWeekIsoDate } from '../utils/datetime';
 import { formatCount, formatVolume, formatWeight } from '../utils/number';
 import { setsOfWorkoutExercises } from '../utils/workoutTree';
 
@@ -69,14 +64,8 @@ export function HistoryScreen({
   const [periodKey, setPeriodKey] = useState<PeriodKey>('week');
   const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[0];
 
-  // 期間の起点。「今週」だけは月曜はじまりで、ほかは n ヶ月前の同日。
-  const cutoff = useMemo(
-    () =>
-      period.months === 0
-        ? startOfWeekIso(new Date())
-        : isoDateMonthsAgo(period.months, new Date()),
-    [period.months],
-  );
+  // 期間の起点。定義は utils/datetime.ts の periodStartIso が持つ。
+  const cutoff = useMemo(() => periodStartIso(period.months) ?? '', [period.months]);
 
   const periodWorkouts = useMemo(
     () => workouts.filter((workout) => workout.performedAt >= cutoff),

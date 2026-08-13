@@ -75,3 +75,16 @@ export const startOfWeekIso = (date: Date): string => {
 
 // ISO 日付が属する週（月曜はじまり）の開始日。履歴の推移グラフを週単位でまとめるのに使う。
 export const startOfWeekIsoDate = (isoDate: string): string => startOfWeekIso(parseIsoDate(isoDate));
+
+/**
+ * 期間の起点（この日以降を対象にする）。`months` が 0 なら今週の月曜、null なら制限なし。
+ *
+ * 履歴タブと CSV 出力で別々に書いていたため、「今週」の定義を変えると
+ * 画面ごとに範囲が食い違う状態だった。ここを唯一の定義にする。
+ */
+export const periodStartIso = (months: number | null, from = new Date()): string | null => {
+  if (months === null) {
+    return null;
+  }
+  return months === 0 ? startOfWeekIso(from) : isoDateMonthsAgo(months, from);
+};

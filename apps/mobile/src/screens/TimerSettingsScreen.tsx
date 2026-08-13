@@ -6,6 +6,7 @@ import { colors } from '../styles/theme';
 import type { TimerSettings } from '../types/domain';
 import { REST_PRESET_LIMIT } from '../types/domain';
 import { formatTimer } from '../utils/format';
+import { addRestPreset, removeRestPreset } from '../utils/restPresets';
 
 // 共通タイマーを増減する刻み。ジムで使う値は30秒単位で足りる。
 const STEP_SECONDS = 30;
@@ -38,21 +39,17 @@ export function TimerSettingsScreen({
     savePresets(presets.map((preset, index) => (index === activeIndex ? next : preset)));
   };
 
+  // 追加・削除の規則は utils/restPresets.ts が持つ（記録中のピッカーと同じ挙動にするため）。
   const addPreset = () => {
-    if (presets.length >= REST_PRESET_LIMIT) {
-      return;
-    }
-    savePresets([...presets, presets[activeIndex] ?? 120]);
-    setSelectedIndex(presets.length);
+    const next = addRestPreset(presets, activeIndex);
+    savePresets(next.presets);
+    setSelectedIndex(next.selectedIndex);
   };
 
-  // 最後の1件は残す（共通タイマーが空になると選ぶものが無くなる）。
   const removePreset = () => {
-    if (presets.length <= 1) {
-      return;
-    }
-    savePresets(presets.filter((_, index) => index !== activeIndex));
-    setSelectedIndex(Math.max(0, activeIndex - 1));
+    const next = removeRestPreset(presets, activeIndex);
+    savePresets(next.presets);
+    setSelectedIndex(next.selectedIndex);
   };
 
   return (

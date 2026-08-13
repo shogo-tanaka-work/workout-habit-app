@@ -16,6 +16,7 @@ import type {
 } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { exerciseNameOf } from '../utils/workoutTree';
+import { restSecondsFor } from '../utils/restPresets';
 
 // 記録タブは2段構え。「種目を選ぶ」→「その種目だけ記録する」。
 //
@@ -149,7 +150,7 @@ export function WorkoutScreen({
         exercise={exercise}
         sets={sets}
         recentSessions={recentSessionsByExerciseId.get(focused.exerciseId) ?? []}
-        restSeconds={focused.restSecondsOverride ?? exercise?.defaultRestSeconds ?? 120}
+        restSeconds={restSecondsFor(focused, exercise)}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
         onStartRestTimer={onStartRestTimer}

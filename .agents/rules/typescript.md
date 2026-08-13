@@ -109,6 +109,40 @@ const label = (status: WorkoutStatus) => ...
 - 単位を持つ数値は名前で表す（`weightKg` / `restSeconds` / `durationMs`）。
   `weight` だけだと kg なのか lb なのか読めない
 
+## 不正な値を作れなくする
+
+`string` や `number` を裸で持ち回ると、**そもそも存在しえない値**を作れてしまう。
+クラス（値オブジェクト）を使わない設計なので、代わりに次の3つで守る。
+
+1. **取りうる値をリテラル型で狭める**（前節）
+2. **単位・意味を名前に入れる**（`weightKg` / `restSeconds` / `durationMs`）
+3. **作る場所を1か所にして、そこで検証する**
+
+```ts
+// NG（負の重量も、kg か lb か不明な値も作れる）
+const addSet = (weight: number) => ...
+
+// OK（作る入口で弾く。入口を通らない値は存在しない）
+const toWeightKg = (input: number): number => {
+  if (!Number.isFinite(input) || input < 0) {
+    throw new Error(`重量が不正です: ${input}`);
+  }
+  return Math.round(input * 10) / 10;
+};
+```
+
+検証を各所の `if` で繰り返すのではなく、**値を作る関数を通す**。
+通っていない値がドメインへ入らない形にする。
+
+## 動的なプロパティアクセスで型検査をすり抜けない
+
+`obj[key]` や `as` を使った書き換えは、コンパイラの検査を無効にする。
+
+- オブジェクトのキーを変数で引くときは、キーの型を `keyof` で縛る
+- 設定値やマスタは `Record<string, T>` ではなく、キーを列挙した型にできないか先に考える
+- **ビルド時に置換される値は静的に書く。** Expo の `process.env.EXPO_PUBLIC_X` は
+  `process.env[key]` の動的アクセスでは置換されず、実行時に `undefined` になる
+
 ## 型で分岐する。値の型で分岐しない
 
 `typeof` や `Array.isArray` での分岐は、**外部入力を検証する境界でだけ**使う。

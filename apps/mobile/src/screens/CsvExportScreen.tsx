@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
-import { formatDate, isoDateMonthsAgo, startOfWeekIso } from '../utils/datetime';
+import { formatDate, periodStartIso } from '../utils/datetime';
 
 type CsvTarget = 'workouts' | 'bodyLogs';
 
@@ -29,13 +29,6 @@ const PERIODS = [
 
 type PeriodKey = (typeof PERIODS)[number]['key'];
 
-const sinceOf = (months: number | null): string | null => {
-  if (months === null) {
-    return null;
-  }
-  return months === 0 ? startOfWeekIso(new Date()) : isoDateMonthsAgo(months, new Date());
-};
-
 // CSV出力の条件を決めてから書き出す。
 //
 // 以前は設定メニューのタップで全期間・全データを即共有していた。
@@ -45,7 +38,7 @@ export function CsvExportScreen({ onExport }: { onExport: (request: CsvExportReq
   const [periodKey, setPeriodKey] = useState<PeriodKey>('all');
 
   const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[0];
-  const since = sinceOf(period.months);
+  const since = periodStartIso(period.months);
 
   const toggleTarget = (key: CsvTarget) => {
     setTargets((current) =>

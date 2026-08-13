@@ -3,7 +3,8 @@ paths: "**/*.ts,**/*.tsx"
 ---
 # プロジェクト構成ルール
 
-3アプリとも「責務ごとのディレクトリ」で分割する。[code-design.md](code-design.md) §1 の具体化。
+3アプリとも「責務ごとのディレクトリ」で分割する。
+[code-design.md](code-design.md)「神ファイル・神関数を作らない」の具体化。
 
 **ディレクトリの中身そのものは各アプリの `AGENTS.md` を正本とする。**
 ここに構成図を再掲しない（同じ図が2箇所にあると、必ず片方だけ古くなる）。
@@ -17,7 +18,7 @@ paths: "**/*.ts,**/*.tsx"
 ## アプリをまたがない
 
 アプリ間で直接 import しない。共有したい定義は各アプリに重複させ、
-対になるファイルを同じ変更セットで直す（[code-design.md](code-design.md) §10）。
+対になるファイルを同じ変更セットで直す（[code-design.md](code-design.md)）。
 
 ## apps/mobile の置き場
 
@@ -29,7 +30,7 @@ paths: "**/*.ts,**/*.tsx"
 | Google サインインと ID トークンの調達 | `auth/` |
 | ローカル通知の登録・取り消し | `notifications/` |
 | `use` で始まる状態/副作用ロジック | `hooks/` |
-| 副作用のない純粋関数（整形・計算） | `utils/`。扱う対象で分ける（[code-design.md](code-design.md) §9） |
+| 副作用のない純粋関数（整形・計算） | `utils/`。扱う対象で分ける（[code-design.md](code-design.md)） |
 | ワークアウト→種目行→セットの階層を辿る規則 | `utils/workoutTree.ts` |
 | 複数画面で使う表示部品 | `components/` |
 | タブ画面・オーバーレイ画面・設定のサブ画面 | `screens/` |

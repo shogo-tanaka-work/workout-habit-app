@@ -110,4 +110,4 @@ paths: "apps/mobile/src/db/**/*.ts,apps/mobile/src/sync/**/*.ts"
 
 ## エラー処理
 - DB 操作の失敗は無言で握りつぶさない。操作名を文脈に付けて throw する
-  （[code-design.md](code-design.md) §7・§8）
+  （[error-handling.md](error-handling.md)）

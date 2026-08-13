@@ -1,12 +1,28 @@
 ---
 paths: "**/*.ts,**/*.tsx"
 ---
-# コード設計ルール（アンチパターン禁止集）
+# コード設計ルール
 
-設計上の悪手を集約したルール。新規実装・リファクタ時に必ず参照する。
-**OK例 / NG例** を併記しているので、判断に迷ったら照合する。
+新規実装・リファクタ時に必ず参照する。**OK例 / NG例** を併記しているので、判断に迷ったら照合する。
 
-## 1. 神ファイル・神関数を作らない
+エラーとログは [error-handling.md](error-handling.md)、型の使い方は [typescript.md](typescript.md)、
+置き場所は [project-structure.md](project-structure.md) にある。
+
+## 判断の順番
+
+設計で迷ったら、この順で満たす。**上位を下位のために犠牲にしない。**
+
+1. **正しく動くか**
+2. **他人が読んで分かるか**
+3. **変えたいときに変えられるか**
+
+3 のためだけに 2 を捨てない。「将来こう拡張するかもしれない」で今読めないコードを書くのは、
+起きていない問題のために確実な損を払う取引になる。
+
+抽象化は**情報を隠す代わりに意味を与える取引**である。意味を与えられない抽象化は、
+隠した分だけ損をする。
+
+## 神ファイル・神関数を作らない
 
 | ルール | 閾値 |
 |---|---|
@@ -27,133 +43,175 @@ paths: "**/*.ts,**/*.tsx"
 
 逆に、**責務が混ざったまま大きいファイルは閾値以下でも分割する**。
 
-## 2. 判定関数・述語の重複を作らない（DRY）
+## 関心の分離
+
+1つの関数・モジュールが答える問いを1つにする。次が混ざっていたら分ける。
+
+| 関心 | 例 |
+|---|---|
+| 取得 | DB から読む、API を叩く |
+| 判断 | 条件を満たすか、どれを選ぶか |
+| 計算 | 集計する、換算する |
+| 整形 | 表示用の文字列にする |
+| 描画 | 画面に出す |
+
+判断の目安は「**この関数が変わる理由はいくつあるか**」。2つ以上なら分ける。
+表示の都合で計算が変わる、DB のカラム名でラベルが変わる、といった状態は分離できていない。
+
+## 高凝集・低結合
+
+- **凝集**: 一緒に変わるものを同じ場所へ置く。同じデータを扱う計算が3か所に散っていたら低凝集
+- **結合**: モジュールが相手の**内部の作り**を知らないようにする。
+  知ってよいのは「何を渡すと何が返るか」だけ
+
+```ts
+// NG（呼ぶ側がデータ構造の辿り方まで知っている＝密結合）
+const volume = workout.exercises.flatMap((e) => e.sets).reduce((sum, s) => sum + s.weightKg * s.reps, 0);
+
+// OK（何を渡すと何が返るかだけを知っている）
+const volume = summarizeSets(sets).totalVolume;
+```
+
+**高凝集を狙って密結合になる**ことがある。「関連しそうだから」と1か所へ集めた結果、
+無関係な変更が互いに影響し合う状態がそれ。凝集は「一緒に**変わる**か」で判断し、
+「似ている」で判断しない。
+
+## 引数
+
+- **4つを超えたらオブジェクト引数にする。** 位置引数が並ぶと、呼び出し側で順番を間違えても
+  型が同じなら気づけない
+- **同じ型の引数を並べない。** `move(fromId, toId)` のような並びは取り違える。
+  順序に意味があるならオブジェクトにして名前を付ける
+- **真偽値のフラグ引数を作らない。** `save(data, true)` は呼び出し側から意味が読めない。
+  振る舞いが2つあるなら関数を2つに分ける
+
+```ts
+// NG
+const load = (id: string, includeArchived: boolean, withSets: boolean) => ...
+load('x', true, false);   // 呼び出しを見ても何が起きるか分からない
+
+// OK
+const loadExercise = (id: string) => ...
+const loadArchivedExercise = (id: string) => ...
+```
+
+## 分岐
+
+### 早期リターンでネストを浅くする
+
+ネストは3段までを目安にする。深くなるのは、**判断と処理が同じ関数にある**合図。
+
+```ts
+// NG
+if (workout) {
+  if (workout.status === 'active') {
+    if (sets.length > 0) {
+      // 本題
+    }
+  }
+}
+
+// OK
+if (!workout) return null;
+if (workout.status !== 'active') return null;
+if (sets.length === 0) return null;
+// 本題
+```
+
+### 条件式に名前を付ける
+
+条件が2つ以上組み合わさったら、変数か関数に切り出して**何を判断しているか**を書く。
+
+```ts
+// NG
+if (set.weightKg > 0 && set.reps > 0 && !set.isWarmup && set.deletedAt === null) { ... }
+
+// OK
+const countsTowardVolume =
+  set.weightKg > 0 && set.reps > 0 && !set.isWarmup && set.deletedAt === null;
+if (countsTowardVolume) { ... }
+```
+
+### 同じ分岐を各所へ広げない
+
+同じ `switch` や `if` の並びが2か所以上に現れたら、**データか型で表す**。
+分岐を書き足すのではなく、テーブルを引く形にする。
+
+```ts
+// NG（種目が増えるたびに全箇所へ case を足す）
+switch (exerciseId) {
+  case 'bench-press': return 40;
+  case 'squat': return 33.3;
+  default: return 30;
+}
+
+// OK（対応表を1か所に持つ）
+const DIVISOR_BY_EXERCISE_ID = new Map([...]);
+export const rmDivisorFor = (id: string) => DIVISOR_BY_EXERCISE_ID.get(id) ?? EPLEY_DIVISOR;
+```
+
+union 型で分岐するときは `never` で網羅を検査する（[typescript.md](typescript.md)）。
+
+## 判定関数・述語の重複を作らない（DRY）
 
 同じ構造の `isXxx` ヘルパーを並べない。**判定基準を引数で渡すファクトリ**にする。
 
-### NG
 ```ts
+// NG
 const isChest = (part: BodyPart | null) => part?.id === 'chest';
 const isBack  = (part: BodyPart | null) => part?.id === 'back';
 // ...部位ごとに増殖
-```
 
-### OK
-```ts
+// OK
 const matchPartId = (id: string) => (part: BodyPart | null): boolean => part?.id === id;
 const isChest = matchPartId('chest');
 ```
 
-## 3. マジックナンバー / マジックストリングを書かない
+**DRY は「知識の重複を避ける」であって「同じ文字列を消す」ではない。**
+形が同じでも変更理由が違うなら、別物として放置する。無関係な2か所を1つにまとめると、
+片方の都合で相手が壊れる。
 
-意味を持つリテラルは **名前付き定数 or ユーティリティ関数** に閉じ込める。
+## マジックナンバー / マジックストリングを書かない
 
-### NG
-```ts
-if (elapsedSec >= 90) { /* レスト終了？なぜ90？ */ }
-const oneRepMax = weight * (1 + reps / 30);   // 30 とは？（Epley係数）
-const day = iso.slice(8, 10);                 // 何番目？
-```
+意味のある値には名前を付け、定数として1か所に置く。
+「なぜその値か」が自明でないものはコメントで理由を書く。
 
-### OK
-```ts
-const DEFAULT_REST_SECONDS = 90;
-const EPLEY_DIVISOR = 30;                      // 1RM = w * (1 + reps/30)
-const dayOf = (isoDate: string): number => Number(isoDate.slice(8, 10));
-```
+## 同じデータを何度もループしない
 
-例外: ループ回数など文脈で自明なリテラル（`i < 3`）は許容。
+同じ配列に対して `filter().length` や `reduce` を3つ以上並べたら、1回のループでまとめる。
+集計は `utils/aggregate.ts` のような純粋関数へ寄せ、画面では結果だけを使う。
 
-## 4. 同じデータを何度もループしない
+## 命名
 
-`sets.filter(...).length` を連続で並べると O(n) で済む集計が O(kn) になる。
-カウンタが多い場合は単一ループでまとめる。
+**名前は「何をするか」ではなく「何のためにあるか」を表す。**
 
-### NG
-```ts
-const completed = sets.filter((s) => s.completed).length;
-const totalReps = sets.filter((s) => s.completed).reduce((a, s) => a + s.reps, 0);
-const volume    = sets.filter((s) => s.completed).reduce((a, s) => a + s.reps * s.weight, 0);
-```
+- 関数は**動詞＋目的語**にする（`summarizeSets` / `estimateOneRepMax` / `buildWorkoutCsv`）。
+  `process` `handle` `manage` `check` のような、何をするか分からない動詞を単独で使わない
+- 真偽値は `is` / `has` / `can` で始める（`isWarmup` / `hasActiveWorkout`）
+- **技術用語で名付けない。** `Manager` `Util` `Helper` `Info` `Data` `Common` は、
+  中身の説明を放棄した名前で、何でも入る器になる。扱う対象で名付ける
+- **省略しない。** `status` `row` `query` と完全形で書く。
+  例外は `i` / `j`（ループ index）、`_`（未使用引数）、`acc`（reduce）
+- 名前と中身がずれたら、**名前ではなく中身を疑う**。
+  「この関数、名前を付けにくい」は責務が混ざっている合図
 
-### OK
-```ts
-let completedCount = 0, totalReps = 0, totalVolume = 0;
-for (const set of sets) {
-  if (!set.completed) continue;
-  completedCount += 1;
-  totalReps += set.reps;
-  totalVolume += set.reps * set.weight;
-}
-```
-
-## 5. 変数名の省略は禁止
-
-スコープが短くても `s` / `r` / `w` / `e` のような1文字変数を使わない（型からの逆引きが手間）。
-
-### NG
-```ts
-sets.map((s) => s.id)
-const w = workouts.find((x) => x.id === id);
-```
-
-### OK
-```ts
-sets.map((set) => set.id)
-const workout = workouts.find((candidate) => candidate.id === id);
-```
-
-慣用例外: `i, j`（ループindex）、`error`は省略しない、`_`（未使用引数）、`acc`（reduce）。
-
-## 6. 型アサーション (`as`) / non-null assertion (`!`) の二重使用禁止
+## 型アサーション (`as`) / non-null assertion (`!`) の二重使用禁止
 
 `row.weight! as number` のように `!` と `as` を重ねるのは型システムを2回欺いている。
-**型ガード関数 + filter** で書き直す。詳細は [typescript.md](typescript.md) §型安全性。
+**型ガード関数 + filter** で書き直す。詳細は [typescript.md](typescript.md)。
 
-## 7. エラーは必ず文脈を付けて投げる
+## 可変なモジュールスコープを持たない
 
-SQLite や D1 のエラーをそのまま再throwすると、どの操作が失敗したか上位で分からない。
+モジュールの先頭で宣言した変数を、関数の中から書き換えない。
 
-### NG
-```ts
-await db.runAsync(sql, params);   // 失敗時にどのクエリか不明
-```
+- **Workers**: インスタンスが複数リクエストで再利用される。
+  リクエスト固有の値を置くと、他人のデータが混ざる
+- **React Native**: 画面をまたいで残り、リロードでしか消えない状態になる。
+  再現しない不具合の温床
 
-### OK
-```ts
-try {
-  await db.runAsync(sql, params);
-} catch (error) {
-  throw new Error(`addSet failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-}
-```
+状態は React の state か、引数で受け渡す。再代入しない定数は置いてよい。
 
-`cause` を使えば元エラーのスタックも保持される。
-
-## 8. エラーを無言で握りつぶさない（catch でログ無しは禁止）
-
-`catch` したエラーを **ログも出さず・throw もせず** デフォルト値返却で黙過するのは禁止。
-障害時に「何が起きたか」がどこにも残らない。
-
-### NG
-```ts
-try { await db.execAsync(ddl); } catch { /* 握りつぶし */ }
-```
-
-### OK
-```ts
-try {
-  await db.execAsync(ddl);
-} catch (error: unknown) {
-  console.error('[db] schema 適用に失敗:', error);
-  throw error;
-}
-```
-
-許容される無言 catch: パースのフォールバックが目的で、後段で文脈付きエラーを throw している場合のみ。
-判断基準は「その catch を通った事実が障害調査で必要になるか？」。
-
-## 9. 車輪の再発明をしない（書く前に `utils/` を見る）
+## 車輪の再発明をしない（書く前に `utils/` を見る）
 
 **新しい関数を書く前に、対象アプリの `utils/` に同じものが無いか確認する。**
 特に日付・数値の整形、記録データの辿り方は既にある。
@@ -161,13 +219,12 @@ try {
 判断の順番:
 
 1. `utils/` に同じ処理があるか → あればそれを使う
-2. 無いが、**同じ式を3箇所以上で書くことになるか** → `utils/` へ出す
+2. 無いが、**同じ規則を3箇所以上で書くことになるか** → `utils/` へ出す
 3. その画面でしか意味を持たない計算か → その場に書いてよい
 
 ### 標準メソッドを包まない。包むのは「規則」だけ
 
 `sort` や `filter` の呼び出し方を短くするだけの関数を作らない。
-**抽象化は情報を隠す代わりに意味を与える取引**で、意味を与えられないなら隠した分だけ損をする。
 
 ```ts
 // NG（式を見れば昇順と分かるのに、定義へジャンプしないと昇順か降順かも分からなくなる）
@@ -199,7 +256,7 @@ export const exerciseNameOf = (exerciseId: string, exerciseById: Map<string, Exe
 
 ### `utils/` を肥大化させない分け方
 
-「巨大ファイルを作らない」（§1）と矛盾させないために、**扱う対象で分ける**。
+「巨大ファイルを作らない」と矛盾させないために、**扱う対象で分ける**。
 1ファイルに雑多な関数を集めた `helpers.ts` や `common.ts` を作らない。
 
 | ファイル | 扱う対象 |
@@ -207,14 +264,14 @@ export const exerciseNameOf = (exerciseId: string, exerciseById: Map<string, Exe
 | `datetime.ts` | 日付・時刻の変換と表記 |
 | `number.ts` | 数値の整形と換算 |
 | `format.ts` | 時間の表示（`0:90` のようなタイマー表記） |
-| `workoutTree.ts` | ワークアウト→種目行→セットの階層を辿る（表示順・名前の解決） |
+| `workoutTree.ts` | ワークアウト→種目行→セットの階層を辿る |
 | `aggregate.ts` | 集計（合計・最大・部位別・期間別） |
 | `calendar.ts` / `calendarMarks.ts` | カレンダーの升目とマーク |
 
 **対象で区切れているうちは、行数が増えても分割しない。** 逆に、区切りに収まらない
 関数が出てきたら、それは新しい対象が現れた合図なのでファイルを足す。
 
-## 10. アプリ間の重複は許容し、境界は越えない
+## アプリ間の重複は許容し、境界は越えない
 
 次の3組は、モバイルと API に同じ知識が重複している。これは**意図的に許容**する（共有パッケージを作らない）。
 
@@ -227,18 +284,30 @@ export const exerciseNameOf = (exerciseId: string, exerciseById: Map<string, Exe
 ただし片方だけ変えないこと。同期対象・カラム・レスポンス形状・換算式・種目を変えたら、
 対になるファイルも同じ変更セットで直す。
 
----
+## 過剰な設計をしない
+
+- **使う予定が今ないものを作らない。** 「後で必要になるかも」の設定・オプション・抽象層は、
+  必要になった時点で足す。使われないコードは読む人の負担にしかならない
+- **1つのパターンを万能薬にしない。** ある場所で効いた設計を、状況の違う場所へ機械的に
+  当てはめない。設計は文脈に依存する
+- **ライブラリの新規導入は方針判断が必要。** 勝手に追加しない（各アプリの `AGENTS.md`）
 
 ## チェックリスト（実装後セルフレビュー）
 
 - [ ] 1ファイル300行・1関数50行・1コンポーネントの責務過多になっていないか
+- [ ] この関数が変わる理由は1つに保たれているか
+- [ ] 呼ぶ側が相手の内部構造を辿っていないか（密結合）
+- [ ] 引数が4つを超えていないか。フラグ引数を足していないか
+- [ ] ネストが3段を超えていないか。早期リターンで浅くできないか
+- [ ] 同じ分岐を2か所以上へ広げていないか（データか型で表せないか）
 - [ ] 同じ構造のヘルパー/述語を3つ以上並べていないか → ファクトリ化
 - [ ] マジックナンバー・マジックストリングを直書きしていないか
 - [ ] `filter().length` 等を同データに対し3つ以上連発していないか
+- [ ] 関数名が動詞＋目的語になっているか。`Util` `Manager` `Data` で名付けていないか
 - [ ] 1文字省略変数を使っていないか（慣用例外を除く）
 - [ ] `as` と `!` を同じ式で併用していないか
-- [ ] 外部エラーを文脈なしで再throw、または無言で握りつぶしていないか
-- [ ] アプリ間で対になる定義を片方だけ変えていないか
+- [ ] モジュールスコープの変数を書き換えていないか
 - [ ] 既に `utils/` にある処理を、画面やコンポーネントで書き直していないか
-- [ ] 同じ「規則」を3箇所以上へ広げていないか（フォールバック・丸め方・換算式は特に）
 - [ ] 標準メソッドの呼び出し方を短くするだけの関数を作っていないか
+- [ ] 今は使わない拡張ポイントを足していないか
+- [ ] アプリ間で対になる定義を片方だけ変えていないか

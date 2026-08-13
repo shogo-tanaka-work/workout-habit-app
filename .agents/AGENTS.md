@@ -67,14 +67,15 @@ Claude Code は4つ目のクライアント。書き込みはモバイルと同�
 
 1. `rules/code-design.md`
 2. `rules/typescript.md`
-3. `rules/project-structure.md`
-4. UI 変更では `DESIGN.md`（ビジュアルの正本。色・余白・文字・角丸・影・レイアウト）
-5. 変更対象に応じて以下を読む
+3. `rules/error-handling.md`
+4. `rules/project-structure.md`
+5. UI 変更では `DESIGN.md`（ビジュアルの正本。色・余白・文字・角丸・影・レイアウト）
+6. 変更対象に応じて以下を読む
    - モバイル: `rules/mobile-react-native.md`、`rules/mobile-sqlite.md`
    - 管理画面: `rules/web-react.md`
    - API: `rules/api.md`、`rules/d1.md`、`rules/cloudflare-workers.md`
    - 認証・デプロイ・秘密値: `rules/auth.md`、`rules/secrets.md`
-6. 実装後に `rules/testing.md`
+7. 実装後に `rules/testing.md`
 
 ## 各アプリの入口
 

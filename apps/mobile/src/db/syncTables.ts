@@ -7,6 +7,8 @@
 // columns は「送信時にスナップショットとして読み出す列」。
 // 所有者（user_id / owner_user_id）はサーバが認証結果から決めるので端末は持たない。
 
+import { newId } from '../utils/id';
+
 export type SyncEntity =
   | 'exercises'
   | 'workouts'
@@ -106,7 +108,16 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
  * サーバ側では全ユーザー共有の行になっている。プリセットの変更は送っても拒否されるため、
  * 種目の同期はカスタム種目だけを対象にする。
  */
-const CUSTOM_EXERCISE_ID_PREFIX = 'exercise-';
+const CUSTOM_EXERCISE_ID_PREFIX = 'exercise';
+
+/**
+ * カスタム種目の ID を発番する。**判定（`isCustomExerciseId`）と同じ定数を使う。**
+ *
+ * かつては呼び出し側が `newId('exercise')` と文字列で書いており、この接頭辞との
+ * 対応がどこにも書かれていなかった。片方を変えると全カスタム種目がプリセット扱いになり、
+ * 名前・部位の変更が保存されなくなる（型でも lint でも検出できない）。
+ */
+export const newCustomExerciseId = (): string => newId(CUSTOM_EXERCISE_ID_PREFIX);
 
 export const isCustomExerciseId = (exerciseId: string): boolean =>
-  exerciseId.startsWith(CUSTOM_EXERCISE_ID_PREFIX);
+  exerciseId.startsWith(`${CUSTOM_EXERCISE_ID_PREFIX}-`);

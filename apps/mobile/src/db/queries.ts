@@ -42,10 +42,18 @@ import {
 } from './mappers';
 import { enqueueDelete, enqueueUpsert } from './outbox';
 
-// 書き込みは「ローカルへ即時反映 ＋ 送信キューへ積む」を1トランザクションで行う。
-// 画面はローカルの結果だけを見て進み、送信は src/sync/pusher.ts が契機ごとに引き受ける。
-// この関数を通さない書き込みを増やさないこと（キューに乗らず、端末にしか残らなくなる）。
-const writeWithOutbox = async (
+/**
+ * 書き込みを1トランザクションで実行し、失敗したら操作名つきのエラーへ包む。
+ *
+ * **この関数は outbox への登録をしない。** 登録は `write` の中で
+ * `enqueueUpsert` / `enqueueDelete` を呼ぶ側の責任。名前に反して面倒を見てくれると
+ * 誤解すると、ローカルにだけ残ってサーバへ永遠に届かない行ができる
+ * （同期のズレとしてしか観測できず、気づくのが遅れる）。
+ *
+ * 端末の書き込みは「ローカルへ即時反映 ＋ 送信キューへ積む」をひとまとまりで行う。
+ * 画面はローカルの結果だけを見て進み、送信は src/sync/pusher.ts が契機ごとに引き受ける。
+ */
+const writeInTransaction = async (
   database: SQLite.SQLiteDatabase,
   operationName: string,
   write: () => Promise<void>,
@@ -309,7 +317,7 @@ export const upsertBodyLog = async (
   },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'upsertBodyLog', async () => {
+  await writeInTransaction(database, 'upsertBodyLog', async () => {
     await database.runAsync(
       `INSERT INTO body_logs
       (id, measured_at, body_weight_kg, body_fat_percentage, estimated_calories_burned, memo, created_at, updated_at)
@@ -342,7 +350,7 @@ export const insertTemplateDeep = async (
   params: { id: string; name: string; exerciseEntries: { id: string; exerciseId: string }[] },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'insertTemplateDeep', async () => {
+  await writeInTransaction(database, 'insertTemplateDeep', async () => {
     await database.runAsync(
       'INSERT INTO templates (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
       params.id,
@@ -372,7 +380,7 @@ export const deleteTemplateDeep = async (
   database: SQLite.SQLiteDatabase,
   templateId: string,
 ): Promise<void> => {
-  await writeWithOutbox(database, 'deleteTemplateDeep', async () => {
+  await writeInTransaction(database, 'deleteTemplateDeep', async () => {
     await database.runAsync('DELETE FROM template_exercises WHERE template_id = ?', templateId);
     await database.runAsync('DELETE FROM templates WHERE id = ?', templateId);
     // 子はサーバ側の外部キー（ON DELETE CASCADE）で消える。親の削除だけを送る。
@@ -412,7 +420,7 @@ export const touchWorkout = async (
   workoutId: string,
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'touchWorkout', async () => {
+  await writeInTransaction(database, 'touchWorkout', async () => {
     await database.runAsync(
       'UPDATE workouts SET last_saved_at = ?, updated_at = ? WHERE id = ?',
       timestamp,
@@ -433,7 +441,7 @@ export const insertWorkout = async (
   params: { id: string; performedAt: string },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'insertWorkout', async () => {
+  await writeInTransaction(database, 'insertWorkout', async () => {
     await database.runAsync(
       'INSERT INTO workouts (id, performed_at, status, memo, last_saved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       params.id,
@@ -460,7 +468,7 @@ export const startPlannedWorkout = async (
   performedAt: string,
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'startPlannedWorkout', async () => {
+  await writeInTransaction(database, 'startPlannedWorkout', async () => {
     await database.runAsync(
       "UPDATE workouts SET status = 'active', performed_at = ?, last_saved_at = ?, updated_at = ? WHERE id = ? AND status = 'planned'",
       performedAt,
@@ -478,7 +486,7 @@ export const setWorkoutStatus = async (
   status: 'active' | 'completed',
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'setWorkoutStatus', async () => {
+  await writeInTransaction(database, 'setWorkoutStatus', async () => {
     await database.runAsync(
       'UPDATE workouts SET status = ?, last_saved_at = ?, updated_at = ? WHERE id = ?',
       status,
@@ -491,18 +499,23 @@ export const setWorkoutStatus = async (
 };
 
 // ワークアウトと、それに紐づく種目・セットをまとめて削除する。
+/**
+ * ワークアウトを子ごと消す。
+ *
+ * **子の特定は SQL で完結させる。** かつては呼び出し側が React state から集めた
+ * workout_exercise の ID を渡していたが、state が DB より古いと渡し漏れた行の
+ * セットだけが孤児として残り、どの画面にも出ないまま残り続けていた。
+ */
 export const deleteWorkoutDeep = async (
   database: SQLite.SQLiteDatabase,
   workoutId: string,
-  workoutExerciseIds: string[],
 ): Promise<void> => {
-  await writeWithOutbox(database, 'deleteWorkoutDeep', async () => {
-    for (const workoutExerciseId of workoutExerciseIds) {
-      await database.runAsync(
-        'DELETE FROM workout_sets WHERE workout_exercise_id = ?',
-        workoutExerciseId,
-      );
-    }
+  await writeInTransaction(database, 'deleteWorkoutDeep', async () => {
+    await database.runAsync(
+      `DELETE FROM workout_sets
+       WHERE workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?)`,
+      workoutId,
+    );
     await database.runAsync('DELETE FROM workout_exercises WHERE workout_id = ?', workoutId);
     await database.runAsync('DELETE FROM workouts WHERE id = ?', workoutId);
     // 子はサーバ側の外部キー（ON DELETE CASCADE）で消える。親の削除だけを送る。
@@ -515,7 +528,7 @@ export const insertWorkoutExercise = async (
   params: { id: string; workoutId: string; exerciseId: string; orderIndex: number },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'insertWorkoutExercise', async () => {
+  await writeInTransaction(database, 'insertWorkoutExercise', async () => {
     await database.runAsync(
       `INSERT INTO workout_exercises
       (id, workout_id, exercise_id, order_index, rest_seconds_override, memo, created_at, updated_at)
@@ -546,7 +559,7 @@ export const insertWorkoutSet = async (
   },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'insertWorkoutSet', async () => {
+  await writeInTransaction(database, 'insertWorkoutSet', async () => {
     await database.runAsync(
       `INSERT INTO workout_sets
       (id, workout_exercise_id, order_index, weight_kg, reps, rpe, is_warmup, is_completed, memo, rest_seconds, started_at, completed_at, deleted_at, created_at, updated_at)
@@ -577,7 +590,7 @@ export const updateWorkoutSet = async (
   set: WorkoutSet,
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'updateWorkoutSet', async () => {
+  await writeInTransaction(database, 'updateWorkoutSet', async () => {
     await database.runAsync(
       `UPDATE workout_sets
      SET weight_kg = ?, reps = ?, rpe = ?, is_warmup = ?, is_completed = ?, memo = ?, rest_seconds = ?, deleted_at = ?, completed_at = ?, updated_at = ?
@@ -604,7 +617,7 @@ export const insertTimerEvent = async (
   params: { id: string; workoutSetId: string; exerciseId: string; durationSeconds: number },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'insertTimerEvent', async () => {
+  await writeInTransaction(database, 'insertTimerEvent', async () => {
     await database.runAsync(
       `INSERT INTO timer_events
       (id, workout_set_id, exercise_id, duration_seconds, started_at, ended_at, status, sound_enabled, created_at, updated_at)
@@ -630,7 +643,7 @@ export const insertExercise = async (
   params: { id: string; name: string; primaryBodyPartId: string },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'insertExercise', async () => {
+  await writeInTransaction(database, 'insertExercise', async () => {
     await database.runAsync(
       `INSERT INTO exercises
       (id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived, created_at, updated_at)
@@ -660,7 +673,7 @@ export const updateExercise = async (
   exercise: Exercise,
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'updateExercise', async () => {
+  await writeInTransaction(database, 'updateExercise', async () => {
     await database.runAsync(
       `UPDATE exercises
        SET name = ?, primary_body_part_id = ?, default_bar_weight_kg = ?, is_archived = ?, updated_at = ?
@@ -692,7 +705,7 @@ export const upsertUserExerciseSetting = async (
   },
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'upsertUserExerciseSetting', async () => {
+  await writeInTransaction(database, 'upsertUserExerciseSetting', async () => {
     // 既存があればその id を使い回す。新しい id を振ると UNIQUE(exercise_id) に当たる。
     const existing = await database.getFirstAsync<{ id: string }>(
       'SELECT id FROM user_exercise_settings WHERE exercise_id = ?',
@@ -727,7 +740,7 @@ export const setExerciseRest = async (
   restSeconds: number,
 ): Promise<void> => {
   const timestamp = nowIso();
-  await writeWithOutbox(database, 'setExerciseRest', async () => {
+  await writeInTransaction(database, 'setExerciseRest', async () => {
     await database.runAsync(
       'UPDATE exercises SET default_rest_seconds = ?, updated_at = ? WHERE id = ?',
       restSeconds,

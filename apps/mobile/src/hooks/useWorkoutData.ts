@@ -38,7 +38,7 @@ import {
   signOut as signOutFromGoogle,
 } from '../auth/googleAuth';
 import { countPendingOperations } from '../db/outbox';
-import { isCustomExerciseId } from '../db/syncTables';
+import { isCustomExerciseId, newCustomExerciseId } from '../db/syncTables';
 import { fetchPlansFromCloud, replacePlannedWorkouts } from '../db/plans';
 import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
 import { pushPendingOperations } from '../sync/pusher';
@@ -267,12 +267,7 @@ export function useWorkoutData() {
 
   const deleteWorkout = async (workoutId: string) => {
     const database = ensureDb();
-    const items = workoutExercises.filter((item) => item.workoutId === workoutId);
-    await deleteWorkoutDeep(
-      database,
-      workoutId,
-      items.map((item) => item.id),
-    );
+    await deleteWorkoutDeep(database, workoutId);
     await reloadData(database);
   };
 
@@ -391,7 +386,7 @@ export function useWorkoutData() {
     }
     const database = ensureDb();
     await insertExercise(database, {
-      id: newId('exercise'),
+      id: newCustomExerciseId(),
       name,
       // 部位は呼び出し側で選ばせる。既定を押し付けると全部が最初の部位になる。
       primaryBodyPartId: bodyPartId || (bodyParts[0]?.id ?? 'chest'),

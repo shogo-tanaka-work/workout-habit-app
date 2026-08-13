@@ -2,7 +2,6 @@
 // 集計は /analytics API 側で行うため、ここに残るのは表示整形と
 // グラフの空期間穴埋め（記録ゼロの週・月をスロットとして並べる）用のみ。
 
-const DAY_MS = 86_400_000;
 const DAYS_PER_WEEK = 7;
 // getDay() は日曜=0。週の起点を月曜にするためのオフセット。
 const MONDAY_INDEX = 1;
@@ -17,7 +16,19 @@ export const formatDateKey = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const addDays = (date: Date, days: number): Date => new Date(date.getTime() + days * DAY_MS);
+/**
+ * 日付を日数分ずらす。
+ *
+ * **固定の 86,400,000ms 加算をしない。** 夏時間のある地域では遷移日をまたぐと
+ * ローカル日付が1日ずれ、API 側（カレンダー演算の `weekStartIso`）が返す週キーと
+ * 食い違う。キーが一致しないと `summaryByWeek.get(...)` が外れて、
+ * データがあるのにグラフが静かにゼロ表示になる。
+ */
+export const addDays = (date: Date, days: number): Date => {
+  const shifted = new Date(date);
+  shifted.setDate(shifted.getDate() + days);
+  return shifted;
+};
 
 // その日が属する週の月曜日（API 側 weekStartIso と同じ定義）。
 export const mondayOf = (date: Date): Date => {

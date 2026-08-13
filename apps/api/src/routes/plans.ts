@@ -11,6 +11,7 @@
 
 import { Hono } from 'hono';
 
+import { scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
 import type { SyncTable } from '../tables';
 import { columnNamesOf, findSyncTable } from '../tables';
@@ -62,16 +63,17 @@ plans.get('/', async (context) => {
 
   // **ロールに関わらず本人の予定だけを返す。** admin が全件を見るのは分析 API の役割で、
   // 他人の予定を端末へ取り込ませる経路は作らない（/backup と同じ判断）。
-  const userId = context.get('user').id;
+  // 条件は db/scope.ts に集約する（route へ WHERE user_id = ? を書かない）。
+  const scope = scopeForUser(context.get('user'), 'user_id');
 
   const workoutsTable = planTableOf('workouts');
   const workoutRows = (
     await context.env.DB.prepare(
       `SELECT ${columnNamesOf(workoutsTable).join(', ')} FROM workouts
-       WHERE user_id = ? AND status = 'planned' AND performed_at BETWEEN ? AND ?
+       WHERE ${scope.condition} AND status = 'planned' AND performed_at BETWEEN ? AND ?
        ORDER BY performed_at, created_at`,
     )
-      .bind(userId, from, to)
+      .bind(...scope.params, from, to)
       .all()
   ).results as Record<string, unknown>[];
 
@@ -79,7 +81,7 @@ plans.get('/', async (context) => {
   const exerciseRows = await selectChildren(
     context.env.DB,
     planTableOf('workout_exercises'),
-    userId,
+    scope,
     'workout_id',
     workoutIds,
     'ORDER BY order_index',
@@ -89,7 +91,7 @@ plans.get('/', async (context) => {
   const setRows = await selectChildren(
     context.env.DB,
     planTableOf('workout_sets'),
-    userId,
+    scope,
     'workout_exercise_id',
     workoutExerciseIds,
     // 論理削除済みのセットは予定としても存在しない。
@@ -115,7 +117,7 @@ plans.get('/', async (context) => {
 const selectChildren = async (
   database: D1Database,
   table: SyncTable,
-  userId: string,
+  scope: ReturnType<typeof scopeForUser>,
   parentColumn: string,
   parentIds: readonly string[],
   suffix: string,
@@ -128,9 +130,9 @@ const selectChildren = async (
     const result = await database
       .prepare(
         `SELECT ${columns} FROM ${table.name}
-         WHERE user_id = ? AND ${parentColumn} IN (${placeholders}) ${suffix}`,
+         WHERE ${scope.condition} AND ${parentColumn} IN (${placeholders}) ${suffix}`,
       )
-      .bind(userId, ...chunk)
+      .bind(...scope.params, ...chunk)
       .all();
     rows.push(...(result.results as Record<string, unknown>[]));
   }

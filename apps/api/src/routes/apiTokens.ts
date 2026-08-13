@@ -6,6 +6,7 @@
 import { Hono } from 'hono';
 
 import { generateApiToken, hashApiToken } from '../auth/apiToken';
+import { scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
 import { requireRole } from '../middleware/authorize';
 
@@ -40,12 +41,12 @@ export const apiTokens = new Hono<AppEnv>();
 apiTokens.use('*', requireRole('admin'));
 
 apiTokens.get('/', async (context) => {
-  const user = context.get('user');
+  const scope = scopeForUser(context.get('user'), 'user_id');
   const result = await context.env.DB.prepare(
     `SELECT id, name, last_used_at, expires_at, revoked_at, created_at
-     FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC`,
+     FROM api_tokens WHERE ${scope.condition} ORDER BY created_at DESC`,
   )
-    .bind(user.id)
+    .bind(...scope.params)
     .all();
   return context.json({ tokens: result.results });
 });

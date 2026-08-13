@@ -6,6 +6,8 @@
 
 import { Hono } from 'hono';
 
+import type { AuthenticatedUser } from './auth/types';
+import { scopeForExercise, scopeForUser } from './db/scope';
 import type { AppEnv } from './env';
 import type { BackupPayload, SyncTable } from './tables';
 import { columnNamesOf, SYNC_TABLES } from './tables';
@@ -17,12 +19,12 @@ const MAX_STATEMENTS_PER_BATCH = 80;
 
 /**
  * 読み出しのスコープ。種目は共有プリセットも返さないと端末側で復元できないため、
- * NULL 所有（プリセット）を含める。
+ * NULL 所有（プリセット）を含める db/scope.ts の種目用スコープを使う。
  */
-const selectScopeOf = (table: SyncTable): string =>
+const selectScopeOf = (table: SyncTable, user: AuthenticatedUser) =>
   table.ownerColumn === 'owner_user_id'
-    ? `${table.ownerColumn} IS NULL OR ${table.ownerColumn} = ?`
-    : `${table.ownerColumn} = ?`;
+    ? scopeForExercise(user, table.ownerColumn)
+    : scopeForUser(user, table.ownerColumn);
 
 export const backup = new Hono<AppEnv>();
 
@@ -30,10 +32,11 @@ backup.get('/', async (context) => {
   const user = context.get('user');
   const tables: Record<string, Record<string, unknown>[]> = {};
   for (const table of SYNC_TABLES) {
+    const scope = selectScopeOf(table, user);
     const result = await context.env.DB.prepare(
-      `SELECT ${columnNamesOf(table).join(', ')} FROM ${table.name} WHERE ${selectScopeOf(table)}`,
+      `SELECT ${columnNamesOf(table).join(', ')} FROM ${table.name} WHERE ${scope.condition}`,
     )
-      .bind(user.id)
+      .bind(...scope.params)
       .all();
     tables[table.name] = result.results as Record<string, unknown>[];
   }
@@ -63,9 +66,11 @@ backup.post('/', async (context) => {
   const counts: Record<string, number> = {};
 
   for (const table of [...SYNC_TABLES].reverse()) {
+    // 種目でも scopeForExercise は使わない。NULL 所有（共有プリセット）まで消えてしまう。
+    const scope = scopeForUser(user, table.ownerColumn);
     deleteStatements.push(
-      context.env.DB.prepare(`DELETE FROM ${table.name} WHERE ${table.ownerColumn} = ?`).bind(
-        user.id,
+      context.env.DB.prepare(`DELETE FROM ${table.name} WHERE ${scope.condition}`).bind(
+        ...scope.params,
       ),
     );
   }

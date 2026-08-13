@@ -271,6 +271,131 @@ export const exerciseNameOf = (exerciseId: string, exerciseById: Map<string, Exe
 **対象で区切れているうちは、行数が増えても分割しない。** 逆に、区切りに収まらない
 関数が出てきたら、それは新しい対象が現れた合図なのでファイルを足す。
 
+## 不変を既定にする
+
+**JavaScript の配列メソッドには、元の配列を壊すものがある。**
+`sort` / `reverse` / `splice` / `push` / `pop` / `shift` / `unshift` / `fill` がそれ。
+
+props や引数で受け取った配列をそのまま `sort` すると、**呼び出し元のデータが変わる**。
+React では「変えたはずのない場所の表示が変わる」「再レンダリングされない」という形で出る。
+
+```ts
+// NG（引数の配列を壊す。呼び出し元の並び順が変わる）
+const latest = (workouts: Workout[]) => workouts.sort((a, b) => ...)[0];
+
+// OK（複製してから並べ替える）
+const latest = (workouts: Workout[]) => [...workouts].sort((a, b) => ...)[0];
+
+// OK（filter / map は新しい配列を返すので、その後の sort は安全）
+const sets = allSets.filter((set) => set.workoutExerciseId === id).sort((a, b) => ...);
+```
+
+- **引数を書き換えない。** 受け取ったオブジェクト・配列は読むだけにする
+- 変更したいときは新しい値を作って返す（`{ ...current, name }` / `[...items, next]`）
+- 読み取り専用で受けたい配列の型は `readonly T[]` にする
+
+## 取得と変更を混ぜない（コマンド・クエリ分離）
+
+**値を返す関数は状態を変えない。状態を変える関数は値を返さない。**
+「取得したつもりが保存もしていた」は追いにくい不具合になる。
+
+```ts
+// NG（名前は取得だが、ついでに保存している）
+const getActiveWorkout = async () => {
+  const workout = await findActive();
+  await touchWorkout(workout.id);   // 副作用
+  return workout;
+};
+
+// OK（分ける）
+const findActiveWorkout = async () => ...;
+const touchWorkout = async (workoutId: string) => ...;
+```
+
+例外は「作って返す」操作（`insertWorkout` が作成した ID を返すなど）。
+その場合は名前で作成だと分かるようにする。
+
+## 結果を返すために引数を使わない
+
+引数として渡したオブジェクトへ書き込んで結果を伝える形にしない。
+呼び出し側から見て、どれが入力でどれが出力か読めなくなる。
+
+```ts
+// NG
+const summarize = (sets: WorkoutSet[], result: SetSummary): void => { result.totalVolume = ...; };
+
+// OK
+const summarize = (sets: WorkoutSet[]): SetSummary => ({ totalVolume: ..., ... });
+```
+
+## 深く辿らない（デメテルの法則）
+
+**知ってよいのは「自分が受け取ったもの」と「その1階層先」まで。**
+`a.b.c.d` のように連鎖して辿ると、途中の構造が変わるたびに壊れる。
+
+```ts
+// NG（呼ぶ側が3階層の構造を知っている）
+const name = workout.exercises[0].exercise.name;
+
+// OK（必要な値を受け取るか、辿り方を1か所へ寄せる）
+const name = exerciseNameOf(item.exerciseId, exerciseById);
+```
+
+`?.` を連ねたくなったら、それは辿りすぎの合図。
+
+## コレクション操作
+
+- **自前でループを組む前に、標準メソッド（`filter` / `map` / `some` / `find` / `reduce`）で書けないか見る。**
+  「n 件目を探す」「条件に合うものだけ集める」を `for` と添字で書かない
+- **ループの中で `if` をネストさせない。** 早期 `continue` で浅くする
+
+```ts
+// NG
+for (const set of sets) {
+  if (!set.isWarmup) {
+    if (set.deletedAt === null) {
+      total += set.weightKg * set.reps;
+    }
+  }
+}
+
+// OK
+for (const set of sets) {
+  if (set.isWarmup) continue;
+  if (set.deletedAt !== null) continue;
+  total += set.weightKg * set.reps;
+}
+```
+
+- 同じコレクションを何度も走査するなら、1回のループにまとめる（`summarizeSets` のように）
+
+## 生成の入口を1つにする
+
+同じ種類のデータを作る手順が各所に散ると、**片方だけ初期値を直し忘れる**。
+新しい行を作る処理は1か所へ寄せ、ID の発番・既定値・タイムスタンプをそこで済ませる。
+
+```ts
+// NG（画面ごとに newId して既定値を並べる。既定値が食い違う）
+await insertWorkoutSet(db, { id: newId('set'), rpe: 0, isWarmup: false, ... });
+
+// OK（作る手順を1か所に持つ）
+await addSet(workoutExercise);
+```
+
+## デッドコードを残さない
+
+- どこからも呼ばれない関数・到達しない分岐・使われない props は、見つけた時点で消す
+- **「そのうち使うかもしれない」で残さない。** 必要になったら履歴から戻せる
+- コメントアウトしたコードを残さない。何が正しいのか読む人に分からなくなる
+
+## 名前と居場所を一致させる
+
+関数の名前が、置いてあるファイルの対象と合っているか確かめる。
+
+- `datetime.ts` に種目の話が出てくる、`aggregate.ts` に表示文言が出てくる、といった状態は
+  置き場所が違う合図
+- 「この関数、どこに置けばいいか分からない」ときは、**関数の責務が複数ある**ことが多い
+
 ## アプリ間の重複は許容し、境界は越えない
 
 次の3組は、モバイルと API に同じ知識が重複している。これは**意図的に許容**する（共有パッケージを作らない）。
@@ -309,5 +434,11 @@ export const exerciseNameOf = (exerciseId: string, exerciseById: Map<string, Exe
 - [ ] モジュールスコープの変数を書き換えていないか
 - [ ] 既に `utils/` にある処理を、画面やコンポーネントで書き直していないか
 - [ ] 標準メソッドの呼び出し方を短くするだけの関数を作っていないか
+- [ ] 受け取った配列を `sort` などで壊していないか（`[...items].sort()` になっているか）
+- [ ] 値を返す関数が、ついでに状態を変えていないか
+- [ ] `a.b.c.d` のように深く辿っていないか
+- [ ] ループの中で `if` をネストさせていないか（早期 continue で浅くできないか）
+- [ ] 到達しないコード・コメントアウトしたコードを残していないか
+- [ ] 関数の名前が、置いてあるファイルの対象と合っているか
 - [ ] 今は使わない拡張ポイントを足していないか
 - [ ] アプリ間で対になる定義を片方だけ変えていないか

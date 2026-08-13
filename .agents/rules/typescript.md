@@ -90,6 +90,51 @@ type PresetExerciseId = 'bench-press' | 'squat' | 'deadlift';
 ただし**狭めた型が外部入力に接するときは、境界で検証してから流す**。
 外から来る値をリテラル型として受け取るのは、検証を飛ばしているのと同じ。
 
+## `string` に何でも詰めない
+
+意味の違う値をすべて `string` で表すと、取り違えてもコンパイラが気づけない。
+**取りうる値が決まっているなら、そこまで狭める。**
+
+```ts
+// NG（どんな文字列でも通る。ID とラベルを取り違えても分からない）
+const label = (status: string) => ...
+
+// OK
+type WorkoutStatus = 'planned' | 'active' | 'completed';
+const label = (status: WorkoutStatus) => ...
+```
+
+- 区切り文字で複数の意味を詰め込んだ文字列（`"chest:bench-press:80"`）を作らない。
+  値ごとにフィールドを持つ型にする
+- 単位を持つ数値は名前で表す（`weightKg` / `restSeconds` / `durationMs`）。
+  `weight` だけだと kg なのか lb なのか読めない
+
+## 型で分岐する。値の型で分岐しない
+
+`typeof` や `Array.isArray` での分岐は、**外部入力を検証する境界でだけ**使う。
+ドメインのロジックで「値の形を調べて振る舞いを変える」書き方をしない。
+
+```ts
+// NG（呼び出し側が渡すものによって意味が変わる。増えるたびに全箇所へ分岐が増える）
+const summarize = (input: WorkoutSet[] | Workout) => {
+  if (Array.isArray(input)) { ... } else { ... }
+};
+
+// OK（引数の型を分け、関数を分ける）
+const summarizeSets = (sets: WorkoutSet[]) => ...;
+const summarizeWorkout = (workout: Workout) => ...;
+```
+
+## `null` と `undefined`
+
+- **「値が無い」を表すのは `null` に寄せる。** `undefined` は「まだ設定していない」
+  （オプショナルなプロパティ、省略された引数）に限る
+- `null` を返す関数は、**呼び出し側が必ず分岐する**ことを前提にする。
+  分岐を強いたくないなら既定値を返すか、例外にする
+- **`null` を返す層を増やさない。** `A が null を返す → B も null を返す → C も…` と
+  連鎖すると、どこで消えたのか追えなくなる。境界で埋めるか、そこで落とす
+- 失敗の理由を伝えたいときは `null` ではなく判別できるユニオンを返す
+
 ## 関数設計
 - 純粋関数を優先し、副作用（DB・タイマー・通知・fetch）を分離する
 - 早期リターンでネストを浅く保つ（[code-design.md](code-design.md)）

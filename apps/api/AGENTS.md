@@ -63,15 +63,14 @@ route を追加するときは `routes/` へ置く（`analytics.ts` と `backup.
 |---|---|---|
 | `GET /health` | 不要 | 死活確認 |
 | `GET /backup` | 必要 | 本人の同期対象テーブルを返す（復元用） |
-| `POST /backup` | 必要 | 本人の行だけを置き換える（**破壊的**） |
 | `POST /sync/operations` | 必要 | 操作（intent）ベースの同期。冪等・部分成功 |
 | `GET /plans` | 必要 | 期間内の予定（`status='planned'`）を本人分だけ返す。Step 5 の受信経路 |
 | `GET /me` | 必要 | 自分の id / 表示名 / ロール。ユーザー一覧の経路は作らない |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/analytics.ts` |
 | `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
 
-`POST /backup` はモバイルが outbox へ移行するまでの経路。移行後は
-初回同期（D1 → 端末）の `GET /backup` だけを残す。
+端末からサーバへの反映は `POST /sync/operations`（操作ベース）に一本化してある。
+全置換の `POST /backup` は使われないまま残っていたため 2026-08-13 に削除した。
 
 静的アセットを持たないため、パスの振り分け設定は不要。追加したら認証要否を明示的に判断する。
 

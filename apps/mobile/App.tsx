@@ -32,7 +32,7 @@ import { TimerSettingsScreen } from './src/screens/TimerSettingsScreen';
 import { WorkoutEditScreen } from './src/screens/WorkoutEditScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
-import type { Tab, WorkoutExercise, WorkoutSet } from './src/types/domain';
+import type { Exercise, Tab, Workout, WorkoutExercise, WorkoutSet } from './src/types/domain';
 import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions } from './src/utils/aggregate';
 import { buildBodyLogCsv, buildWorkoutCsv } from './src/utils/csv';
@@ -41,6 +41,12 @@ import { exercisesInWorkout } from './src/utils/workoutTree';
 
 // 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
 const RECENT_SESSION_COUNT = 5;
+
+/** タブの上へ全面でかぶせる画面。ヘッダーの戻る導線と中身は同じ値から決める。 */
+type Overlay =
+  | { kind: 'exerciseDetail'; title: string; close: () => void; exercise: Exercise }
+  | { kind: 'workoutEdit'; title: string; close: () => void; workout: Workout }
+  | { kind: 'settings'; title: string; close: () => void; route: SettingsRoute };
 
 export default function App() {
   const data = useWorkoutData();
@@ -172,15 +178,29 @@ export default function App() {
   );
 
   // タブの上へ全面でかぶせる画面（戻る導線つき）。3つは同時に開かない。
-  const overlay = selectedExercise
-    ? { title: selectedExercise.name, close: () => setSelectedExerciseId(null) }
+  // **優先順位を決めるのはここだけ。** 描画側は overlay.kind で分けるので、
+  // 同じ順序を2度書かない（片方だけ直すとヘッダーと中身が食い違う）。
+  const overlay: Overlay | null = selectedExercise
+    ? {
+        kind: 'exerciseDetail',
+        title: selectedExercise.name,
+        close: () => setSelectedExerciseId(null),
+        exercise: selectedExercise,
+      }
     : editingWorkout
       ? {
+          kind: 'workoutEdit',
           title: `${formatJapaneseDate(editingWorkout.performedAt)} の記録`,
           close: () => setEditingWorkoutId(null),
+          workout: editingWorkout,
         }
       : settingsRoute
-        ? { title: SETTINGS_TITLES[settingsRoute], close: () => setSettingsRoute(null) }
+        ? {
+            kind: 'settings',
+            title: SETTINGS_TITLES[settingsRoute],
+            close: () => setSettingsRoute(null),
+            route: settingsRoute,
+          }
         : null;
 
   const isHomeTab = tab === 'home' && overlay === null;
@@ -387,14 +407,14 @@ export default function App() {
             contentContainerStyle={styles.contentContainer}
             keyboardShouldPersistTaps="handled"
           >
-            {selectedExercise ? (
+            {overlay?.kind === 'exerciseDetail' ? (
               <ExerciseDetailScreen
-                exercise={selectedExercise}
+                exercise={overlay.exercise}
                 sessions={selectedExerciseSessions}
               />
-            ) : editingWorkout ? (
+            ) : overlay?.kind === 'workoutEdit' ? (
               <WorkoutEditScreen
-                workout={editingWorkout}
+                workout={overlay.workout}
                 workoutExercises={editingWorkoutExercises}
                 visibleSets={data.visibleSets}
                 exerciseById={data.exerciseById}
@@ -402,42 +422,44 @@ export default function App() {
                 onPatchSet={(setId, patch) => runAction(() => data.patchSet(setId, patch))}
                 onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}
               />
-            ) : settingsRoute === 'exercises' ? (
-              <ExerciseListScreen
-                exercises={data.exercises}
-                bodyParts={data.bodyParts}
-                bodyPartById={data.bodyPartById}
-                newExerciseName={newExerciseName}
-                onChangeNewExerciseName={setNewExerciseName}
-                onAddCustomExercise={(bodyPartId) =>
-                  runAction(() => handleAddCustomExercise(bodyPartId))
-                }
-                onEditExercise={setEditingExerciseId}
-                onSelectExercise={setSelectedExerciseId}
-              />
-            ) : settingsRoute === 'timer' ? (
-              <TimerSettingsScreen
-                timerSettings={data.timerSettings}
-                onUpdate={(settings) => runAction(() => data.updateTimerSettings(settings))}
-              />
-            ) : settingsRoute === 'plates' ? (
-              <PlateCalculator />
-            ) : settingsRoute === 'csv' ? (
-              <CsvExportScreen onExport={(request) => runAction(() => handleExportCsv(request))} />
-            ) : settingsRoute === 'sync' ? (
-              <CloudSyncSection
-                syncSettings={data.syncSettings}
-                pendingCount={data.pendingSyncCount}
-                account={data.account}
-                isGoogleSignInAvailable={data.isGoogleSignInAvailable}
-                onSaveConnection={data.updateSyncConnection}
-                onSignIn={data.signInToGoogle}
-                onSignOut={data.signOutOfGoogle}
-                onSyncNow={data.syncNow}
-                onImportPlans={data.importPlans}
-                onTogglePaused={data.updateSyncPaused}
-                onRestore={data.restoreFromCloud}
-              />
+            ) : overlay?.kind === 'settings' ? (
+              overlay.route === 'exercises' ? (
+                <ExerciseListScreen
+                  exercises={data.exercises}
+                  bodyParts={data.bodyParts}
+                  bodyPartById={data.bodyPartById}
+                  newExerciseName={newExerciseName}
+                  onChangeNewExerciseName={setNewExerciseName}
+                  onAddCustomExercise={(bodyPartId) =>
+                    runAction(() => handleAddCustomExercise(bodyPartId))
+                  }
+                  onEditExercise={setEditingExerciseId}
+                  onSelectExercise={setSelectedExerciseId}
+                />
+              ) : overlay.route === 'timer' ? (
+                <TimerSettingsScreen
+                  timerSettings={data.timerSettings}
+                  onUpdate={(settings) => runAction(() => data.updateTimerSettings(settings))}
+                />
+              ) : overlay.route === 'plates' ? (
+                <PlateCalculator />
+              ) : overlay.route === 'csv' ? (
+                <CsvExportScreen onExport={(request) => runAction(() => handleExportCsv(request))} />
+              ) : (
+                <CloudSyncSection
+                  syncSettings={data.syncSettings}
+                  pendingCount={data.pendingSyncCount}
+                  account={data.account}
+                  isGoogleSignInAvailable={data.isGoogleSignInAvailable}
+                  onSaveConnection={data.updateSyncConnection}
+                  onSignIn={data.signInToGoogle}
+                  onSignOut={data.signOutOfGoogle}
+                  onSyncNow={data.syncNow}
+                  onImportPlans={data.importPlans}
+                  onTogglePaused={data.updateSyncPaused}
+                  onRestore={data.restoreFromCloud}
+                />
+              )
             ) : (
               <>
                 {tab === 'workout' ? (

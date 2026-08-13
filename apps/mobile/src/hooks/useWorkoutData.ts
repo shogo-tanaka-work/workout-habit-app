@@ -8,27 +8,28 @@ import { seedMasters } from '../db/seed';
 import {
   deleteTemplateDeep,
   deleteWorkoutDeep,
-  findActiveWorkoutRow,
   insertExercise,
   insertTemplateDeep,
   insertTimerEvent,
   insertWorkout,
   insertWorkoutExercise,
   insertWorkoutSet,
-  loadWorkoutData,
-  markLastBackupAt,
   setExerciseRest,
-  updateExercise,
-  setSyncPaused,
-  upsertUserExerciseSetting,
   setWorkoutStatus,
   startPlannedWorkout,
   touchWorkout,
+  updateExercise,
   updateWorkoutSet,
   upsertBodyLog,
+  upsertUserExerciseSetting,
+} from '../db/queries';
+import { findActiveWorkoutRow, loadWorkoutData } from '../db/loadWorkoutData';
+import {
+  markLastBackupAt,
+  setSyncPaused,
   upsertSyncConnection,
   upsertTimerSettings,
-} from '../db/queries';
+} from '../db/appSettings';
 import type { GoogleAccount } from '../auth/googleAuth';
 import {
   getIdToken,

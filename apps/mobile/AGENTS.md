@@ -63,7 +63,9 @@ apps/mobile/
   src/
     types/        domain.ts（ドメイン型）/ db.ts（SQLite 行型）
     auth/         googleAuth.ts（Google サインインと ID トークンの調達）
-    db/           schema.ts / seed.ts / queries.ts / mappers.ts / migrations.ts
+    db/           schema.ts / seed.ts / migrations.ts / mappers.ts
+                  loadWorkoutData.ts（読み取り）/ queries.ts（同期対象への書き込み）
+                  appSettings.ts（端末ローカルの設定。outbox に積まない）
                   outbox.ts（操作キュー）/ syncTables.ts（同期対象の定義）/ sync.ts（取り込み）
     sync/         pusher.ts（送信役）
     hooks/        useWorkoutData / useRestTimer

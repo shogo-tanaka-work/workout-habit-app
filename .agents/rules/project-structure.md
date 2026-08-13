@@ -39,7 +39,10 @@ paths: "**/*.ts,**/*.tsx"
 | 置くもの | 行き先 |
 |---|---|
 | 型定義（interface / type / union） | `types/` |
-| SQL・テーブル定義・CRUD・行→ドメイン変換 | `db/` |
+| テーブル定義・行→ドメイン変換 | `db/schema.ts` / `db/mappers.ts` |
+| 画面が使うデータの一括読み取り | `db/loadWorkoutData.ts` |
+| 同期対象テーブルへの書き込み（**outbox への登録が要る**） | `db/queries.ts` |
+| 端末ローカルの設定（**同期しない。outbox に積まない**） | `db/appSettings.ts` |
 | 送信キューと同期の実務 | `db/outbox.ts`（キュー） / `db/sync.ts`（取り込み） / `sync/pusher.ts`（送信） |
 | Google サインインと ID トークンの調達 | `auth/` |
 | ローカル通知の登録・取り消し | `notifications/` |

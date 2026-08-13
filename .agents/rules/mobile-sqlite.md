@@ -70,6 +70,9 @@ paths: "apps/mobile/src/db/**/*.ts,apps/mobile/src/sync/**/*.ts"
 
 | ファイル | 役割 |
 |---|---|
+| `db/queries.ts` | 同期対象テーブルへの書き込み。**write の中で enqueue する** |
+| `db/appSettings.ts` | 端末ローカルの設定。同期対象外なので enqueue しない |
+| `db/loadWorkoutData.ts` | 画面が使うデータの一括読み取り |
 | `db/syncTables.ts` | 同期対象エンティティと列の定義。`apps/api/src/tables.ts` と対になる |
 | `db/outbox.ts` | 操作キューの出し入れ。`sync_outbox` テーブル |
 | `sync/pusher.ts` | 送信役。`POST /sync/operations` へ送り、確定した操作を取り下げる |

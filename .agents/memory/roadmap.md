@@ -411,35 +411,47 @@ Phase 3 の順序には意味がある。**#7 で作る部位ピッカーを #8 
 
 `.agents/rules/` を整えたうえで、ESLint（typescript-eslint の recommended-type-checked）を
 3アプリへ入れ、警告0にしてから設計面の指摘を高→中→低の順に潰した。
-3アプリとも typecheck / lint はクリーン。**この作業に付随する残タスクは下の2件だけ。**
+3アプリとも typecheck / lint はクリーン。付随タスク2件も 2026-08-13 に実装済み（下記）。
 
-### TODO: モバイルの再レンダリングと再読込を減らす（2026-08-13 追加・未着手）
+### モバイルの再レンダリングと再読込を減らす（2026-08-13 実装。実機計測が残）
 
-**次に着手するのはこれ。** 前提だったコードルール改善は完了済み。
+背景: `reloadData` が書き込みのたび（19か所）に全11テーブルを読み直し、
+11個の state が全部新しい参照になって `App.tsx` 以下が全再レンダリングされていた。
+メモは1文字打つたびにこの処理が走っていた。メモリは問題でないことは確認済み
+（フックの戻り値 5.8 KB、実データ 604 セット＝141 KB の 1/24）。
 
-現状の計測で分かっていること。
+実装したこと。
 
-- `reloadData` は全11テーブルを SQLite から読み直し、11個の state を差し替える。
-  これが書き込みのたび（19か所）に走る。セットを1つ足すだけで 604 セット＋
-  179 種目行＋64 ワークアウトを読み直している
-- state がすべて新しい参照になるため、`App.tsx` と全子コンポーネントが再レンダリングされる
-- メモを1文字打つたびにこの処理が走る（`SetActionSheet` / `SetEditor` の `onChangeText`）
+- **`reloadTables(database, tables)` を導入し、書き込んだテーブルだけ再読込する。**
+  19サイト中17は1〜3テーブルで済む。全テーブルの `reloadData` を使うのは
+  起動時とクラウド復元だけ。書き込みゼロで reload していた2サイト
+  （`startWorkout` の既存 active 分岐と `startWorkoutFromTemplate` の衝突分岐）は
+  `['workouts']` へ縮小した（state が知らない active 行の取り込み用途は残る）
+- 種目は上書き（`user_exercise_settings`）を畳み込んでから配るため、
+  **どちらか一方を指定しても両テーブルを読み直す**（`loadWorkoutData.ts` でローダーを共有）
+- **メモ入力を draft + 確定時保存へ。** 数値入力（`NumberCell` / `LabeledNumber`）と同じ形。
+  `SetActionSheet` はシートを閉じるとき、`SetEditor` は入力確定（blur / return）で保存する。
+  1文字ごとの「2 UPDATE + 全読込 + 全再描画」が消えた。
+  **落とし穴:** 閉じ際に別の patch と2回に分けて送ると、両方が閉じた時点の state から
+  組み立てるため先の変更が消える。1回の patch にまとめること（`withMemoDraft`）
+- **`React.memo` + `useCallback` + 抜けていた `useMemo`。** memo の対象はカレンダー
+  （`MonthCalendar`）・グラフ（`TrendChart`）・セット表（`SetLogTable`）・編集行
+  （`SetEditor` / `WorkoutExerciseList`）。前提として `useWorkoutData` / `useSync` の
+  返す関数と `App.tsx` のハンドラを useCallback 化した（インラインアローのままでは
+  props が毎回新参照になり memo が効かない）
 
-**フックの分け方では解決しない。** 分割後も同じ state を購読するため。
+残: **実機での計測。** `__DEV__` 時に `[perf] reload <テーブル> <ms>` ログを
+`reloadTables` に仕込んである。実機でメモ入力・セット追加・種目完了を操作し、
+再読込の粒度と待ち時間を確認する。再レンダリング回数は React DevTools の
+Profiler（Highlight updates）で見る。
 
-進める順番。
+### web の部位別集計を API へ移す（2026-08-13 実装・デプロイ待ち）
 
-1. **実機で計測する。** 再レンダリング回数と、書き込み後の待ち時間を測り、どこが重いかを確かめる
-2. **`reloadData` の粒度を上げる。** 書き込んだテーブルだけ再読込する。19か所すべてに効く
-3. **`React.memo` + `useCallback`。** 重い子（カレンダー・グラフ・セット表）を対象にする
+`BodyPartSection.tsx` の `sumByBodyPart`（クライアント集計）が規約の例外になっていた件。
 
-**メモリは問題ではない**ことを確認済み。フックの戻り値オブジェクトは 5.8 KB で、
-実データ 604 セット（141 KB）の 1/24。フックの分け方でメモリ消費は変わらない。
-
-### TODO: web の部位別集計を API へ移す（2026-08-13 追加・未着手）
-
-`apps/web/src/sections/BodyPartSection.tsx` の `sumByBodyPart` が、
-`/analytics/body-parts` の週単位レスポンスをクライアントで合算している。
-web の規約は「集計は API 側に一元化、クライアントは表示整形のみ」なので例外になっている。
-
-API 側に期間合計を返す形を足す必要があるため、web だけでは閉じない。
+- `/analytics/body-parts` は**期間合計**（部位ごと・ボリューム降順）を返す形へ変更。
+  集計は D1 の `GROUP BY` で行い、route は5行（4層分離に整合）。
+  週単位の内訳は消費者が `sumByBodyPart` だけだったため削除した
+- web は `response.bodyParts` の表示整形のみに。`APIリファレンス.md` も更新済み
+- **レスポンス形状の破壊的変更のため、デプロイは api → web の順で連続して行う**（未実施。
+  逆順だと api が出るまで部位別セクションが壊れた画面になる）

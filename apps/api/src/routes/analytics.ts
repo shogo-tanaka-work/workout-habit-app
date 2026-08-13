@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 
 import { scopeForExercise, scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
-import { loadWorkoutAggregates, round1, summarizeByPeriod } from '../analytics/aggregate';
+import { loadWorkoutAggregates, roundToOneDecimal, summarizeByPeriod } from '../analytics/aggregate';
 import { monthlyPeriod, weeklyPeriod } from '../analytics/period';
 import { countedSetsCondition, COMPLETED_WORKOUT_STATUS, rmDivisorSql } from '../analytics/sql';
 import { DAYS_PER_WEEK, monthOf, shiftIsoDate, weekStartIso } from '../utils/isoDate';
@@ -148,7 +148,7 @@ analytics.get('/daily', async (context) => {
       date: row.date,
       workoutCount: row.workouts,
       setCount: row.sets,
-      totalVolume: round1(row.volume ?? 0),
+      totalVolume: roundToOneDecimal(row.volume ?? 0),
     })),
   });
 });
@@ -270,7 +270,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
   const sessions = result.results.map((row) => ({
     date: row.date,
     setCount: row.sets,
-    totalVolume: round1(row.volume ?? 0),
+    totalVolume: roundToOneDecimal(row.volume ?? 0),
     totalReps: row.total_reps ?? 0,
     maxReps: row.max_reps ?? 0,
     topWeightKg: row.top_weight ?? 0,
@@ -279,7 +279,7 @@ analytics.get('/exercises/:exerciseId', async (context) => {
   const summary = {
     sessionCount: sessions.length,
     setCount: sessions.reduce((sum, session) => sum + session.setCount, 0),
-    totalVolume: round1(sessions.reduce((sum, session) => sum + session.totalVolume, 0)),
+    totalVolume: roundToOneDecimal(sessions.reduce((sum, session) => sum + session.totalVolume, 0)),
     bestOneRepMax: sessions.reduce((max, session) => Math.max(max, session.bestOneRepMax), 0),
   };
   return context.json({ exercise, today, since, summary, sessions });
@@ -343,7 +343,7 @@ analytics.get('/habit', async (context) => {
     currentStreakWeeks: streakWeeks,
     activeWeeks,
     totalWeeks: weekSeries.length,
-    averageWorkoutsPerWeek: round1(totalWorkouts / weekSeries.length),
+    averageWorkoutsPerWeek: roundToOneDecimal(totalWorkouts / weekSeries.length),
     weeks: weekSeries,
   });
 });

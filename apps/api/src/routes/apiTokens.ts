@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 
 import { generateApiToken, hashApiToken } from '../auth/apiToken';
 import { scopeForUser } from '../db/scope';
+import { isRecord } from '../utils/isRecord';
 import type { AppEnv } from '../env';
 import { requireRole } from '../middleware/authorize';
 
@@ -17,23 +18,27 @@ const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 type CreateTokenInput = { name: string; expiresAt: string | null };
 
-const parseCreateInput = (body: unknown): CreateTokenInput | { error: string } => {
-  if (typeof body !== 'object' || body === null) {
-    return { error: 'body must be an object' };
+// 判別プロパティ（ok）で分ける。'error' in input のようなプロパティ名頼みの判定は、
+// 入力側に同名のフィールドが増えた瞬間に誤作動する。
+const parseCreateInput = (
+  body: unknown,
+): { ok: true; input: CreateTokenInput } | { ok: false; error: string } => {
+  if (!isRecord(body)) {
+    return { ok: false, error: 'body must be an object' };
   }
-  const { name, expiresAt } = body as Record<string, unknown>;
+  const { name, expiresAt } = body;
   if (typeof name !== 'string' || name.trim().length === 0) {
-    return { error: 'name is required' };
+    return { ok: false, error: 'name is required' };
   }
   if (name.length > MAX_TOKEN_NAME_LENGTH) {
-    return { error: `name must be ${MAX_TOKEN_NAME_LENGTH} characters or less` };
+    return { ok: false, error: `name must be ${MAX_TOKEN_NAME_LENGTH} characters or less` };
   }
   if (expiresAt !== undefined && expiresAt !== null) {
     if (typeof expiresAt !== 'string' || !ISO_DATETIME_PATTERN.test(expiresAt)) {
-      return { error: 'expiresAt must be an ISO 8601 UTC datetime' };
+      return { ok: false, error: 'expiresAt must be an ISO 8601 UTC datetime' };
     }
   }
-  return { name: name.trim(), expiresAt: (expiresAt as string | undefined) ?? null };
+  return { ok: true, input: { name: name.trim(), expiresAt: expiresAt ?? null } };
 };
 
 export const apiTokens = new Hono<AppEnv>();
@@ -61,9 +66,9 @@ apiTokens.post('/', async (context) => {
       400,
     );
   }
-  const input = parseCreateInput(body);
-  if ('error' in input) {
-    return context.json({ error: input.error }, 400);
+  const parsed = parseCreateInput(body);
+  if (!parsed.ok) {
+    return context.json({ error: parsed.error }, 400);
   }
 
   const user = context.get('user');
@@ -77,7 +82,7 @@ apiTokens.post('/', async (context) => {
       `INSERT INTO api_tokens (id, user_id, name, token_hash, expires_at, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, user.id, input.name, tokenHash, input.expiresAt, now, now)
+      .bind(id, user.id, parsed.input.name, tokenHash, parsed.input.expiresAt, now, now)
       .run();
   } catch (error) {
     throw new Error(
@@ -87,7 +92,7 @@ apiTokens.post('/', async (context) => {
   }
 
   // token を返すのはこの1回だけ。以降はハッシュしか残らない。
-  return context.json({ id, name: input.name, expiresAt: input.expiresAt, token: plainToken }, 201);
+  return context.json({ id, name: parsed.input.name, expiresAt: parsed.input.expiresAt, token: plainToken }, 201);
 });
 
 apiTokens.post('/:tokenId/revoke', async (context) => {

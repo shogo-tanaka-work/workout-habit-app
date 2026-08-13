@@ -14,9 +14,17 @@ export const formatIsoDate = (date: Date): string => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
+/**
+ * `YYYY-MM-DD` をローカル日付として解釈する。
+ * **`new Date('YYYY-MM-DD')` は使わない**（UTC 解釈になり、日本時間では前日になる）。
+ *
+ * 形式が不正なら `Invalid Date` を返す。呼び出し側が ISO_DATE_PATTERN で
+ * 検証済みであることを前提にしている（ここでフォールバックを持つと、
+ * 検証漏れが「1970年の集計」として静かに紛れ込む）。
+ */
 export const parseIsoDate = (isoDate: string): Date => {
   const [year, month, day] = isoDate.split('-').map(Number);
-  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
+  return new Date(year, month - 1, day);
 };
 
 // 月曜はじまりの週開始日（モバイル側 startOfWeekIso と同じ定義）。

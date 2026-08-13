@@ -40,23 +40,21 @@ sync.post('/operations', async (context) => {
   const resultById = new Map(results.map((result) => [result.id, result]));
 
   // 検証で落ちた操作も含め、送られた順に結果を返す。
-  let unnamedCount = 0;
-  const merged: OperationResult[] = parsed.operations.map((item) => {
+  // ID が無い操作には位置から連番を振る（map の外の変数を書き換えないよう index を使う）。
+  const merged: OperationResult[] = parsed.operations.map((item, index) => {
     if (!item.ok) {
-      unnamedCount += item.id === null ? 1 : 0;
       return {
-        id: item.id ?? `unknown-${unnamedCount}`,
+        id: item.id ?? `unknown-${index + 1}`,
         status: 'rejected' as const,
         error: item.error,
       };
     }
-    return (
-      resultById.get(item.operation.id) ?? {
-        id: item.operation.id,
-        status: 'rejected' as const,
-        error: 'not processed',
-      }
-    );
+    // applyOperations は渡した全操作の結果を返すため、ここは必ず見つかる。
+    return resultById.get(item.operation.id) ?? {
+      id: item.operation.id,
+      status: 'rejected' as const,
+      error: 'result missing',
+    };
   });
 
   const appliedCount = merged.filter((result) => result.status === 'applied').length;

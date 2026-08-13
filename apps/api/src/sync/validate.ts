@@ -5,6 +5,7 @@
 
 import type { SyncColumn, SyncTable } from '../tables';
 import { findSyncTable } from '../tables';
+import { isRecord } from '../utils/isRecord';
 
 /** 1リクエストで受け付ける操作の上限。 */
 const MAX_OPERATIONS_PER_REQUEST = 200;
@@ -21,9 +22,6 @@ export type SyncOperation = {
 export type ParsedOperation =
   | { ok: true; operation: SyncOperation }
   | { ok: false; id: string | null; error: string };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;

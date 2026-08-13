@@ -6,6 +6,8 @@
 // 失敗理由を戻り値で区別しないのは意図的（どのチェックで落ちたかを外部へ漏らさない）。
 // 調査に要る情報は console.warn へ出す。トークン本体・メール・sub は出さない。
 
+import { isRecord } from '../utils/isRecord';
+
 const SUPPORTED_ALGORITHM = 'RS256';
 const JWT_SEGMENT_COUNT = 3;
 /** 端末とサーバの時刻ずれの許容幅。 */
@@ -69,9 +71,6 @@ const decodeJsonSegment = <T>(segment: string): T | null => {
     return null;
   }
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
 
 const fetchJwks = async (jwksUrl: string): Promise<JsonWebKey[]> => {
   const response = await fetch(jwksUrl, { cf: { cacheTtl: 600 } });

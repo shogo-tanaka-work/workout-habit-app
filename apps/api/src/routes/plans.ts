@@ -11,6 +11,7 @@
 
 import { Hono } from 'hono';
 
+import type { Scope } from '../db/scope';
 import { scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
 import { daysBetweenIso, ISO_DATE_PATTERN } from '../utils/isoDate';
@@ -111,7 +112,7 @@ plans.get('/', async (context) => {
 const selectChildren = async (params: {
   database: D1Database;
   table: SyncTable;
-  scope: ReturnType<typeof scopeForUser>;
+  scope: Scope;
   /** 親を指す列（例: 'workout_id'）。呼び出し側のリテラルであること。 */
   parentColumn: string;
   parentIds: readonly string[];

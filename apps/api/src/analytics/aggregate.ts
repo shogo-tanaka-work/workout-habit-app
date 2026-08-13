@@ -6,7 +6,7 @@ import { countedSetsCondition, COMPLETED_WORKOUT_STATUS } from './sql';
 // route からは「取得 → 集計 → JSON 化」の3手順として呼べるようにする。
 
 
-export const round1 = (value: number): number => Math.round(value * 10) / 10;
+export const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
 
 // 完了済みワークアウト1件ごとの集計行（日付つき）。
 export type WorkoutAggregateRow = {

@@ -8,14 +8,24 @@
 
 import type { AuthenticatedUser, Identity, Role } from './types';
 
+/** users.status の取りうる値。D1 の CHECK 制約と同じ集合を型でも持つ。 */
+type UserStatus = 'invited' | 'active' | 'disabled';
+
 type UserRow = {
   id: string;
   role: string;
   status: string;
 };
 
-const ACTIVE_STATUS = 'active';
-const INVITED_STATUS = 'invited';
+const ACTIVE_STATUS: UserStatus = 'active';
+const INVITED_STATUS: UserStatus = 'invited';
+
+/** 招待時に埋まらない項目。初回ログインで判明した値を後から書き込む。 */
+type ProfileFields = {
+  /** Google 経路でのみ判明する。他の経路では null。 */
+  googleSub: string | null;
+  displayName: string | null;
+};
 
 const USER_COLUMNS = 'id, role, status';
 
@@ -54,8 +64,7 @@ const findByEmail = (database: D1Database, email: string): Promise<UserRow | nul
 const activate = async (
   database: D1Database,
   userId: string,
-  googleSub: string | null,
-  displayName: string | null,
+  profile: ProfileFields,
 ): Promise<void> => {
   const now = new Date().toISOString();
   try {
@@ -68,7 +77,7 @@ const activate = async (
              updated_at = ?
          WHERE id = ?`,
       )
-      .bind(ACTIVE_STATUS, googleSub, displayName, now, userId)
+      .bind(ACTIVE_STATUS, profile.googleSub, profile.displayName, now, userId)
       .run();
   } catch (error) {
     throw new Error(
@@ -90,10 +99,9 @@ const activate = async (
 const fillMissingProfile = async (
   database: D1Database,
   userId: string,
-  googleSub: string | null,
-  displayName: string | null,
+  profile: ProfileFields,
 ): Promise<void> => {
-  if (googleSub === null && displayName === null) {
+  if (profile.googleSub === null && profile.displayName === null) {
     return;
   }
   try {
@@ -105,7 +113,7 @@ const fillMissingProfile = async (
              updated_at = ?
          WHERE id = ? AND (google_sub IS NULL OR display_name IS NULL)`,
       )
-      .bind(googleSub, displayName, new Date().toISOString(), userId)
+      .bind(profile.googleSub, profile.displayName, new Date().toISOString(), userId)
       .run();
   } catch (error) {
     console.warn('[auth] users の補完に失敗', error instanceof Error ? error.message : '');
@@ -119,8 +127,7 @@ const fillMissingProfile = async (
 const acceptOrActivate = async (
   database: D1Database,
   row: UserRow | null,
-  googleSub: string | null,
-  displayName: string | null,
+  profile: ProfileFields,
 ): Promise<AuthenticatedUser | null> => {
   if (!row) {
     return null;
@@ -128,7 +135,7 @@ const acceptOrActivate = async (
   if (row.status === ACTIVE_STATUS) {
     const user = toAuthenticatedUser(row);
     if (user) {
-      await fillMissingProfile(database, row.id, googleSub, displayName);
+      await fillMissingProfile(database, row.id, profile);
     }
     return user;
   }
@@ -137,7 +144,7 @@ const acceptOrActivate = async (
     if (!user) {
       return null;
     }
-    await activate(database, row.id, googleSub, displayName);
+    await activate(database, row.id, profile);
     return user;
   }
   return null;
@@ -166,13 +173,19 @@ export const resolveUser = async (
 
   if (identity.kind === 'access') {
     const row = await findByEmail(database, identity.email);
-    return acceptOrActivate(database, row, null, null);
+    return acceptOrActivate(database, row, { googleSub: null, displayName: null });
   }
 
   const bySub = await findByGoogleSub(database, identity.googleSub);
   if (bySub) {
-    return acceptOrActivate(database, bySub, null, identity.displayName);
+    return acceptOrActivate(database, bySub, {
+      googleSub: null,
+      displayName: identity.displayName,
+    });
   }
   const byEmail = await findByEmail(database, identity.email);
-  return acceptOrActivate(database, byEmail, identity.googleSub, identity.displayName);
+  return acceptOrActivate(database, byEmail, {
+    googleSub: identity.googleSub,
+    displayName: identity.displayName,
+  });
 };

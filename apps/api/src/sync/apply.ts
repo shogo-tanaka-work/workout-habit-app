@@ -206,7 +206,9 @@ const applyOne = async (
     await database.batch([mutation, ledgerStatement(database, user, operation, appliedAt)]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[sync] 操作の適用に失敗: ${table.name}/${operation.op}`);
+    // 理由まで残す。クライアントが結果を捨てた場合、サーバ側だけが手がかりになる
+    // （記録の中身は出さない。error-handling.md）。
+    console.warn(`[sync] 操作の適用に失敗: ${table.name}/${operation.op}: ${message}`);
     return { id: operation.id, status: 'rejected', error: message };
   }
 

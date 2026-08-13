@@ -1,5 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
+import { isRecord } from '../utils/isRecord';
+
 import type { SyncSettings, TimerSettings, TimerState } from '../types/domain';
 import { DEFAULT_REST_PRESETS, REST_PRESET_LIMIT } from '../types/domain';
 import type { AppSettingRow } from '../types/db';
@@ -133,7 +135,30 @@ export const saveRestTimer = async (
   await upsertAppSetting(database, REST_TIMER_KEY, JSON.stringify(timer));
 };
 
-/** 保存された休憩タイマーを読む。壊れていたら無視する（タイマーは復元できなくても致命的ではない）。 */
+/**
+ * 保存された JSON を TimerState として読む。**形が違えば null を返す。**
+ *
+ * アプリの更新でタイマーの形を変えると、端末には古い形が残っている。
+ * 無検証で通すと、欠けた項目が undefined のまま画面へ流れて表示が崩れる。
+ */
+const toTimerState = (value: unknown): TimerState | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const { workoutSetId, exerciseName, duration, remaining, running, finished, endsAt } = value;
+  if (
+    typeof workoutSetId !== 'string' ||
+    typeof exerciseName !== 'string' ||
+    typeof duration !== 'number' ||
+    typeof remaining !== 'number' ||
+    typeof running !== 'boolean' ||
+    typeof finished !== 'boolean' ||
+    !(typeof endsAt === 'number' || endsAt === null)
+  ) {
+    return null;
+  }
+  return { workoutSetId, exerciseName, duration, remaining, running, finished, endsAt };
+};
 
 /** 保存された休憩タイマーを読む。壊れていたら無視する（タイマーは復元できなくても致命的ではない）。 */
 export const loadRestTimer = async (
@@ -147,11 +172,7 @@ export const loadRestTimer = async (
     return null;
   }
   try {
-    const parsed: unknown = JSON.parse(row.value);
-    if (typeof parsed !== 'object' || parsed === null) {
-      return null;
-    }
-    return parsed as TimerState;
+    return toTimerState(JSON.parse(row.value));
   } catch (error) {
     console.warn(
       '[timer] 保存された休憩タイマーを読めませんでした',

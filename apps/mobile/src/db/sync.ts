@@ -1,5 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
+import { isRecord } from '../utils/isRecord';
+
 import type { SyncEntity } from './syncTables';
 import { SYNC_COLUMNS } from './syncTables';
 
@@ -96,9 +98,11 @@ export const fetchBackupFromCloud = async (
   if (!response.ok) {
     throw new Error(`データの取得に失敗しました (HTTP ${response.status})`);
   }
-  const payload = (await response.json()) as BackupPayload;
-  if (typeof payload?.tables !== 'object' || payload.tables === null) {
+  // 復元はローカルを全消ししてから流し込む。形を確かめる前に as で名乗らせると、
+  // 壊れた応答でも「消してから気づく」ことになる。
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !isRecord(payload.tables)) {
     throw new Error('取得したデータの形式が不正です');
   }
-  return payload;
+  return payload as BackupPayload;
 };

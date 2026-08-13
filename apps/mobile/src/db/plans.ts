@@ -1,5 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
+import { isRecord } from '../utils/isRecord';
+
 import type { SyncEntity } from './syncTables';
 import { SYNC_COLUMNS } from './syncTables';
 
@@ -48,12 +50,11 @@ const toSqlValue = (value: unknown): string | number | null => {
 };
 
 const isPlanPayload = (value: unknown): value is PlansPayload => {
-  const tables = (value as PlansPayload | null)?.tables;
-  return (
-    typeof tables === 'object' &&
-    tables !== null &&
-    PLAN_ENTITIES.every((entity) => Array.isArray(tables[entity]))
-  );
+  if (!isRecord(value) || !isRecord(value.tables)) {
+    return false;
+  }
+  const { tables } = value;
+  return PLAN_ENTITIES.every((entity) => Array.isArray(tables[entity]));
 };
 
 const normalizeBaseUrl = (apiUrl: string): string => apiUrl.trim().replace(/\/+$/, '');

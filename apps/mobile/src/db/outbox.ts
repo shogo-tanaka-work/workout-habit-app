@@ -6,6 +6,8 @@
 
 import type * as SQLite from 'expo-sqlite';
 
+import { isRecord } from '../utils/isRecord';
+
 import { nowIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 import type { SyncEntity } from './syncTables';
@@ -103,8 +105,8 @@ const parsePayload = (payload: string | null, entryId: string): Record<string, u
   }
   try {
     const parsed: unknown = JSON.parse(payload);
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
+    if (isRecord(parsed)) {
+      return parsed;
     }
     console.warn(`[outbox] payload がオブジェクトではありません: ${entryId}`);
     return null;

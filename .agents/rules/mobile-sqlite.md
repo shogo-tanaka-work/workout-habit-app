@@ -1,5 +1,5 @@
 ---
-paths: "apps/mobile/src/db/**/*.ts"
+paths: "apps/mobile/src/db/**/*.ts,apps/mobile/src/sync/**/*.ts"
 ---
 # データ永続化ルール（expo-sqlite）
 
@@ -19,13 +19,14 @@ paths: "apps/mobile/src/db/**/*.ts"
   通さない書き込みを増やすと、その変更はキューに乗らず端末にしか残らない
 - 送信の契機は「その種目の全セット完了」。補助的にワークアウト完了・
   アプリのバックグラウンド遷移／復帰・「今すぐ同期」ボタン
-- ユーザーへ「機内モード」のような概念は見せない。出すのは `未送信 N件` の控えめな表示だけ
+- ユーザーへ「機内モード」のような概念は見せない。出すのは `未送信 N件` の控えめな表示だけ。
+  現在の置き場は設定タブ →「クラウド同期」画面（`components/CloudSyncSection.tsx`）
 
 ## スキーマの集約
 - テーブル DDL は `src/db/schema.ts` の `SCHEMA_SQL` に集約する。各所に散らさない
-- 現在のテーブル: `body_parts` `exercises` `user_exercise_settings` `workouts`
+- 現在のテーブルは12個: `body_parts` `exercises` `user_exercise_settings` `workouts`
   `workout_exercises` `workout_sets` `timer_events` `templates` `template_exercises`
-  `app_settings` `body_logs`
+  `app_settings` `body_logs` `sync_outbox`
 - カラム名は snake_case。`created_at` / `updated_at` を持たせ、主キーは文字列ID（`newId()` で発番）
 - `CREATE TABLE IF NOT EXISTS` で冪等に保つ。起動のたび再実行しても既存データを壊さない
 
@@ -51,13 +52,19 @@ paths: "apps/mobile/src/db/**/*.ts"
 - 破壊的変更（カラム削除・型変更・制約追加）は、SQLite に `ALTER TABLE ADD CONSTRAINT` が無いため
   「新テーブル作成 → 複製 → 削除 → リネーム」の再構築になる。段階適用にし、複数の変更を1回にまとめる
 - **既存データを壊さないこと**（このアプリのデータはユーザーのトレーニング記録＝代替不能）
-- スキーマを変えたら `apps/api/migrations/` と `apps/api/src/tables.ts`、`db/sync.ts` の
-  `SYNC_TABLES` も同じ変更セットで直す
+- スキーマを変えたら、次をすべて同じ変更セットで直す。
+  `apps/api/migrations/`（D1 の DDL）/ `apps/api/src/tables.ts` の `SYNC_TABLES` /
+  `db/syncTables.ts` の `SYNC_COLUMNS` / `db/migrations.ts`（端末の段階適用）/
+  必要なら `db/seed.ts`
 - `PRAGMA foreign_keys = ON` は接続時に有効化している。外部キーを定義すれば即座に効く
 
 ## シードの冪等化
 - マスタ（部位・種目）の初期投入は `db/seed.ts` に置き、
   何度実行しても重複しないよう `INSERT OR IGNORE` か存在チェックを入れる
+- **共有プリセット種目は D1 の migrations に入っていない。** サーバ側は CSV 投入や
+  手動 SQL で維持しており、端末側の正本が `seedExercises`。種目を増やすときは
+  `seed.ts` と D1 の `exercises`（`owner_user_id IS NULL`）の両方へ入れる。
+  片方だけだと、同期のたびに端末とサーバで種目数が食い違う
 
 ## 同期
 
@@ -69,8 +76,11 @@ paths: "apps/mobile/src/db/**/*.ts"
 | `db/sync.ts` | サーバの内容で端末を作り直す取り込み（機種変更・再インストール向け） |
 | `db/plans.ts` | 予定（`status='planned'`）の取り込み。`GET /plans` の期間をまるごと置き換える |
 
-- `app_settings`（接続先・タイマー設定・`sync_paused`・`rest_timer`）と `sync_outbox` は
-  端末ローカルのため同期対象外。
+- `app_settings` と `sync_outbox` は端末ローカルのため同期対象外。
+  `app_settings` のキーは接続先（`sync_api_url` / `sync_last_backup_at` / `sync_paused`）、
+  タイマーの通知設定（`timer_sound_enabled` / `timer_vibration_enabled`）、
+  共通タイマーのプリセット（`timer_rest_presets`、JSON 配列）、
+  実行中の休憩タイマー（`rest_timer`）。
   `body_parts` は共有マスタで seed が持つため同期しない
 - `enqueueUpsert` は同じ行の未送信 upsert があれば payload を差し替える。
   **並び順は据え置く**（積み直すと親より子が先に送られ、サーバで弾かれる）

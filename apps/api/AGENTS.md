@@ -37,22 +37,25 @@ Cloudflare Workers 上の Hono API。**D1 の所有者であり、認証境界**
 
 ```
 src/
-  index.ts      Hono アプリ本体（CORS・認証ミドルウェア・/health・route のマウント）
+  index.ts      Hono アプリ本体（認証ミドルウェア・/health・route のマウント）
   env.ts        Bindings と Hono の型引数
   analytics.ts  /analytics/* の集計エンドポイント
   backup.ts     /backup の読み出しと置換（本人スコープ）
-  tables.ts     同期対象エンティティの定義（列の型・親参照）。apps/mobile/src/db/sync.ts と対になる
+  tables.ts     同期対象エンティティの定義（列の型・親参照）。apps/mobile/src/db/syncTables.ts と対になる
   sync/         操作（intent）ベースの同期。validate（形式検証）・apply（冪等な適用）
   auth/         認証と認可。types / jwt / access / google / apiToken / users
   middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
   db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
   routes/       ドメイン単位の route（sync / plans / me / apiTokens）
-migrations/     D1 のマイグレーション。0001 が初期スキーマ、0002 がマルチユーザー化
+migrations/     D1 のマイグレーション。0001 初期スキーマ / 0002 マルチユーザー化 /
+                0003 操作ベース同期の台帳 / 0004 種目の上書き設定
+                **共有プリセット種目は migrations に入っていない**（seed.ts と D1 を直接揃える）
 wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
 ```
 
-`index.ts` が 300 行を超えたら `routes/` `services/` `repositories/` `middleware/` へ分割する。
+route を追加するときは `routes/` へ置く（`analytics.ts` と `backup.ts` が
+トップレベルにあるのは分割前からの経緯で、倣う形ではない）。
 
 ## エンドポイント
 

@@ -18,6 +18,15 @@ paths: "**/*.ts,**/*.tsx"
 型・DB・状態・CRUD・UI・StyleSheet を1ファイルへ全部入れるのは禁止。
 責務ごとのディレクトリへ分ける（[project-structure.md](project-structure.md)）。
 
+**行数の閾値は「読む単位が混ざっているか」を測る代理指標であって、目的ではない。**
+同じ形の定義が並ぶだけのファイルは対象外とする。
+
+- `apps/mobile/src/styles/appStyles.ts` — スタイル定義の集約。分割すると
+  「どこに定義されているか」を探す手間が増え、重複したスタイルが生まれやすくなる
+- `apps/mobile/src/db/seed.ts`、`apps/api/src/tables.ts` — 同型のデータ定義が並ぶファイル
+
+逆に、**責務が混ざったまま大きいファイルは閾値以下でも分割する**。
+
 ## 2. 判定関数・述語の重複を作らない（DRY）
 
 同じ構造の `isXxx` ヘルパーを並べない。**判定基準を引数で渡すファクトリ**にする。
@@ -157,10 +166,16 @@ const avgVolume = safeDivide(totalVolume, setCount);
 
 ## 10. アプリ間の重複は許容し、境界は越えない
 
-`apps/mobile/src/db/sync.ts` と `apps/api/src/tables.ts` のように、
-同期対象テーブル定義がモバイルと API に重複する。これは**意図的に許容**する（共有パッケージを作らない）。
+次の3組は、モバイルと API に同じ知識が重複している。これは**意図的に許容**する（共有パッケージを作らない）。
 
-ただし片方だけ変えないこと。同期対象・カラム・レスポンス形状を変えたら、対になるファイルも同じ変更セットで直す。
+| 内容 | mobile | api |
+|---|---|---|
+| 同期対象のテーブルと列 | `src/db/syncTables.ts` の `SYNC_COLUMNS` | `src/tables.ts` の `SYNC_TABLES` |
+| 推定1RM の除数（BIG3 は FWJ の換算表） | `src/utils/oneRepMax.ts` | `src/analytics.ts` の `rmDivisorSql` |
+| 共有プリセット種目 | `src/db/seed.ts` の `seedExercises` | D1 の `exercises`（`owner_user_id IS NULL`） |
+
+ただし片方だけ変えないこと。同期対象・カラム・レスポンス形状・換算式・種目を変えたら、
+対になるファイルも同じ変更セットで直す。
 
 ---
 

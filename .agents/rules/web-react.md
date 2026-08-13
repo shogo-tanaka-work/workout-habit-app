@@ -14,14 +14,21 @@ paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts,apps/web/worker/**/*.ts"
 新しい集計値が必要になったら、`sections/` で計算せず API 側にエンドポイントか項目を追加する。
 
 ## データ取得
-- 取得は `api.ts` の `apiGet` と `hooks/useApiData` を通す。`sections/` から直接 `fetch` しない
+- 取得は `api.ts` の `apiGet` と `hooks/useApiData` を通す。`sections/` から直接 `fetch` しない。
+  取得先は `/analytics/*` のほか `/plans`（予定）と `/me`（表示中のユーザー）がある
 - API は**同一オリジンの `/api/*`**。配信元 Worker（`worker/index.ts`）が
   Service Binding で `workout-habit-api` へ中継する。オリジンを直書きしない
 - **画面は認証情報を持たない。** 認証は Cloudflare Access がホストの入口で済ませている。
   トークンの入力・保存・送信を復活させない
 - レスポンス型は `types/api.ts` に定義し、`apps/api` の返す JSON と対応させる。
   API 側のレスポンス形状を変えたらこのファイルも同じ変更セットで直す
-- 読み込み中・エラー・空データの3状態を必ず扱う。`components/Loadable.tsx` を使う
+- 読み込み中・エラー・空データの3状態を必ず扱う。`components/Loadable.tsx` を使う。
+  例外は画面の主役でない補助表示（`components/Viewer.tsx` の「誰として見ているか」）。
+  取得に失敗しても表示を消すだけにし、ダッシュボード本体をエラー画面に変えない
+- 表示設定（週次目標など、サーバに持たせるほどでない値）は `localStorage` に置いてよい。
+  記録データを `localStorage` へ写さない
+- **`npm run dev` では `/api/*` が 404 になる。** 中継役の Worker が居ないため。
+  データを伴う確認はデプロイ後の環境で行う
 
 ## 配信元 Worker（worker/index.ts）
 
@@ -37,7 +44,6 @@ paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts,apps/web/worker/**/*.ts"
 
 ## レイアウト
 - PC・タブレット・スマートフォンすべてでページ全体の横スクロールを発生させない
-- Grid/Flex の可変領域には `min-width: 0` を設定する
 - 画面幅だけで重要な操作や情報を失わせない
 - 視覚表現の判断は `.agents/DESIGN.md` に従う。色・余白は `styles.css` の CSS カスタムプロパティを使う
 

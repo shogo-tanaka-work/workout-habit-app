@@ -1,5 +1,5 @@
 ---
-paths: "apps/api/src/**/*.ts,apps/api/wrangler.jsonc,apps/web/wrangler.jsonc"
+paths: "apps/api/src/**/*.ts,apps/api/wrangler.jsonc,apps/web/wrangler.jsonc,apps/web/worker/**/*.ts"
 ---
 # Cloudflare Workers
 
@@ -20,12 +20,15 @@ paths: "apps/api/src/**/*.ts,apps/api/wrangler.jsonc,apps/web/wrangler.jsonc"
 | Worker | 設定ファイル | 中身 |
 |---|---|---|
 | `workout-habit-api` | `apps/api/wrangler.jsonc` | API 専用。`main` あり、`assets` なし、D1 binding あり |
-| `workout-habit-admin` | `apps/web/wrangler.jsonc` | 管理画面専用。`main` なし、`assets` のみ |
+| `workout-habit-admin` | `apps/web/wrangler.jsonc` | 管理画面。`main`（`worker/index.ts`）＋ `assets` ＋ API への Service Binding |
 
 - **API Worker に `assets` を戻さない。** 分離した意味が無くなり、Access をホスト単位で
   掛けられなくなる
-- 管理画面 Worker は Worker スクリプトを持たない。`main` は wrangler のスキーマ上任意
-- 別オリジンのため CORS が要る。詳細は `.agents/rules/api.md` と `.agents/memory/cloudflare.md`
+- 管理画面 Worker の役割は「`dist` の配信」と「`/api/*` を Service Binding で API へ中継」の2つだけ。
+  集計も認可もここでしない
+- **CORS は持たない。** 中継によって画面と API が同一オリジンになるため。理由は `rules/api.md`、
+  構成の詳細は `memory/cloudflare.md`
+- **API Worker は転送されたヘッダを信用せず、改めて JWT を検証する**
 
 ## 変更後の反映
 

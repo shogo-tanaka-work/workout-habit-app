@@ -33,7 +33,7 @@
 | フレームワーク | Expo SDK 56 / React Native 0.85 | New Architecture（Fabric/TurboModules）が標準 |
 | UI ランタイム | React 19 | |
 | 言語 | TypeScript（strict） | `expo/tsconfig.base` を extends |
-| ローカルDB | expo-sqlite | 11テーブル。マスタ（部位・種目・上書き）＋記録（workout/sets）＋設定・ボディログ |
+| ローカルDB | expo-sqlite | 12テーブル。マスタ（部位・種目・上書き）＋記録（workout/sets）＋設定・ボディログ・送信キュー |
 | 音声 | expo-audio | タイマー完了音（timer-complete.wav） |
 | 通知 | expo-notifications | 休憩終了のローカル通知。アプリ内と同じ音を鳴らす |
 | ピッカー | @react-native-picker/picker | レスト時間選択 |
@@ -68,7 +68,9 @@ apps/mobile/
     sync/         pusher.ts（送信役）
     hooks/        useWorkoutData / useRestTimer
     utils/        datetime / format / number / aggregate / plates / calendar / csv / id
-    components/   TimerBanner / SetEditor / SetTable / TrendChart / PlateCalculator ほか
+    components/   記録: ExercisePicker / ExerciseLogPanel / SetLogTable / SetActionSheet / RecentSessions
+                  編集: WorkoutExerciseList / SetEditor
+                  共通: TimerBanner / TrendChart / StatSummary / MonthCalendar / PlateCalculator ほか
     screens/      HomeScreen / WorkoutScreen / HistoryScreen / SettingsScreen
                   ExerciseListScreen / ExerciseDetailScreen / TimerSettingsScreen / WorkoutEditScreen
     styles/       theme.ts（色・余白・フォント）/ appStyles.ts（共有 StyleSheet）

@@ -60,7 +60,7 @@ Claude Code は4つ目のクライアント。書き込みはモバイルと同�
 - Secrets をコードや Wrangler 設定へ直書きしない。
 - SQL 値は D1 prepared statement の `bind()` で渡す。
 - 端末内 SQLite のデータはユーザーのトレーニング記録＝代替不能。破壊的変更は段階適用する。
-- 既存のマイグレーションとテストを無断で削除しない。
+- 既存のマイグレーションを無断で削除しない（自動テストは未整備。追加したら同じ扱いにする）。
 - README や `docs/` は、依頼の対象でない限り変更しない。
 
 ## ルール読み込み順
@@ -68,7 +68,7 @@ Claude Code は4つ目のクライアント。書き込みはモバイルと同�
 1. `rules/code-design.md`
 2. `rules/typescript.md`
 3. `rules/project-structure.md`
-4. UI 変更では `DESIGN.md` と `rules/ui-design.md`
+4. UI 変更では `DESIGN.md`（ビジュアルの正本。色・余白・文字・角丸・影・レイアウト）
 5. 変更対象に応じて以下を読む
    - モバイル: `rules/mobile-react-native.md`、`rules/mobile-sqlite.md`
    - 管理画面: `rules/web-react.md`

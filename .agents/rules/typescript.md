@@ -57,7 +57,8 @@ export const toBodyPart = (row: BodyPartRow): BodyPart => ({
   例外: `i, j`（ループindex）、`_`（未使用引数）、`acc`（reduce）。`error` は省略しない
 
 ## インポート
-- 相対パスは `../../` を超えない。深い場合は `tsconfig` の path エイリアス（`@/*`）を使う
+- 相対パスで書く。3アプリとも `tsconfig` に `paths` を設定していない
+  （ディレクトリが浅く、`../../` を超える import が発生していないため）
 - 型のみのインポートは `import type` を使う
 - 未使用インポートを残さない
 - アプリをまたぐ import は禁止（`apps/web` から `apps/api/src` を import しない）

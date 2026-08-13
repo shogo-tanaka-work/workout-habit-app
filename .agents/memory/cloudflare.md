@@ -7,10 +7,11 @@
 ```text
 Worker: workout-habit-api      ← API 専用（apps/api）。静的アセットを持たない
   D1 database (binding: DB): workout-habit-db
-  Secret: API_TOKEN, ALLOWED_ORIGINS
+  Secret: ACCESS_TEAM_DOMAIN, ACCESS_AUD, GOOGLE_CLIENT_IDS
 
-Worker: workout-habit-admin    ← 管理画面専用（apps/web）。Worker スクリプトを持たない
-  静的アセットのみ
+Worker: workout-habit-admin    ← 管理画面（apps/web）
+  静的アセット（dist）＋ worker/index.ts
+  Service binding (API): workout-habit-api
 
 compatibility_date: 2026-06-01（両方）
 observability: enabled（API 側）
@@ -28,23 +29,29 @@ observability: enabled（API 側）
 
 ### apps/web/wrangler.jsonc
 
-- `main` を持たない**静的アセットのみの Worker**（wrangler のスキーマ上 `main` は任意）
-- `assets.directory` は `./dist`、`not_found_handling` は `single-page-application`
+- `main` は `worker/index.ts`、`assets.directory` は `./dist`、
+  `not_found_handling` は `single-page-application`
+- `services` で `workout-habit-api` を binding 名 `API` として持つ
+- `run_worker_first` により `/api/*` は静的アセットより先に Worker が受ける
 
-### CORS
+### CORS は持たない（2026-08-08 に廃止）
 
-別オリジンになったため `apps/api` に Hono の `cors()` を入れている。
+画面から API を**同一オリジンで**呼ぶ形にしたため、CORS そのものが不要になった。
 
-- 許可オリジンは **`ALLOWED_ORIGINS` シークレット**（カンマ区切り）で渡す。
-  値は秘密ではないが、`workers.dev` のサブドメインをリポジトリへ書かないため `vars` を使わない
-- 未設定なら CORS ヘッダを出さない fail closed
-- CORS ミドルウェアは**認証より前**に置く。プリフライト（OPTIONS）は `Authorization` を持たないため、
-  認証を先に通すと 401 になってブラウザ側で失敗する
+`/api/*` は `workout-habit-admin` の Worker が受け、Service Binding で
+`workout-habit-api` へ中継する。公開インターネットを経由しない。
+
+- 以前あった `ALLOWED_ORIGINS` シークレットと Hono の `cors()` は削除済み
+- **API Worker は転送されたヘッダを信用せず、改めて JWT を検証する**
+
+なぜ中継するのか。Cloudflare Access は**ホスト単位**で守るため、Access が付ける
+`Cf-Access-Jwt-Assertion` はそのホスト宛のリクエストにしか付かない。画面から API Worker の
+オリジンを直接叩くと JWT が付かず、かといって API 側にも Access を掛けると、
+未認証の XHR がログイン画面へのリダイレクトを受けて壊れる。
 
 ### 管理画面の接続先
 
-`apps/web` はビルド時に `VITE_API_ORIGIN` を埋め込む。`apps/web/.env.local` に置く
-（`env.example` をコピーする）。**未設定でビルドすると画面が設定漏れのメッセージを出す。**
+ビルド時の環境変数は無い。API は同一オリジンの `/api` 固定（`apps/web/src/api.ts`）。
 
 ## デプロイ
 

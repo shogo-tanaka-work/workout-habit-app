@@ -12,7 +12,7 @@
 - `.agents/AGENTS.md` — 入口。3アプリの責務境界とルール読み込み順
 - `.agents/rules/web-react.md` — 責務境界・データ取得・レイアウト・グラフ
 - `.agents/rules/code-design.md`、`typescript.md`、`project-structure.md` — 全アプリ共通
-- `.agents/DESIGN.md` と `.agents/rules/ui-design.md` — UI を変更するとき
+- `.agents/DESIGN.md` — UI を変更するとき（ビジュアルの正本）
 
 ## 技術スタック
 
@@ -39,7 +39,7 @@ src/
   api.ts        apiGet（同一オリジンの /api/*）と表示設定の localStorage 管理
   App.tsx       ApiContext 提供 → セクション描画の薄いシェル
   styles.css    CSS カスタムプロパティとクラス定義
-  vite-env.d.ts import.meta.env の型定義
+  vite-env.d.ts vite/client の型参照のみ（import.meta.env は使っていない）
 worker/
   index.ts      配信元 Worker。dist の配信と /api/* の中継だけを行う
 wrangler.jsonc  workout-habit-admin Worker の設定（assets + API への Service Binding）

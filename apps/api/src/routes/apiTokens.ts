@@ -91,13 +91,13 @@ apiTokens.post('/', async (context) => {
 });
 
 apiTokens.post('/:tokenId/revoke', async (context) => {
-  const user = context.get('user');
+  const scope = scopeForUser(context.get('user'), 'user_id');
   const now = new Date().toISOString();
   const result = await context.env.DB.prepare(
     `UPDATE api_tokens SET revoked_at = ?, updated_at = ?
-     WHERE id = ? AND user_id = ? AND revoked_at IS NULL`,
+     WHERE id = ? AND ${scope.condition} AND revoked_at IS NULL`,
   )
-    .bind(now, now, context.req.param('tokenId'), user.id)
+    .bind(now, now, context.req.param('tokenId'), ...scope.params)
     .run();
   if (result.meta.changes === 0) {
     return context.json({ error: 'token not found' }, 404);

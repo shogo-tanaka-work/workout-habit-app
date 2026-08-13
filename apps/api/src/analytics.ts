@@ -14,6 +14,19 @@ import type { AppEnv } from './env';
 // 日付はモバイル側が端末ローカル日付（YYYY-MM-DD）で保存しているため、
 // 基準日をクライアントから `?today=YYYY-MM-DD` で渡せるようにする（省略時はUTC今日）。
 
+/**
+ * 集計に数えるセットの条件。**新しい集計クエリを書くときは必ず添える。**
+ *
+ * 手書きでコピーしていると、書き忘れても型でも lint でも捕まらず、
+ * 「ウォームアップを足すほど総ボリュームが増える」というこの規則が防ぎたい事故が
+ * そのまま再発する。列別名は呼び出し側のリテラルであること。
+ */
+const countedSetsCondition = (setsAlias: string): string =>
+  `${setsAlias}.deleted_at IS NULL AND ${setsAlias}.is_warmup = 0`;
+
+/** 集計対象のワークアウト。予定や記録中は数えない。 */
+const COMPLETED_WORKOUT_STATUS = 'completed';
+
 const EPLEY_DIVISOR = 30;
 
 // 推定1RM は「weight * (1 + reps / 除数)」で、除数だけが種目で変わる。
@@ -112,8 +125,8 @@ const loadWorkoutAggregates = async (
               SUM(s.reps) AS reps
        FROM workouts w
        JOIN workout_exercises we ON we.workout_id = w.id
-       JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0
-       WHERE w.status = 'completed' AND w.performed_at >= ? AND ${scope.condition}
+       JOIN workout_sets s ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')}
+       WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND w.performed_at >= ? AND ${scope.condition}
        GROUP BY w.id
        ORDER BY w.performed_at`,
     )
@@ -194,7 +207,7 @@ analytics.get('/body-parts', async (context) => {
      JOIN workouts w ON we.workout_id = w.id
      JOIN exercises e ON we.exercise_id = e.id
      LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
-     WHERE w.status = 'completed' AND s.deleted_at IS NULL AND s.is_warmup = 0 AND w.performed_at >= ?
+     WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND ${countedSetsCondition('s')} AND w.performed_at >= ?
        AND ${scope.condition}
      GROUP BY w.performed_at, bp.id
      ORDER BY w.performed_at`,
@@ -255,8 +268,8 @@ analytics.get('/daily', async (context) => {
             SUM(s.weight_kg * s.reps) AS volume
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id
-     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0
-     WHERE w.status = 'completed' AND w.performed_at >= ? AND ${scope.condition}
+     JOIN workout_sets s ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')}
+     WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND w.performed_at >= ? AND ${scope.condition}
      GROUP BY w.performed_at
      ORDER BY w.performed_at`,
   )
@@ -265,7 +278,7 @@ analytics.get('/daily', async (context) => {
   const totalScope = scopeForUser(context.get('user'), 'user_id');
   const total = await context.env.DB.prepare(
     `SELECT COUNT(*) AS workouts FROM workouts
-     WHERE status = 'completed' AND ${totalScope.condition}`,
+     WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND ${totalScope.condition}`,
   )
     .bind(...totalScope.params)
     .first<{ workouts: number }>();
@@ -332,9 +345,9 @@ analytics.get('/exercises', async (context) => {
      LEFT JOIN body_parts bp ON bp.id = e.primary_body_part_id
      LEFT JOIN workout_exercises we ON we.exercise_id = e.id
      LEFT JOIN workouts w
-       ON w.id = we.workout_id AND w.status = 'completed' AND ${workoutScope.condition}
+       ON w.id = we.workout_id AND w.status = '${COMPLETED_WORKOUT_STATUS}' AND ${workoutScope.condition}
      LEFT JOIN workout_sets s
-       ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0 AND w.id IS NOT NULL
+       ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')} AND w.id IS NOT NULL
      WHERE e.is_archived = 0 AND ${exerciseScope.condition}
      GROUP BY e.id
      ORDER BY session_count DESC, e.name`,
@@ -391,8 +404,8 @@ analytics.get('/exercises/:exerciseId', async (context) => {
             ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${rmDivisorSql('we.exercise_id')})), 1) AS best_one_rep_max
      FROM workouts w
      JOIN workout_exercises we ON we.workout_id = w.id AND we.exercise_id = ?
-     JOIN workout_sets s ON s.workout_exercise_id = we.id AND s.deleted_at IS NULL AND s.is_warmup = 0
-     WHERE w.status = 'completed' AND w.performed_at >= ? AND ${workoutScope.condition}
+     JOIN workout_sets s ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')}
+     WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND w.performed_at >= ? AND ${workoutScope.condition}
      GROUP BY w.id
      ORDER BY w.performed_at`,
   )
@@ -428,14 +441,14 @@ analytics.get('/habit', async (context) => {
   const result = await context.env.DB.prepare(
     `SELECT performed_at AS date, COUNT(*) AS workouts
      FROM workouts
-     WHERE status = 'completed' AND performed_at >= ? AND ${scope.condition}
+     WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND performed_at >= ? AND ${scope.condition}
      GROUP BY performed_at`,
   )
     .bind(since, ...scope.params)
     .all<{ date: string; workouts: number }>();
   const lastWorkout = await context.env.DB.prepare(
     `SELECT MAX(performed_at) AS last_date FROM workouts
-     WHERE status = 'completed' AND ${scope.condition}`,
+     WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND ${scope.condition}`,
   )
     .bind(...scope.params)
     .first<{ last_date: string | null }>();

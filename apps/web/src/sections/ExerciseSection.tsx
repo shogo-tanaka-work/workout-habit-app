@@ -64,7 +64,9 @@ export const ExerciseSection = () => {
       <Loadable state={listState}>
         {() =>
           options.length === 0 ? (
-            <p className="chart-empty">記録のある種目がありません。アプリでワークアウトを記録すると表示されます</p>
+            <p className="chart-empty">
+              記録のある種目がありません。アプリでワークアウトを記録すると表示されます
+            </p>
           ) : (
             <Loadable state={detailState}>
               {(detail) => {

@@ -3,11 +3,11 @@ import { useState } from 'react';
 import { Loadable } from '../components/Loadable';
 import { Section } from '../components/Section';
 import { useApiData } from '../hooks/useApiData';
+import type { ToggleOption } from '../components/ToggleGroup';
+import { ToggleGroup } from '../components/ToggleGroup';
 import type { BodyPartsResponse } from '../types/api';
 import { formatDateKey } from '../utils/datetime';
 import { formatVolume, safeDivide } from '../utils/number';
-import type { ToggleOption } from '../components/ToggleGroup';
-import { ToggleGroup } from '../components/ToggleGroup';
 
 // 部位別ボリューム。/analytics/body-parts の週単位集計を期間で合算して横バー表示する。
 
@@ -28,15 +28,13 @@ const sumByBodyPart = (response: BodyPartsResponse): BodyPartTotal[] => {
   const totalByBodyPartId = new Map<string, BodyPartTotal>();
   for (const week of response.weeks) {
     for (const part of week.bodyParts) {
-      const total = totalByBodyPartId.get(part.bodyPartId) ?? {
+      const current = totalByBodyPartId.get(part.bodyPartId);
+      totalByBodyPartId.set(part.bodyPartId, {
         bodyPartId: part.bodyPartId,
         name: part.name,
-        setCount: 0,
-        totalVolume: 0,
-      };
-      total.setCount += part.setCount;
-      total.totalVolume += part.totalVolume;
-      totalByBodyPartId.set(part.bodyPartId, total);
+        setCount: (current?.setCount ?? 0) + part.setCount,
+        totalVolume: (current?.totalVolume ?? 0) + part.totalVolume,
+      });
     }
   }
   return [...totalByBodyPartId.values()].sort((a, b) => b.totalVolume - a.totalVolume);
@@ -60,10 +58,15 @@ export const BodyPartSection = () => {
       <Loadable state={state}>
         {(response) => {
           const totals = sumByBodyPart(response);
-          const maxVolume = totals[0]?.totalVolume ?? 0;
           if (totals.length === 0) {
-            return <p className="chart-empty">この期間の記録がありません。期間を広げるか、アプリで記録を追加してください</p>;
+            return (
+              <p className="chart-empty">
+                この期間の記録がありません。期間を広げるか、アプリで記録を追加してください
+              </p>
+            );
           }
+          // 降順に並べてあるので先頭が最大。バーの幅はこれを 100% とする。
+          const maxVolume = totals[0].totalVolume;
           return (
             <ul className="hbar-list">
               {totals.map((total) => (

@@ -21,7 +21,11 @@ const defaultFormat = (value: number): string => String(Math.round(value));
 
 export const BarChart = ({ points, formatValue = defaultFormat }: BarChartProps) => {
   if (points.length === 0) {
-    return <p className="chart-empty">表示できるデータがありません。アプリから「クラウドへバックアップ」を実行してください</p>;
+    return (
+      <p className="chart-empty">
+        表示できるデータがありません。アプリで記録すると、同期後にここへ反映されます
+      </p>
+    );
   }
 
   const maxValue = Math.max(...points.map((point) => point.value), 1);

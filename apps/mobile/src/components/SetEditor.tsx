@@ -1,3 +1,4 @@
+import { memo, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
@@ -16,7 +17,8 @@ import { LabeledNumber } from './LabeledNumber';
 // この行は過去の記録を直すときだけ使う（記録中の入力は SetLogTable が受け持つ）。
 // そのため休憩タイマーの開始ボタンは置かない。
 
-export function SetEditor({
+// memo している。1画面に多数並ぶため、他セットの編集で全行を描き直さない。
+export const SetEditor = memo(function SetEditor({
   set,
   setNumber,
   workoutExercise,
@@ -28,6 +30,23 @@ export function SetEditor({
   workoutExercise: WorkoutExercise;
   onPatchSet: (setId: string, patch: SetPatch) => void;
 }) {
+  // メモは1文字ごとに保存しない（打鍵のたびに DB 書き込みと再読込が走るため）。
+  // 数値入力（LabeledNumber）と同じ draft + 確定パターンで、入力確定時に保存する。
+  const [memoDraft, setMemoDraft] = useState(set.memo);
+  const [lastMemo, setLastMemo] = useState(set.memo);
+
+  // 親から渡る値が変わったら入力ドラフトを同期する（レンダー中の state 調整）。
+  if (set.memo !== lastMemo) {
+    setLastMemo(set.memo);
+    setMemoDraft(set.memo);
+  }
+
+  const commitMemo = () => {
+    if (memoDraft !== set.memo) {
+      onPatchSet(set.id, { memo: memoDraft });
+    }
+  };
+
   // 記録は消えると取り返しがつかない。まず一拍置く。
   const confirmDelete = () => {
     Alert.alert(
@@ -84,8 +103,10 @@ export function SetEditor({
         />
       </View>
       <TextInput
-        value={set.memo}
-        onChangeText={(memo) => onPatchSet(set.id, { memo })}
+        value={memoDraft}
+        onChangeText={setMemoDraft}
+        onEndEditing={commitMemo}
+        onSubmitEditing={commitMemo}
         placeholder="メモ"
         placeholderTextColor={colors.textFaint}
         style={styles.memoInput}
@@ -97,4 +118,4 @@ export function SetEditor({
       </Text>
     </View>
   );
-}
+});

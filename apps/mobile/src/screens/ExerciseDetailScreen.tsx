@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { LabeledNumber } from '../components/LabeledNumber';
@@ -26,6 +26,16 @@ const PERIODS = [
 
 type PeriodKey = (typeof PERIODS)[number]['key'];
 
+// セッション列（古い→新しい順）から TrendChart へ渡す点列を作る。
+const buildTrendPoints = (
+  trendSessions: ExerciseSession[],
+  selectValue: (session: ExerciseSession) => number,
+) =>
+  trendSessions.map((session) => ({
+    label: formatMonthDay(session.workout.performedAt),
+    value: selectValue(session),
+  }));
+
 // 参考UI（種目クリック詳細・種目単位詳細）準拠の種目詳細。
 // 日付ごとのセット表＋集計を新しい順に並べ、下に期間切り替え付きの推移グラフ群を置く。
 export function ExerciseDetailScreen({
@@ -36,6 +46,37 @@ export function ExerciseDetailScreen({
   sessions: ExerciseSession[];
 }) {
   const [periodKey, setPeriodKey] = useState<PeriodKey>('3m');
+  const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[1];
+
+  // 期間の絞り込みと点列の組み立て。memo した TrendChart が効くよう、
+  // sessions か期間が変わったときだけ新しい配列を作る。
+  const periodSessions = useMemo(() => {
+    const cutoff = isoDateMonthsAgo(period.months, new Date());
+    return sessions.filter((session) => session.workout.performedAt >= cutoff);
+  }, [sessions, period.months]);
+
+  // グラフは古い→新しい順で描く。
+  const trendSessions = useMemo(
+    () => periodSessions.slice(0, TREND_POINT_LIMIT).reverse(),
+    [periodSessions],
+  );
+
+  const volumePoints = useMemo(
+    () => buildTrendPoints(trendSessions, (session) => session.summary.totalVolume),
+    [trendSessions],
+  );
+  const oneRepMaxPoints = useMemo(
+    () => buildTrendPoints(trendSessions, (session) => session.summary.bestOneRepMax),
+    [trendSessions],
+  );
+  const totalRepsPoints = useMemo(
+    () => buildTrendPoints(trendSessions, (session) => session.summary.totalReps),
+    [trendSessions],
+  );
+  const maxRepsPoints = useMemo(
+    () => buildTrendPoints(trendSessions, (session) => session.summary.maxReps),
+    [trendSessions],
+  );
 
   if (sessions.length === 0) {
     return (
@@ -71,10 +112,6 @@ export function ExerciseDetailScreen({
       : best,
   );
 
-  const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[1];
-  const cutoff = isoDateMonthsAgo(period.months, new Date());
-  const periodSessions = sessions.filter((session) => session.workout.performedAt >= cutoff);
-
   // 期間全体のサマリ（参考UIの「総ボリューム・総セット・トレーニング回数」）。
   let periodVolume = 0;
   let periodSetCount = 0;
@@ -82,14 +119,6 @@ export function ExerciseDetailScreen({
     periodVolume += session.summary.totalVolume;
     periodSetCount += session.summary.setCount;
   }
-
-  // グラフは古い→新しい順で描く。
-  const trendSessions = periodSessions.slice(0, TREND_POINT_LIMIT).reverse();
-  const buildPoints = (selectValue: (session: ExerciseSession) => number) =>
-    trendSessions.map((session) => ({
-      label: formatMonthDay(session.workout.performedAt),
-      value: selectValue(session),
-    }));
 
   return (
     <View style={styles.stack}>
@@ -151,25 +180,25 @@ export function ExerciseDetailScreen({
       <TrendChart
         title="ボリューム推移"
         unit="kg"
-        points={buildPoints((session) => session.summary.totalVolume)}
+        points={volumePoints}
         color={colors.chartPrimary}
       />
       <TrendChart
         title="推定1RM推移"
         unit="kg"
-        points={buildPoints((session) => session.summary.bestOneRepMax)}
+        points={oneRepMaxPoints}
         color={colors.chartPrimary}
       />
       <TrendChart
         title="総レップ数推移"
         unit="回"
-        points={buildPoints((session) => session.summary.totalReps)}
+        points={totalRepsPoints}
         color={colors.chartSecondary}
       />
       <TrendChart
         title="最大レップ数推移"
         unit="回"
-        points={buildPoints((session) => session.summary.maxReps)}
+        points={maxRepsPoints}
         color={colors.chartSecondary}
       />
 

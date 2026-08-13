@@ -45,6 +45,7 @@ export function useSync(store: WorkoutStore) {
     account,
     pendingSyncCount,
     reloadData,
+    reloadTables,
     ensureDb,
     setSyncSettings,
     setAccount,
@@ -52,13 +53,16 @@ export function useSync(store: WorkoutStore) {
   } = store;
 
   // サーバの接続先を保存する。認証情報は端末に置かない。
-  const updateSyncConnection = async (apiUrl: string) => {
-    const openDatabase = ensureDb();
-    await upsertSyncConnection(openDatabase, { apiUrl: apiUrl.trim() });
-    setSyncSettings((previous) => ({ ...previous, apiUrl: apiUrl.trim() }));
-  };
+  const updateSyncConnection = useCallback(
+    async (apiUrl: string) => {
+      const openDatabase = ensureDb();
+      await upsertSyncConnection(openDatabase, { apiUrl: apiUrl.trim() });
+      setSyncSettings((previous) => ({ ...previous, apiUrl: apiUrl.trim() }));
+    },
+    [ensureDb, setSyncSettings],
+  );
 
-  const ensureSyncConnection = (): SyncSettings => {
+  const ensureSyncConnection = useCallback((): SyncSettings => {
     if (!syncSettings.apiUrl) {
       throw new Error('API URLを設定してください');
     }
@@ -66,51 +70,7 @@ export function useSync(store: WorkoutStore) {
       throw new Error('Google アカウントでログインしてください');
     }
     return syncSettings;
-  };
-
-  // Google サインイン。成功したらアカウントを保持し、溜まった操作を送る。
-  const signInToGoogle = async (): Promise<void> => {
-    const signedIn = await signInWithGoogle();
-    if (!signedIn) {
-      return;
-    }
-    setAccount(signedIn);
-    // ログイン前に溜まっていた操作をここで送る（オンライン復帰と同じ扱い）。
-    void syncInBackground();
-  };
-
-  const signOutOfGoogle = async (): Promise<void> => {
-    await signOutFromGoogle();
-    setAccount(null);
-  };
-
-  // 送信待ちの操作をサーバへ送る。手動の「今すぐ同期」から呼ぶ。
-  const syncNow = async () => {
-    const openDatabase = ensureDb();
-    const connection = ensureSyncConnection();
-    const result = await pushPendingOperations(openDatabase, {
-      apiUrl: connection.apiUrl,
-      getIdToken,
-    });
-    setPendingSyncCount(result.pending);
-    if (result.settled > 0) {
-      const timestamp = nowIso();
-      await markLastBackupAt(openDatabase, timestamp);
-      setSyncSettings((previous) => ({ ...previous, lastBackupAt: timestamp }));
-    }
-    if (result.failed > 0) {
-      throw new Error(`${result.failed}件の操作がサーバに拒否されました`);
-    }
-  };
-
-  // 自動送信の一時停止。**送信役だけを止める**ので、記録の保存処理は1実装のまま。
-  // ローミング中や通信量を抑えたいときに使う。手動の「今すぐ同期」は止めない
-  // （止めると、送り忘れた分が端末にしか存在しない状態を自分で作ることになる）。
-  const updateSyncPaused = async (isPaused: boolean): Promise<void> => {
-    const openDatabase = ensureDb();
-    await setSyncPaused(openDatabase, isPaused);
-    setSyncSettings((previous) => ({ ...previous, isPaused }));
-  };
+  }, [syncSettings, account]);
 
   // 自動送信。契機（種目の全セット完了・ワークアウト完了・バックグラウンド遷移）から呼ぶ。
   // 失敗しても画面は止めない。積まれたまま次の契機で再送する。
@@ -129,6 +89,53 @@ export function useSync(store: WorkoutStore) {
       setPendingSyncCount(await countPendingOperations(database));
     }
   }, [database, syncSettings.apiUrl, account, syncSettings.isPaused, setPendingSyncCount]);
+
+  // Google サインイン。成功したらアカウントを保持し、溜まった操作を送る。
+  const signInToGoogle = useCallback(async (): Promise<void> => {
+    const signedIn = await signInWithGoogle();
+    if (!signedIn) {
+      return;
+    }
+    setAccount(signedIn);
+    // ログイン前に溜まっていた操作をここで送る（オンライン復帰と同じ扱い）。
+    void syncInBackground();
+  }, [setAccount, syncInBackground]);
+
+  const signOutOfGoogle = useCallback(async (): Promise<void> => {
+    await signOutFromGoogle();
+    setAccount(null);
+  }, [setAccount]);
+
+  // 送信待ちの操作をサーバへ送る。手動の「今すぐ同期」から呼ぶ。
+  const syncNow = useCallback(async () => {
+    const openDatabase = ensureDb();
+    const connection = ensureSyncConnection();
+    const result = await pushPendingOperations(openDatabase, {
+      apiUrl: connection.apiUrl,
+      getIdToken,
+    });
+    setPendingSyncCount(result.pending);
+    if (result.settled > 0) {
+      const timestamp = nowIso();
+      await markLastBackupAt(openDatabase, timestamp);
+      setSyncSettings((previous) => ({ ...previous, lastBackupAt: timestamp }));
+    }
+    if (result.failed > 0) {
+      throw new Error(`${result.failed}件の操作がサーバに拒否されました`);
+    }
+  }, [ensureDb, ensureSyncConnection, setPendingSyncCount, setSyncSettings]);
+
+  // 自動送信の一時停止。**送信役だけを止める**ので、記録の保存処理は1実装のまま。
+  // ローミング中や通信量を抑えたいときに使う。手動の「今すぐ同期」は止めない
+  // （止めると、送り忘れた分が端末にしか存在しない状態を自分で作ることになる）。
+  const updateSyncPaused = useCallback(
+    async (isPaused: boolean): Promise<void> => {
+      const openDatabase = ensureDb();
+      await setSyncPaused(openDatabase, isPaused);
+      setSyncSettings((previous) => ({ ...previous, isPaused }));
+    },
+    [ensureDb, setSyncSettings],
+  );
 
   // 未送信が残っている間だけ定期的に再送する。
   //
@@ -156,34 +163,34 @@ export function useSync(store: WorkoutStore) {
       const { from, to } = planRange();
       const payload = await fetchPlansFromCloud(syncSettings.apiUrl, await getIdToken(), from, to);
       await replacePlannedWorkouts(database, payload);
-      await reloadData(database);
+      await reloadTables(database, ['workouts', 'workout_exercises', 'workout_sets']);
     } catch (error: unknown) {
       console.warn(
         '[plans] 予定の取り込みに失敗',
         error instanceof Error ? error.message : String(error),
       );
     }
-  }, [database, syncSettings.apiUrl, account, syncSettings.isPaused, reloadData]);
+  }, [database, syncSettings.apiUrl, account, syncSettings.isPaused, reloadTables]);
 
   // 手動の取り込み。失敗を画面へ伝えたいので、こちらは例外を投げる。
-  const importPlans = async (): Promise<void> => {
+  const importPlans = useCallback(async (): Promise<void> => {
     const openDatabase = ensureDb();
     const connection = ensureSyncConnection();
     const { from, to } = planRange();
     const payload = await fetchPlansFromCloud(connection.apiUrl, await getIdToken(), from, to);
     await replacePlannedWorkouts(openDatabase, payload);
-    await reloadData(openDatabase);
-  };
+    await reloadTables(openDatabase, ['workouts', 'workout_exercises', 'workout_sets']);
+  }, [ensureDb, ensureSyncConnection, reloadTables]);
 
   // クラウドのバックアップでローカルを置き換える（復元）。呼び出し側で確認ダイアログを出す。
-  const restoreFromCloud = async () => {
+  const restoreFromCloud = useCallback(async () => {
     const openDatabase = ensureDb();
     const connection = ensureSyncConnection();
     const payload = await fetchBackupFromCloud(connection.apiUrl, await getIdToken());
     await applyBackupPayload(openDatabase, payload);
     await reloadData(openDatabase);
     setPendingSyncCount(0);
-  };
+  }, [ensureDb, ensureSyncConnection, reloadData, setPendingSyncCount]);
 
   return {
     syncSettings,

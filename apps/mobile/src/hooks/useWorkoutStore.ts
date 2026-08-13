@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { GoogleAccount } from '../auth/googleAuth';
 import { restoreAccount } from '../auth/googleAuth';
-import { loadWorkoutData } from '../db/loadWorkoutData';
+import type { WorkoutTable } from '../db/loadWorkoutData';
+import { ALL_WORKOUT_TABLES, loadWorkoutTables } from '../db/loadWorkoutData';
 import { runMigrations } from '../db/migrations';
 import { countPendingOperations } from '../db/outbox';
 import { seedMasters } from '../db/seed';
@@ -129,21 +130,37 @@ export function useWorkoutStore() {
     });
   }, [activeExercises, workoutExercises]);
 
-  const reloadData = useCallback(async (database: SQLite.SQLiteDatabase) => {
-    const data = await loadWorkoutData(database);
-    setBodyParts(data.bodyParts);
-    setExercises(data.exercises);
-    setUserExerciseSettings(data.userExerciseSettings);
-    setWorkouts(data.workouts);
-    setWorkoutExercises(data.workoutExercises);
-    setWorkoutSets(data.workoutSets);
-    setTemplates(data.templates);
-    setTemplateExercises(data.templateExercises);
-    setTimerSettings(data.timerSettings);
-    setBodyLogs(data.bodyLogs);
-    setSyncSettings(data.syncSettings);
-    setPendingSyncCount(await countPendingOperations(database));
-  }, []);
+  // 書き込んだテーブルだけを読み直す。全テーブルを読み直すと全 state の参照が変わり、
+  // 無関係な画面の再レンダリングと useMemo の再計算まで走るため。
+  const reloadTables = useCallback(
+    async (database: SQLite.SQLiteDatabase, tables: readonly WorkoutTable[]) => {
+      const startedAtMs = Date.now();
+      const data = await loadWorkoutTables(database, tables);
+      if (data.bodyParts) setBodyParts(data.bodyParts);
+      if (data.exercises) setExercises(data.exercises);
+      if (data.userExerciseSettings) setUserExerciseSettings(data.userExerciseSettings);
+      if (data.workouts) setWorkouts(data.workouts);
+      if (data.workoutExercises) setWorkoutExercises(data.workoutExercises);
+      if (data.workoutSets) setWorkoutSets(data.workoutSets);
+      if (data.templates) setTemplates(data.templates);
+      if (data.templateExercises) setTemplateExercises(data.templateExercises);
+      if (data.timerSettings) setTimerSettings(data.timerSettings);
+      if (data.bodyLogs) setBodyLogs(data.bodyLogs);
+      if (data.syncSettings) setSyncSettings(data.syncSettings);
+      setPendingSyncCount(await countPendingOperations(database));
+      if (__DEV__) {
+        // 実機計測用。書き込み後の再読込にかかった時間を粒度つきで出す。
+        console.log(`[perf] reload ${tables.join('+')} ${String(Date.now() - startedAtMs)}ms`);
+      }
+    },
+    [],
+  );
+
+  // 全テーブルの再読込。起動時の初期化と、クラウド復元（全テーブルが変わる）だけが使う。
+  const reloadData = useCallback(
+    (database: SQLite.SQLiteDatabase) => reloadTables(database, ALL_WORKOUT_TABLES),
+    [reloadTables],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -178,12 +195,12 @@ export function useWorkoutStore() {
     };
   }, [reloadData]);
 
-  const ensureDb = (): SQLite.SQLiteDatabase => {
+  const ensureDb = useCallback((): SQLite.SQLiteDatabase => {
     if (!db) {
       throw new Error('データベースの準備がまだ終わっていません');
     }
     return db;
-  };
+  }, [db]);
   return {
     database: db,
     isReady,
@@ -216,6 +233,7 @@ export function useWorkoutStore() {
     setAccount,
     setPendingSyncCount,
     reloadData,
+    reloadTables,
     ensureDb,
   };
 }

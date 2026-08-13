@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import {
   InputAccessoryView,
   Keyboard,
@@ -56,7 +56,9 @@ function NumberCell({
   );
 }
 
-export function SetLogTable({
+// memo している。休憩タイマーの毎秒の再レンダリングが App から降りてくるため、
+// sets とハンドラが変わらない限り表を描き直さない。
+export const SetLogTable = memo(function SetLogTable({
   sets,
   onPatchSet,
   onOpenSetActions,
@@ -163,4 +165,4 @@ export function SetLogTable({
       </View>
     </ScrollView>
   );
-}
+});

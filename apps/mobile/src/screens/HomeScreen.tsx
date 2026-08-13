@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BodyLogInput } from '../components/BodyLogInput';
@@ -132,6 +132,12 @@ export function HomeScreen({
     });
   }, [layout, defaultDetailHeight]);
 
+  // memo した MonthCalendar へ渡すため、参照を安定させる（インラインだと毎レンダー新参照）。
+  const handleWeekRowHeight = useCallback(
+    (height: number) => setLayout(withMeasured('weekRow', height)),
+    [],
+  );
+
   const calendarWorkouts = useMemo(
     () => [...completedWorkouts, ...plannedWorkouts, ...(activeWorkout ? [activeWorkout] : [])],
     [completedWorkouts, plannedWorkouts, activeWorkout],
@@ -169,7 +175,7 @@ export function HomeScreen({
             selectedDate={selectedDate}
             today={today}
             onSelectDate={setSelectedDate}
-            onWeekRowHeight={(height) => setLayout(withMeasured('weekRow', height))}
+            onWeekRowHeight={handleWeekRowHeight}
           />
         </View>
       </View>

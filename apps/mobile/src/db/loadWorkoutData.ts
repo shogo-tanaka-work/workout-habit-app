@@ -40,11 +40,11 @@ import {
 
 // 端末 DB の読み取り。**書き込みは db/queries.ts が持つ。**
 //
-// 画面が要るデータを一度に読み、ドメイン型へ変換して配る。
-// 取得カラムは types/db.ts の行型と1対1で対応させて明示する
-// （SELECT * を使うと、テーブルへ列を足したときに行型と静かにずれる）。
+// テーブル単位で読み直せるようにしている。書き込みのたびに全テーブルを読み直すと、
+// 全 state の参照が変わって無関係な画面まで再レンダリングされるため、
+// 呼び出し側は「書き込んだテーブルだけ」を指定して読み直す。
 
-type WorkoutData = {
+export type WorkoutData = {
   bodyParts: BodyPart[];
   /** 上書きを反映した実効値。生の行が要る場面は無いため、こちらだけを配る。 */
   exercises: Exercise[];
@@ -59,8 +59,21 @@ type WorkoutData = {
   syncSettings: SyncSettings;
 };
 
-// 取得カラム。types/db.ts の行型と1対1で対応させる。
-// SELECT * を使うと、テーブルへ列を足したときに行型と静かにずれる。
+/** 再読込を指定できるテーブル。書き込み後は、書き込んだテーブルだけを渡す。 */
+export const ALL_WORKOUT_TABLES = [
+  'body_parts',
+  'exercises',
+  'user_exercise_settings',
+  'workouts',
+  'workout_exercises',
+  'workout_sets',
+  'templates',
+  'template_exercises',
+  'app_settings',
+  'body_logs',
+] as const;
+
+export type WorkoutTable = (typeof ALL_WORKOUT_TABLES)[number];
 
 // 取得カラム。types/db.ts の行型と1対1で対応させる。
 // SELECT * を使うと、テーブルへ列を足したときに行型と静かにずれる。
@@ -83,22 +96,12 @@ const TEMPLATE_COLUMNS = 'id, name, created_at';
 
 const TEMPLATE_EXERCISE_COLUMNS = 'id, template_id, exercise_id, order_index';
 
-export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<WorkoutData> => {
-  const [
-    bodyPartRows,
-    exerciseRows,
-    settingRows,
-    workoutRows,
-    workoutExerciseRows,
-    workoutSetRows,
-    templateRows,
-    templateExerciseRows,
-    appSettingRows,
-    bodyLogRows,
-  ] = await Promise.all([
-    database.getAllAsync<BodyPartRow>(
-      `SELECT ${BODY_PART_COLUMNS} FROM body_parts ORDER BY order_index`,
-    ),
+// 種目は上書き（user_exercise_settings）を畳み込んでから配るため、
+// どちらか一方だけが変わっても両テーブルを読み直す（2つのテーブルで1つのローダーを共有）。
+const loadExercisesWithOverrides = async (
+  database: SQLite.SQLiteDatabase,
+): Promise<Partial<WorkoutData>> => {
+  const [exerciseRows, settingRows] = await Promise.all([
     database.getAllAsync<ExerciseRow>(
       // アーカイブ済みも読み込む。除外すると戻す手段が無くなるうえ、
       // 過去の記録から種目名を引けなくなる。表示側で絞る。
@@ -107,31 +110,10 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
     database.getAllAsync<UserExerciseSettingRow>(
       `SELECT ${USER_EXERCISE_SETTING_COLUMNS} FROM user_exercise_settings`,
     ),
-    database.getAllAsync<WorkoutRow>(
-      `SELECT ${WORKOUT_COLUMNS} FROM workouts ORDER BY created_at DESC`,
-    ),
-    database.getAllAsync<WorkoutExerciseRow>(
-      `SELECT ${WORKOUT_EXERCISE_COLUMNS} FROM workout_exercises ORDER BY order_index`,
-    ),
-    database.getAllAsync<WorkoutSetRow>(
-      `SELECT ${WORKOUT_SET_COLUMNS} FROM workout_sets ORDER BY order_index`,
-    ),
-    database.getAllAsync<TemplateRow>(
-      `SELECT ${TEMPLATE_COLUMNS} FROM templates ORDER BY created_at DESC`,
-    ),
-    database.getAllAsync<TemplateExerciseRow>(
-      `SELECT ${TEMPLATE_EXERCISE_COLUMNS} FROM template_exercises ORDER BY order_index`,
-    ),
-    database.getAllAsync<AppSettingRow>('SELECT key, value FROM app_settings'),
-    database.getAllAsync<BodyLogRow>(
-      'SELECT id, measured_at, body_weight_kg, body_fat_percentage, memo FROM body_logs ORDER BY measured_at DESC',
-    ),
   ]);
   const settings = settingRows.map(toUserExerciseSetting);
   const settingByExerciseId = new Map(settings.map((setting) => [setting.exerciseId, setting]));
-
   return {
-    bodyParts: bodyPartRows.map(toBodyPart),
     // 上書きをここで畳み込む。画面ごとに合成すると、必ずどこかで忘れる。
     exercises: exerciseRows.map((row) => {
       const exercise = toExercise(row);
@@ -147,15 +129,82 @@ export const loadWorkoutData = async (database: SQLite.SQLiteDatabase): Promise<
       };
     }),
     userExerciseSettings: settings,
-    workouts: workoutRows.map(toWorkout),
-    workoutExercises: workoutExerciseRows.map(toWorkoutExercise),
-    workoutSets: workoutSetRows.map(toWorkoutSet),
-    templates: templateRows.map(toTemplate),
-    templateExercises: templateExerciseRows.map(toTemplateExercise),
-    timerSettings: toTimerSettings(appSettingRows),
-    bodyLogs: bodyLogRows.map(toBodyLog),
-    syncSettings: toSyncSettings(appSettingRows),
   };
+};
+
+type TableLoader = (database: SQLite.SQLiteDatabase) => Promise<Partial<WorkoutData>>;
+
+const TABLE_LOADERS: Record<WorkoutTable, TableLoader> = {
+  body_parts: async (database) => ({
+    bodyParts: (
+      await database.getAllAsync<BodyPartRow>(
+        `SELECT ${BODY_PART_COLUMNS} FROM body_parts ORDER BY order_index`,
+      )
+    ).map(toBodyPart),
+  }),
+  exercises: loadExercisesWithOverrides,
+  user_exercise_settings: loadExercisesWithOverrides,
+  workouts: async (database) => ({
+    workouts: (
+      await database.getAllAsync<WorkoutRow>(
+        `SELECT ${WORKOUT_COLUMNS} FROM workouts ORDER BY created_at DESC`,
+      )
+    ).map(toWorkout),
+  }),
+  workout_exercises: async (database) => ({
+    workoutExercises: (
+      await database.getAllAsync<WorkoutExerciseRow>(
+        `SELECT ${WORKOUT_EXERCISE_COLUMNS} FROM workout_exercises ORDER BY order_index`,
+      )
+    ).map(toWorkoutExercise),
+  }),
+  workout_sets: async (database) => ({
+    workoutSets: (
+      await database.getAllAsync<WorkoutSetRow>(
+        `SELECT ${WORKOUT_SET_COLUMNS} FROM workout_sets ORDER BY order_index`,
+      )
+    ).map(toWorkoutSet),
+  }),
+  templates: async (database) => ({
+    templates: (
+      await database.getAllAsync<TemplateRow>(
+        `SELECT ${TEMPLATE_COLUMNS} FROM templates ORDER BY created_at DESC`,
+      )
+    ).map(toTemplate),
+  }),
+  template_exercises: async (database) => ({
+    templateExercises: (
+      await database.getAllAsync<TemplateExerciseRow>(
+        `SELECT ${TEMPLATE_EXERCISE_COLUMNS} FROM template_exercises ORDER BY order_index`,
+      )
+    ).map(toTemplateExercise),
+  }),
+  app_settings: async (database) => {
+    const appSettingRows = await database.getAllAsync<AppSettingRow>(
+      'SELECT key, value FROM app_settings',
+    );
+    return {
+      timerSettings: toTimerSettings(appSettingRows),
+      syncSettings: toSyncSettings(appSettingRows),
+    };
+  },
+  body_logs: async (database) => ({
+    bodyLogs: (
+      await database.getAllAsync<BodyLogRow>(
+        'SELECT id, measured_at, body_weight_kg, body_fat_percentage, memo FROM body_logs ORDER BY measured_at DESC',
+      )
+    ).map(toBodyLog),
+  }),
+};
+
+/** 指定したテーブルだけを読み直す。ローダーを共有するテーブルの重複は1回にまとめる。 */
+export const loadWorkoutTables = async (
+  database: SQLite.SQLiteDatabase,
+  tables: readonly WorkoutTable[],
+): Promise<Partial<WorkoutData>> => {
+  const loaders = [...new Set(tables.map((table) => TABLE_LOADERS[table]))];
+  const parts = await Promise.all(loaders.map((load) => load(database)));
+  return parts.reduce<Partial<WorkoutData>>((merged, part) => ({ ...merged, ...part }), {});
 };
 
 export const findActiveWorkoutRow = (database: SQLite.SQLiteDatabase): Promise<WorkoutRow | null> =>

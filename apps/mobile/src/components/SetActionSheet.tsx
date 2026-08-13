@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
@@ -24,14 +25,30 @@ export function SetActionSheet({
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onClose: () => void;
 }) {
+  // メモは1文字ごとに保存しない（打鍵のたびに DB 書き込みと再読込が走るため）。
+  // 数値入力の draft + 確定パターンと同じく、シートを閉じるときにまとめて保存する。
+  const [memoDraft, setMemoDraft] = useState(set.memo);
+
+  // 別の変更と一緒に閉じるときは1回の patch にまとめる。2回に分けると、
+  // どちらも閉じた時点の state から組み立てるため、先に送った変更が消える。
+  const withMemoDraft = (patch: SetPatch): SetPatch =>
+    memoDraft === set.memo ? patch : { ...patch, memo: memoDraft };
+
   const applyAndClose = (patch: SetPatch) => {
-    onPatchSet(set.id, patch);
+    onPatchSet(set.id, withMemoDraft(patch));
+    onClose();
+  };
+
+  const commitMemoAndClose = () => {
+    if (memoDraft !== set.memo) {
+      onPatchSet(set.id, { memo: memoDraft });
+    }
     onClose();
   };
 
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+    <Modal transparent animationType="slide" visible onRequestClose={commitMemoAndClose}>
+      <Pressable style={styles.modalBackdrop} onPress={commitMemoAndClose}>
         <Pressable style={styles.modalCard} onPress={() => undefined}>
           <Text style={styles.sectionTitle}>セット {setNumber}</Text>
 
@@ -77,8 +94,8 @@ export function SetActionSheet({
           </Pressable>
 
           <TextInput
-            value={set.memo}
-            onChangeText={(memo) => onPatchSet(set.id, { memo })}
+            value={memoDraft}
+            onChangeText={setMemoDraft}
             placeholder="このセットのメモ"
             placeholderTextColor={colors.textFaint}
             style={styles.memoInput}
@@ -93,7 +110,7 @@ export function SetActionSheet({
             >
               <Text style={styles.deleteButtonText}>削除</Text>
             </Pressable>
-            <Pressable style={styles.primaryButtonFlat} onPress={onClose}>
+            <Pressable style={styles.primaryButtonFlat} onPress={commitMemoAndClose}>
               <Text style={styles.primaryButtonText}>閉じる</Text>
             </Pressable>
           </View>

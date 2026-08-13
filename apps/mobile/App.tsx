@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -32,7 +32,14 @@ import { TimerSettingsScreen } from './src/screens/TimerSettingsScreen';
 import { WorkoutEditScreen } from './src/screens/WorkoutEditScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
-import type { Exercise, Tab, Workout, WorkoutExercise, WorkoutSet } from './src/types/domain';
+import type {
+  Exercise,
+  SetPatch,
+  Tab,
+  Workout,
+  WorkoutExercise,
+  WorkoutSet,
+} from './src/types/domain';
 import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions } from './src/utils/aggregate';
 import { buildBodyLogCsv, buildWorkoutCsv } from './src/utils/csv';
@@ -170,10 +177,7 @@ export default function App() {
     ? (data.completedWorkouts.find((workout) => workout.id === editingWorkoutId) ?? null)
     : null;
   const editingWorkoutExercises = useMemo(
-    () =>
-      editingWorkoutId
-        ? exercisesInWorkout(editingWorkoutId, data.workoutExercises)
-        : [],
+    () => (editingWorkoutId ? exercisesInWorkout(editingWorkoutId, data.workoutExercises) : []),
     [editingWorkoutId, data.workoutExercises],
   );
 
@@ -221,14 +225,17 @@ export default function App() {
   // `void data.addSet(...)` のように捨てると、保存の失敗が誰にも伝わらないまま消える
   // （記録できていないのに気づけないのが一番困る）。必ずここを通して報告する。
   // 文脈つきのメッセージは db/queries.ts の writeWithOutbox が付けている。
-  const reportFailure = (error: unknown): void => {
+  const reportFailure = useCallback((error: unknown): void => {
     console.error('[App] 操作に失敗', error);
     Alert.alert('操作に失敗しました', error instanceof Error ? error.message : String(error));
-  };
+  }, []);
 
-  const runAction = (action: () => Promise<unknown>): void => {
-    action().catch(reportFailure);
-  };
+  const runAction = useCallback(
+    (action: () => Promise<unknown>): void => {
+      action().catch(reportFailure);
+    },
+    [reportFailure],
+  );
 
   // 成否で画面を進めるか決めたいときに使う。失敗の報告は runAction と同じ。
   const runActionForResult = async (action: () => Promise<unknown>): Promise<boolean> => {
@@ -241,10 +248,34 @@ export default function App() {
     }
   };
 
-  const handleStartRestTimer = async (set: WorkoutSet, workoutExercise: WorkoutExercise) => {
-    const nextTimer = await data.beginRestTimer(set, workoutExercise);
-    setTimer(nextTimer);
-  };
+  // memo したコンポーネント（SetLogTable / SetEditor / MonthCalendar / TrendChart）へ
+  // 届く経路のハンドラは useCallback で参照を安定させる。毎レンダー作り直すと
+  // props の比較が常に不一致になり、memo が効かない。
+  const { addSet, patchSet, beginRestTimer } = data;
+
+  const handleStartRestTimer = useCallback(
+    (set: WorkoutSet, workoutExercise: WorkoutExercise): void => {
+      runAction(async () => {
+        const nextTimer = await beginRestTimer(set, workoutExercise);
+        setTimer(nextTimer);
+      });
+    },
+    [runAction, beginRestTimer, setTimer],
+  );
+
+  const handleAddSet = useCallback(
+    (workoutExercise: WorkoutExercise): void => {
+      runAction(() => addSet(workoutExercise));
+    },
+    [runAction, addSet],
+  );
+
+  const handlePatchSet = useCallback(
+    (setId: string, patch: SetPatch): void => {
+      runAction(() => patchSet(setId, patch));
+    },
+    [runAction, patchSet],
+  );
 
   const handleAddCustomExercise = async (bodyPartId: string) => {
     const added = await data.addCustomExercise(newExerciseName, bodyPartId);
@@ -272,9 +303,9 @@ export default function App() {
     await data.deleteWorkout(workoutId);
   };
 
-  const openRestPicker = (exerciseId: string, seconds: number) => {
+  const openRestPicker = useCallback((exerciseId: string, seconds: number) => {
     setRestPicker({ exerciseId, seconds });
-  };
+  }, []);
 
   // 選んだ対象・期間の記録をCSVにして共有シートへ渡す（ファイル保存・AirDrop・メール等）。
   const handleExportCsv = async (request: CsvExportRequest) => {
@@ -418,8 +449,8 @@ export default function App() {
                 workoutExercises={editingWorkoutExercises}
                 visibleSets={data.visibleSets}
                 exerciseById={data.exerciseById}
-                onAddSet={(item) => runAction(() => data.addSet(item))}
-                onPatchSet={(setId, patch) => runAction(() => data.patchSet(setId, patch))}
+                onAddSet={handleAddSet}
+                onPatchSet={handlePatchSet}
                 onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}
               />
             ) : overlay?.kind === 'settings' ? (
@@ -444,7 +475,9 @@ export default function App() {
               ) : overlay.route === 'plates' ? (
                 <PlateCalculator />
               ) : overlay.route === 'csv' ? (
-                <CsvExportScreen onExport={(request) => runAction(() => handleExportCsv(request))} />
+                <CsvExportScreen
+                  onExport={(request) => runAction(() => handleExportCsv(request))}
+                />
               ) : (
                 <CloudSyncSection
                   syncSettings={data.syncSettings}
@@ -478,8 +511,12 @@ export default function App() {
                     onStartFromTemplate={(template) =>
                       runAction(() => data.startWorkoutFromTemplate(template))
                     }
-                    onSaveTemplate={(name) => runAction(() => data.saveActiveWorkoutAsTemplate(name))}
-                    onDeleteTemplate={(templateId) => runAction(() => data.deleteTemplate(templateId))}
+                    onSaveTemplate={(name) =>
+                      runAction(() => data.saveActiveWorkoutAsTemplate(name))
+                    }
+                    onDeleteTemplate={(templateId) =>
+                      runAction(() => data.deleteTemplate(templateId))
+                    }
                     onComplete={() => runAction(handleComplete)}
                     onPause={() => runAction(handlePause)}
                     onAddExercise={(exercise) =>
@@ -488,9 +525,9 @@ export default function App() {
                     onAddCustomExercise={(name, bodyPartId) =>
                       runAction(() => data.addCustomExercise(name, bodyPartId))
                     }
-                    onAddSet={(item) => runAction(() => data.addSet(item))}
-                    onPatchSet={(setId, patch) => runAction(() => data.patchSet(setId, patch))}
-                    onStartRestTimer={(set, item) => runAction(() => handleStartRestTimer(set, item))}
+                    onAddSet={handleAddSet}
+                    onPatchSet={handlePatchSet}
+                    onStartRestTimer={handleStartRestTimer}
                     onOpenRestPicker={openRestPicker}
                   />
                 ) : null}
@@ -541,9 +578,7 @@ export default function App() {
         <RestPickerModal
           value={restPicker.seconds}
           presets={data.timerSettings.restPresets}
-          onConfirm={(seconds, presets) =>
-            runAction(() => confirmRestPicker(seconds, presets))
-          }
+          onConfirm={(seconds, presets) => runAction(() => confirmRestPicker(seconds, presets))}
           onCancel={() => setRestPicker(null)}
         />
       ) : null}

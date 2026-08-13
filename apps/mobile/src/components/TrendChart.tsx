@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 import { Text, View } from 'react-native';
 
@@ -13,6 +13,7 @@ type TrendPoint = {
 const CHART_HEIGHT = 150;
 const PLOT_TOP = 8;
 const PLOT_BOTTOM = 8;
+const PLOT_HEIGHT = CHART_HEIGHT - PLOT_TOP - PLOT_BOTTOM;
 const Y_LABEL_WIDTH = 52;
 const GRID_FRACTIONS = [0, 1 / 3, 2 / 3, 1] as const;
 const DOT_SIZE = 7;
@@ -71,7 +72,10 @@ const buildScale = (rawMin: number, rawMax: number): { minValue: number; step: n
 
 // 外部チャートライブラリを使わず、View の絶対配置で折れ線を描く簡易推移グラフ。
 // points は古い→新しい順で渡す。
-export function TrendChart({
+//
+// memo している。親画面はタブ切替や期間切替で頻繁に再レンダリングされるが、
+// points と色が同じなら座標計算も描画もやり直す必要がない。
+export const TrendChart = memo(function TrendChart({
   title,
   unit,
   points,
@@ -84,39 +88,48 @@ export function TrendChart({
 }) {
   const [canvasWidth, setCanvasWidth] = useState(0);
 
-  const handleLayout = (event: LayoutChangeEvent) => {
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
     setCanvasWidth(event.nativeEvent.layout.width);
-  };
+  }, []);
 
   const plotWidth = Math.max(0, canvasWidth - Y_LABEL_WIDTH);
-  const plotHeight = CHART_HEIGHT - PLOT_TOP - PLOT_BOTTOM;
 
-  const rawMax = points.reduce((max, point) => Math.max(max, point.value), 0);
-  const rawMin = points.reduce((min, point) => Math.min(min, point.value), rawMax);
-  const { minValue, step } = buildScale(rawMin, rawMax);
+  const { minValue, step } = useMemo(() => {
+    const rawMax = points.reduce((max, point) => Math.max(max, point.value), 0);
+    const rawMin = points.reduce((min, point) => Math.min(min, point.value), rawMax);
+    return buildScale(rawMin, rawMax);
+  }, [points]);
   const maxValue = minValue + step * GRID_INTERVALS;
   const valueRange = maxValue - minValue || 1;
 
-  const positions = points.map((point, index) => {
-    const ratio = points.length === 1 ? 0.5 : index / (points.length - 1);
-    return {
-      x: Y_LABEL_WIDTH + ratio * plotWidth,
-      y: PLOT_TOP + (1 - (point.value - minValue) / valueRange) * plotHeight,
-    };
-  });
+  const positions = useMemo(
+    () =>
+      points.map((point, index) => {
+        const ratio = points.length === 1 ? 0.5 : index / (points.length - 1);
+        return {
+          x: Y_LABEL_WIDTH + ratio * plotWidth,
+          y: PLOT_TOP + (1 - (point.value - minValue) / valueRange) * PLOT_HEIGHT,
+        };
+      }),
+    [points, plotWidth, minValue, valueRange],
+  );
 
-  const segments = positions.slice(1).map((end, index) => {
-    const start = positions[index];
-    const deltaX = end.x - start.x;
-    const deltaY = end.y - start.y;
-    const length = Math.hypot(deltaX, deltaY);
-    return {
-      length,
-      angle: Math.atan2(deltaY, deltaX),
-      centerX: (start.x + end.x) / 2,
-      centerY: (start.y + end.y) / 2,
-    };
-  });
+  const segments = useMemo(
+    () =>
+      positions.slice(1).map((end, index) => {
+        const start = positions[index];
+        const deltaX = end.x - start.x;
+        const deltaY = end.y - start.y;
+        const length = Math.hypot(deltaX, deltaY);
+        return {
+          length,
+          angle: Math.atan2(deltaY, deltaX),
+          centerX: (start.x + end.x) / 2,
+          centerY: (start.y + end.y) / 2,
+        };
+      }),
+    [positions],
+  );
 
   const xLabelPoints =
     points.length > 4
@@ -138,9 +151,11 @@ export function TrendChart({
             <View style={styles.chartCanvas} onLayout={handleLayout}>
               {GRID_FRACTIONS.map((fraction) => (
                 <View key={`grid-${fraction}`}>
-                  <View style={[styles.chartGridLine, { top: PLOT_TOP + fraction * plotHeight }]} />
+                  <View
+                    style={[styles.chartGridLine, { top: PLOT_TOP + fraction * PLOT_HEIGHT }]}
+                  />
                   <Text
-                    style={[styles.chartGridLabel, { top: PLOT_TOP + fraction * plotHeight - 7 }]}
+                    style={[styles.chartGridLabel, { top: PLOT_TOP + fraction * PLOT_HEIGHT - 7 }]}
                   >
                     {formatAxisValue(maxValue - fraction * valueRange, step)}
                   </Text>
@@ -191,4 +206,4 @@ export function TrendChart({
       </View>
     </View>
   );
-}
+});

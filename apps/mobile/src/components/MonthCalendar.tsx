@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { DatePickerModal } from './DatePickerModal';
@@ -21,7 +21,10 @@ const MAX_VISIBLE_MARKS = 3;
 // ホームの主役になる月間カレンダー（月曜はじまり）。
 // 日セルには「部位色 × 種目数」のマークを出し、その月の実績が一望できるようにする。
 // タップでその日を選び、下の詳細セクションが連動する。
-export function MonthCalendar({
+//
+// memo している。ホームはドラッグやタイマーで頻繁に再レンダリングされるが、
+// カレンダー自体は marksByDate と選択日が変わらない限り描き直す必要がない。
+export const MonthCalendar = memo(function MonthCalendar({
   marksByDate,
   selectedDate,
   today,
@@ -37,7 +40,7 @@ export function MonthCalendar({
 }) {
   const [yearMonth, setYearMonth] = useState(() => currentYearMonth(new Date()));
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
-  const weeks = buildMonthWeeks(yearMonth);
+  const weeks = useMemo(() => buildMonthWeeks(yearMonth), [yearMonth]);
 
   // 色の対応。スタイル自体は appStyles で共有しているので、色を変えるならそちらを直す。
   const weekendTextStyle = (weekdayIndex: number) => {
@@ -181,4 +184,4 @@ export function MonthCalendar({
       ) : null}
     </View>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { ExerciseLogPanel } from '../components/ExerciseLogPanel';
@@ -77,6 +77,29 @@ export function WorkoutScreen({
   // 追加直後は workoutExercise がまだ手元に無く、再読み込み後に解決するため。
   const [focusedExerciseId, setFocusedExerciseId] = useState<string | null>(null);
 
+  const focused = focusedExerciseId
+    ? (workoutExercises.find((item) => item.exerciseId === focusedExerciseId) ?? null)
+    : null;
+
+  // memo した SetLogTable が効くよう、セット表へ渡す配列は元データが変わったときだけ作り直す。
+  const focusedSets = useMemo(() => {
+    if (!focused) {
+      return [];
+    }
+    return visibleSets
+      .filter((set) => set.workoutExerciseId === focused.id)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+  }, [focused, visibleSets]);
+
+  const todaySetCountByExerciseId = useMemo(() => {
+    const countByExerciseId = new Map<string, number>();
+    for (const item of workoutExercises) {
+      const count = visibleSets.filter((set) => set.workoutExerciseId === item.id).length;
+      countByExerciseId.set(item.exerciseId, (countByExerciseId.get(item.exerciseId) ?? 0) + count);
+    }
+    return countByExerciseId;
+  }, [workoutExercises, visibleSets]);
+
   // テンプレートからの開始は、記録中でないときだけ（ワークアウトは同時に1つ）。
   const confirmDeleteTemplate = (template: Template) => {
     Alert.alert('テンプレートを削除', `「${template.name}」を削除します。`, [
@@ -135,20 +158,13 @@ export function WorkoutScreen({
     );
   }
 
-  const focused = focusedExerciseId
-    ? (workoutExercises.find((item) => item.exerciseId === focusedExerciseId) ?? null)
-    : null;
-
   if (focused) {
     const exercise = exerciseById.get(focused.exerciseId);
-    const sets = visibleSets
-      .filter((set) => set.workoutExerciseId === focused.id)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
     return (
       <ExerciseLogPanel
         workoutExercise={focused}
         exercise={exercise}
-        sets={sets}
+        sets={focusedSets}
         recentSessions={recentSessionsByExerciseId.get(focused.exerciseId) ?? []}
         restSeconds={restSecondsFor(focused, exercise)}
         onAddSet={onAddSet}
@@ -157,15 +173,6 @@ export function WorkoutScreen({
         onOpenRestPicker={onOpenRestPicker}
         onBack={() => setFocusedExerciseId(null)}
       />
-    );
-  }
-
-  const todaySetCountByExerciseId = new Map<string, number>();
-  for (const item of workoutExercises) {
-    const count = visibleSets.filter((set) => set.workoutExerciseId === item.id).length;
-    todaySetCountByExerciseId.set(
-      item.exerciseId,
-      (todaySetCountByExerciseId.get(item.exerciseId) ?? 0) + count,
     );
   }
 

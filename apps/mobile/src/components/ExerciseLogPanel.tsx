@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { RecentSessions } from './RecentSessions';
@@ -49,16 +49,24 @@ export function ExerciseLogPanel({
 
   // 完了を付けると、そのまま休憩に入る（beginRestTimer が完了も立てる）。
   // ボタンを2つ置かず、ジムでの一手を減らすため。止めたいときはタイマーバナーから止める。
-  const handlePatchSet = (setId: string, patch: SetPatch) => {
-    if (patch.isCompleted === true) {
-      const target = sets.find((set) => set.id === setId);
-      if (target) {
-        onStartRestTimer(target, workoutExercise);
-        return;
+  // memo した SetLogTable へ渡すため、useCallback で参照を安定させる。
+  const handlePatchSet = useCallback(
+    (setId: string, patch: SetPatch) => {
+      if (patch.isCompleted === true) {
+        const target = sets.find((set) => set.id === setId);
+        if (target) {
+          onStartRestTimer(target, workoutExercise);
+          return;
+        }
       }
-    }
-    onPatchSet(setId, patch);
-  };
+      onPatchSet(setId, patch);
+    },
+    [sets, onStartRestTimer, workoutExercise, onPatchSet],
+  );
+
+  const handleOpenSetActions = useCallback((set: WorkoutSet, setNumber: number) => {
+    setActionTarget({ set, setNumber });
+  }, []);
 
   const actionSetIndex = actionTarget
     ? sets.findIndex((set) => set.id === actionTarget.set.id)
@@ -108,7 +116,7 @@ export function ExerciseLogPanel({
         <SetLogTable
           sets={sets}
           onPatchSet={handlePatchSet}
-          onOpenSetActions={(set, setNumber) => setActionTarget({ set, setNumber })}
+          onOpenSetActions={handleOpenSetActions}
         />
 
         <View style={styles.sectionBody}>

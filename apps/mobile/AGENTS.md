@@ -68,7 +68,9 @@ apps/mobile/
                   appSettings.ts（端末ローカルの設定。outbox に積まない）
                   outbox.ts（操作キュー）/ syncTables.ts（同期対象の定義）/ sync.ts（取り込み）
     sync/         pusher.ts（送信役）
-    hooks/        useWorkoutData / useRestTimer
+    hooks/        useWorkoutStore（DB初期化・状態・派生値）
+                  useWorkoutData（書き込みと同期。store を束ねて配るファサード）
+                  useRestTimer
     utils/        datetime / format / number / workoutTree / aggregate / oneRepMax
                   plates / calendar / calendarMarks / csv / id
     components/   記録: ExercisePicker / ExerciseLogPanel / SetLogTable / SetActionSheet / RecentSessions

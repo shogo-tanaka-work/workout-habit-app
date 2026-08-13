@@ -30,16 +30,6 @@ export const generateApiToken = (): string => {
   return `${API_TOKEN_PREFIX}${toBase64Url(randomBytes)}`;
 };
 
-/** Web Crypto による固定時間比較。長さが違う場合は比較せず false。 */
-const equalsInConstantTime = (left: string, right: string): boolean => {
-  const leftBytes = new TextEncoder().encode(left);
-  const rightBytes = new TextEncoder().encode(right);
-  if (leftBytes.byteLength !== rightBytes.byteLength) {
-    return false;
-  }
-  return crypto.subtle.timingSafeEqual(leftBytes, rightBytes);
-};
-
 type ApiTokenRow = {
   id: string;
   user_id: string;
@@ -71,7 +61,9 @@ export const verifyApiToken = async (
       { cause: error },
     );
   }
-  if (!row || !equalsInConstantTime(row.token_hash, tokenHash)) {
+  // 照合は上の SQL（token_hash = ?）が済ませている。行が返った時点で一致は確定しており、
+  // 取り出した値をもう一度比べても結果は変わらない。
+  if (!row) {
     return null;
   }
   if (row.revoked_at !== null) {

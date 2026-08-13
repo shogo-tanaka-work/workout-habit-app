@@ -7,13 +7,16 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "hono": "^4.7.0"
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
     "typescript": "^5.9.0",
+    "typescript-eslint": "^8.67.0",
     "wrangler": "^4.45.0"
   }
 }

@@ -1,0 +1,18 @@
+{
+  // 中継 Worker は Workers ランタイム向けで、DOM も React も使わない。
+  // 画面側（tsconfig.json）と lib が違うため設定を分ける。
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": ["worker"]
+}

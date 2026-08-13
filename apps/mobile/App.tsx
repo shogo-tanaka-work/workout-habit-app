@@ -205,6 +205,18 @@ export default function App() {
     ? (data.exerciseById.get(editingExerciseId) ?? null)
     : null;
 
+  // Promise を返す操作を、戻り値 void の props へ渡すときの受け口。
+  //
+  // `void data.addSet(...)` のように捨てると、保存の失敗が誰にも伝わらないまま消える
+  // （記録できていないのに気づけないのが一番困る）。必ずここを通して報告する。
+  // 文脈つきのメッセージは db/queries.ts の writeWithOutbox が付けている。
+  const runAction = (action: () => Promise<unknown>): void => {
+    action().catch((error: unknown) => {
+      console.error('[App] 操作に失敗', error);
+      Alert.alert('操作に失敗しました', error instanceof Error ? error.message : String(error));
+    });
+  };
+
   const handleStartRestTimer = async (set: WorkoutSet, workoutExercise: WorkoutExercise) => {
     const nextTimer = await data.beginRestTimer(set, workoutExercise);
     setTimer(nextTimer);
@@ -228,7 +240,7 @@ export default function App() {
       setTab('workout');
       return;
     }
-    void handleStart();
+    runAction(handleStart);
   };
 
   const handleDeleteWorkout = async (workoutId: string) => {
@@ -356,12 +368,12 @@ export default function App() {
               bodyLogs={data.bodyLogs}
               onResume={() => setTab('workout')}
               onBeginPlanned={(workoutId) => {
-                void data.beginPlannedWorkout(workoutId).then(() => setTab('workout'));
+                runAction(() => data.beginPlannedWorkout(workoutId).then(() => setTab('workout')));
               }}
               onEditWorkout={handleEditWorkoutFromHome}
               onSelectExercise={setSelectedExerciseId}
               onSaveBodyLog={(measuredAt, weightKg, fatPercentage) =>
-                void data.saveBodyLog(measuredAt, weightKg, fatPercentage)
+                runAction(() => data.saveBodyLog(measuredAt, weightKg, fatPercentage))
               }
             />
           </View>
@@ -382,9 +394,9 @@ export default function App() {
                 workoutExercises={editingWorkoutExercises}
                 visibleSets={data.visibleSets}
                 exerciseById={data.exerciseById}
-                onAddSet={data.addSet}
-                onPatchSet={data.patchSet}
-                onDeleteWorkout={handleDeleteWorkout}
+                onAddSet={(item) => runAction(() => data.addSet(item))}
+                onPatchSet={(setId, patch) => runAction(() => data.patchSet(setId, patch))}
+                onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}
               />
             ) : settingsRoute === 'exercises' ? (
               <ExerciseListScreen
@@ -393,19 +405,21 @@ export default function App() {
                 bodyPartById={data.bodyPartById}
                 newExerciseName={newExerciseName}
                 onChangeNewExerciseName={setNewExerciseName}
-                onAddCustomExercise={handleAddCustomExercise}
+                onAddCustomExercise={(bodyPartId) =>
+                  runAction(() => handleAddCustomExercise(bodyPartId))
+                }
                 onEditExercise={setEditingExerciseId}
                 onSelectExercise={setSelectedExerciseId}
               />
             ) : settingsRoute === 'timer' ? (
               <TimerSettingsScreen
                 timerSettings={data.timerSettings}
-                onUpdate={(settings) => void data.updateTimerSettings(settings)}
+                onUpdate={(settings) => runAction(() => data.updateTimerSettings(settings))}
               />
             ) : settingsRoute === 'plates' ? (
               <PlateCalculator />
             ) : settingsRoute === 'csv' ? (
-              <CsvExportScreen onExport={(request) => void handleExportCsv(request)} />
+              <CsvExportScreen onExport={(request) => runAction(() => handleExportCsv(request))} />
             ) : settingsRoute === 'sync' ? (
               <CloudSyncSection
                 syncSettings={data.syncSettings}
@@ -434,19 +448,21 @@ export default function App() {
                     lastPerformedByExerciseId={lastPerformedByExerciseId}
                     templates={data.templates}
                     templateExercises={data.templateExercises}
-                    onStart={handleStart}
-                    onStartFromTemplate={data.startWorkoutFromTemplate}
-                    onSaveTemplate={(name) => void data.saveActiveWorkoutAsTemplate(name)}
-                    onDeleteTemplate={data.deleteTemplate}
-                    onComplete={handleComplete}
-                    onPause={handlePause}
+                    onStart={() => runAction(handleStart)}
+                    onStartFromTemplate={(template) =>
+                      runAction(() => data.startWorkoutFromTemplate(template))
+                    }
+                    onSaveTemplate={(name) => runAction(() => data.saveActiveWorkoutAsTemplate(name))}
+                    onDeleteTemplate={(templateId) => runAction(() => data.deleteTemplate(templateId))}
+                    onComplete={() => runAction(handleComplete)}
+                    onPause={() => runAction(handlePause)}
                     onAddExercise={data.addExerciseToWorkout}
                     onAddCustomExercise={(name, bodyPartId) =>
-                      void data.addCustomExercise(name, bodyPartId)
+                      runAction(() => data.addCustomExercise(name, bodyPartId))
                     }
-                    onAddSet={data.addSet}
-                    onPatchSet={data.patchSet}
-                    onStartRestTimer={handleStartRestTimer}
+                    onAddSet={(item) => runAction(() => data.addSet(item))}
+                    onPatchSet={(setId, patch) => runAction(() => data.patchSet(setId, patch))}
+                    onStartRestTimer={(set, item) => runAction(() => handleStartRestTimer(set, item))}
                     onOpenRestPicker={openRestPicker}
                   />
                 ) : null}
@@ -487,7 +503,7 @@ export default function App() {
           bodyParts={data.bodyParts}
           onSave={(next) => {
             setEditingExerciseId(null);
-            void data.saveExercise(next);
+            runAction(() => data.saveExercise(next));
           }}
           onCancel={() => setEditingExerciseId(null)}
         />

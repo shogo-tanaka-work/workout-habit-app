@@ -70,16 +70,21 @@ const decodeJsonSegment = <T>(segment: string): T | null => {
   }
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 const fetchJwks = async (jwksUrl: string): Promise<JsonWebKey[]> => {
   const response = await fetch(jwksUrl, { cf: { cacheTtl: 600 } });
   if (!response.ok) {
     throw new Error(`JWKS の取得に失敗しました: ${jwksUrl} が ${response.status} を返しました`);
   }
-  const body = (await response.json()) as { keys?: JsonWebKey[] };
-  if (!Array.isArray(body.keys) || body.keys.length === 0) {
+  // 外部から来る JSON はアサーションで通さず、境界で形を確かめる。
+  const body: unknown = await response.json();
+  const keys = isRecord(body) ? body.keys : undefined;
+  if (!Array.isArray(keys) || keys.length === 0) {
     throw new Error(`JWKS の形式が不正です: ${jwksUrl}`);
   }
-  return body.keys;
+  return keys as JsonWebKey[];
 };
 
 /**

@@ -35,9 +35,16 @@ const toSqlValue = (value: unknown): string | number | null => {
     return value;
   }
   if (typeof value === 'boolean') {
+    // SQLite に真偽値の型は無い。API も 0/1 で返すが、念のため同じ形へ寄せる。
     return value ? 1 : 0;
   }
-  return value === null || value === undefined ? null : String(value);
+  if (value === null || value === undefined) {
+    return null;
+  }
+  // 同期対象の列は text / integer / real だけ（apps/api/src/tables.ts）。
+  // オブジェクトや配列が来るのは形式違反で、String() で押し込むと
+  // '[object Object]' が予定として残る。取り込みを失敗させて気づけるようにする。
+  throw new Error(`取り込めない値の型です: ${typeof value}`);
 };
 
 const isPlanPayload = (value: unknown): value is PlansPayload => {

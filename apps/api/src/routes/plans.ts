@@ -26,9 +26,8 @@ const IDS_PER_QUERY = 90;
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const PLAN_TABLES = ['workouts', 'workout_exercises', 'workout_sets'] as const;
-
-type PlanTableName = (typeof PLAN_TABLES)[number];
+/** 予定として配る対象。実績のテーブルを混ぜない。 */
+type PlanTableName = 'workouts' | 'workout_exercises' | 'workout_sets';
 
 /** 定義が見つからないのは tables.ts との不整合であり、起動時に気付きたい。 */
 const planTableOf = (name: PlanTableName): SyncTable => {
@@ -75,28 +74,28 @@ plans.get('/', async (context) => {
     )
       .bind(...scope.params, from, to)
       .all()
-  ).results as Record<string, unknown>[];
+  ).results;
 
   const workoutIds = workoutRows.map((row) => String(row.id));
-  const exerciseRows = await selectChildren(
-    context.env.DB,
-    planTableOf('workout_exercises'),
+  const exerciseRows = await selectChildren({
+    database: context.env.DB,
+    table: planTableOf('workout_exercises'),
     scope,
-    'workout_id',
-    workoutIds,
-    'ORDER BY order_index',
-  );
+    parentColumn: 'workout_id',
+    parentIds: workoutIds,
+    suffix: 'ORDER BY order_index',
+  });
 
   const workoutExerciseIds = exerciseRows.map((row) => String(row.id));
-  const setRows = await selectChildren(
-    context.env.DB,
-    planTableOf('workout_sets'),
+  const setRows = await selectChildren({
+    database: context.env.DB,
+    table: planTableOf('workout_sets'),
     scope,
-    'workout_exercise_id',
-    workoutExerciseIds,
+    parentColumn: 'workout_exercise_id',
+    parentIds: workoutExerciseIds,
     // 論理削除済みのセットは予定としても存在しない。
-    'AND deleted_at IS NULL ORDER BY order_index',
-  );
+    suffix: 'AND deleted_at IS NULL ORDER BY order_index',
+  });
 
   return context.json({
     from,
@@ -114,14 +113,17 @@ plans.get('/', async (context) => {
  * 親 ID で子行を引く。所有者の条件は親を辿らず自テーブルにも掛ける
  * （どのテーブル単独で見ても他人の行が出ないようにする）。
  */
-const selectChildren = async (
-  database: D1Database,
-  table: SyncTable,
-  scope: ReturnType<typeof scopeForUser>,
-  parentColumn: string,
-  parentIds: readonly string[],
-  suffix: string,
-): Promise<Record<string, unknown>[]> => {
+const selectChildren = async (params: {
+  database: D1Database;
+  table: SyncTable;
+  scope: ReturnType<typeof scopeForUser>;
+  /** 親を指す列（例: 'workout_id'）。呼び出し側のリテラルであること。 */
+  parentColumn: string;
+  parentIds: readonly string[];
+  /** WHERE の後ろへ足す条件と並び順。 */
+  suffix: string;
+}): Promise<Record<string, unknown>[]> => {
+  const { database, table, scope, parentColumn, parentIds, suffix } = params;
   const rows: Record<string, unknown>[] = [];
   const columns = columnNamesOf(table).join(', ');
   for (let offset = 0; offset < parentIds.length; offset += IDS_PER_QUERY) {
@@ -134,7 +136,7 @@ const selectChildren = async (
       )
       .bind(...scope.params, ...chunk)
       .all();
-    rows.push(...(result.results as Record<string, unknown>[]));
+    rows.push(...(result.results));
   }
   return rows;
 };

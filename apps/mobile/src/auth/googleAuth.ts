@@ -14,9 +14,14 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 
+// Expo の環境変数は型が付かない（any）ため、ここで文字列へ絞ってから配る。
+// **参照は静的に書く。** `process.env[key]` の動的アクセスはビルド時に値へ置換されない。
+const asClientId = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.length > 0 ? value : undefined;
+
 /** Google Cloud で作成した OAuth クライアント ID。値はリポジトリへ書かない。 */
-const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const WEB_CLIENT_ID = asClientId(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
+const IOS_CLIENT_ID = asClientId(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
 
 export type GoogleAccount = {
   email: string;

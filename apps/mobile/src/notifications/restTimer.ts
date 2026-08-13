@@ -14,12 +14,14 @@ import * as Notifications from 'expo-notifications';
 // expo-notifications プラグイン（sounds）が端末へ焼き込む。**差し替えには再ビルドが要る。**
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: false,
-    shouldShowList: false,
-  }),
+  // 判断に非同期処理は要らないが、SDK が Promise を返す型を求めるため resolve して返す。
+  handleNotification: () =>
+    Promise.resolve({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: false,
+      shouldShowList: false,
+    }),
 });
 
 /** 予約中の通知 ID。同時に走る休憩タイマーは1つなので1件だけ持つ。 */

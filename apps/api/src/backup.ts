@@ -38,7 +38,7 @@ backup.get('/', async (context) => {
     )
       .bind(...scope.params)
       .all();
-    tables[table.name] = result.results as Record<string, unknown>[];
+    tables[table.name] = result.results;
   }
   return context.json({ exportedAt: new Date().toISOString(), tables } satisfies BackupPayload);
 });

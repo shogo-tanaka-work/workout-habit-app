@@ -168,6 +168,60 @@ body {
   color: var(--text-secondary);
 }
 
+/* トレーニングのフェーズ（継続状況の先頭に置く、今の局面） */
+.phase {
+  margin-bottom: var(--space-lg);
+}
+
+.phase-current {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+  font-size: var(--font-sm);
+}
+
+.phase-name {
+  color: var(--accent-text);
+  font-size: var(--font-md);
+  font-weight: 700;
+}
+
+.phase-period,
+.phase-days {
+  color: var(--text-secondary);
+}
+
+.phase-note {
+  color: var(--text-faint);
+  font-size: var(--font-xs);
+  overflow-wrap: anywhere;
+}
+
+.phase-history {
+  margin-top: var(--space-sm);
+}
+
+.phase-history-summary {
+  color: var(--text-faint);
+  font-size: var(--font-xs);
+  cursor: pointer;
+}
+
+.phase-history-list {
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phase-history-item {
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  padding: var(--space-xxs) 0;
+  overflow-wrap: anywhere;
+}
+
 /* 目標進捗バー */
 .goal-bar {
   height: 6px;

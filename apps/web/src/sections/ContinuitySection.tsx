@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { loadWeeklyGoal, saveWeeklyGoal } from '../api';
 import { CalendarHeatmap } from '../components/CalendarHeatmap';
 import { Loadable } from '../components/Loadable';
+import { PhaseSummary } from '../components/PhaseSummary';
 import { Section } from '../components/Section';
 import { useApiData } from '../hooks/useApiData';
 import type { DailyResponse, HabitResponse } from '../types/api';
@@ -50,6 +51,8 @@ export const ContinuitySection = () => {
         </label>
       }
     >
+      {/* 継続の数値は、今が減量期か中断中かで読み方が変わる。数値より先に局面を示す。 */}
+      <PhaseSummary />
       <Loadable state={habitState}>
         {(habit) => (
           <Loadable state={dailyState}>

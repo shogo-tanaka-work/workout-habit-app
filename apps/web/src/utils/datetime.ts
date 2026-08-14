@@ -6,7 +6,8 @@ const DAYS_PER_WEEK = 7;
 // getDay() は日曜=0。週の起点を月曜にするためのオフセット。
 const MONDAY_INDEX = 1;
 
-// 同ファイル内の mondayOf からのみ使う。
+const MS_PER_DAY = 86_400_000;
+
 const parseDateKey = (dateKey: string): Date => new Date(`${dateKey}T00:00:00`);
 
 export const formatDateKey = (date: Date): string => {
@@ -55,6 +56,14 @@ export const listRecentMonthKeys = (count: number, today = new Date()): string[]
   }
   return monthKeys;
 };
+
+/**
+ * 2つの dateKey の間の日数（`toKey` が後なら正）。
+ *
+ * 夏時間で 23h / 25h になる日を挟んでも1日ずれないよう、日数へ丸めてから返す。
+ */
+export const countDaysBetween = (fromKey: string, toKey: string): number =>
+  Math.round((parseDateKey(toKey).getTime() - parseDateKey(fromKey).getTime()) / MS_PER_DAY);
 
 // "6/9" のような短い表記（週ラベル・グラフ軸用）。
 export const formatShortDate = (dateKey: string): string => {

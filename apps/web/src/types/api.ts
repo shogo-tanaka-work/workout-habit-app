@@ -131,6 +131,29 @@ export type FeedbackResponse = {
   feedback: WeeklyFeedback[];
 };
 
+/** フェーズの種別（training_phases.phase の契約値）。ラベル対応は utils/trainingPhase.ts に置く。 */
+export type TrainingPhaseKind = 'cut' | 'bulk' | 'maintain' | 'break';
+
+/**
+ * トレーニングのフェーズ1件（training_phases）。`endedOn` が null なら進行中。
+ *
+ * `phase` を `TrainingPhaseKind` へ狭めないのは、これが検証していない外部入力だから。
+ * API 側が値を増やしても画面が黙って壊れないよう string で受け、
+ * `utils/trainingPhase.ts` の1か所でラベルへ解決する（未知値はフォールバック）。
+ */
+export type TrainingPhase = {
+  phase: string;
+  startedOn: string;
+  endedOn: string | null;
+  note: string;
+  updatedAt: string;
+};
+
+/** /training-phases のレスポンス。startedOn の新しい順で返る。 */
+export type TrainingPhasesResponse = {
+  phases: TrainingPhase[];
+};
+
 export type BodyLogsResponse = {
   bodyLogs: { date: string; bodyWeightKg: number | null; bodyFatPercentage: number | null }[];
 };

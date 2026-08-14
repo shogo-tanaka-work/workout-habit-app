@@ -22,6 +22,17 @@
   --danger: #e0705f;
   --danger-surface: #2e1b18;
 
+  /* 部位色（カテゴリ色）。apps/mobile/src/styles/theme.ts の bodyPartColors と同じ値を保つ。
+     正本は .agents/DESIGN.md「カテゴリ色（部位）」。unknown は微文字色に寄せ、色で意味を主張させない。 */
+  --body-part-chest: #e07a5f;
+  --body-part-back: #6f9fd8;
+  --body-part-legs: #a082cc;
+  --body-part-shoulders: #77b98a;
+  --body-part-arms: #c9b458;
+  --body-part-core: #5fb8b0;
+  --body-part-cardio: #c97fa8;
+  --body-part-unknown: #7b7163;
+
   /* 余白。5段階＋最小値。中間値を作らない。 */
   --space-xxs: 2px;
   --space-xs: 4px;
@@ -231,41 +242,10 @@ select {
   cursor: pointer;
 }
 
-/* チャート */
-.chart-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.chart {
+/* チャート（Chart.js の canvas 親。maintainAspectRatio: false のため高さをここで決める） */
+.chart-canvas {
   position: relative;
-}
-
-/* 縦軸の最大値（左上）・最小値（左下）をグラフに重ねて表示する。
-   inset は LineChart の PADDING_Y / PADDING_X とおおよそ対応。 */
-.chart-scale {
-  position: absolute;
-  inset: 4px 8px 28px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-start;
-  pointer-events: none;
-  color: var(--text-faint);
-  font-size: var(--font-xs);
-}
-
-.chart-axis {
-  display: flex;
-  justify-content: space-between;
-  color: var(--text-faint);
-  font-size: var(--font-xs);
-}
-
-.chart-last-value {
-  color: var(--accent-text);
-  font-weight: 700;
+  height: 240px;
 }
 
 .chart-empty,
@@ -276,53 +256,58 @@ select {
   text-align: center;
 }
 
-.chart-text {
-  fill: var(--accent-text);
-  font-size: var(--font-xs);
-  font-weight: 700;
-}
-
-.chart-text-faint {
-  fill: var(--text-faint);
-  font-weight: 400;
-}
-
-/* 部位別の横バー */
-.hbar-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.hbar-item {
-  display: grid;
-  grid-template-columns: 72px 1fr 150px;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.hbar-name {
+/* 種目別グラフの目標達成率（目標線の説明文） */
+.goal-summary {
+  margin: 0 0 var(--space-sm);
   font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
-.hbar-track {
-  height: 14px;
-  background: var(--surface-raised);
+/* 部位別の横積み上げバー。行の高さは HorizontalStackedBars の ROW_HEIGHT が
+   inline の grid-template-rows で与える（canvas 側の行と揃えるため）。 */
+.hbar-chart {
+  display: grid;
+  grid-template-columns: 72px 1fr 150px;
+  column-gap: var(--space-md);
 }
 
-.hbar-fill {
-  height: 100%;
-  background: var(--accent);
+.hbar-name {
+  grid-column: 1;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+.hbar-canvas {
+  grid-column: 2;
+  position: relative;
+  min-width: 0;
+}
+
+/* Chart.js の内蔵ツールチップは canvas の外へ出られないため、DOM で描く（external tooltip） */
+.hbar-tooltip {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -130%);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xxs) var(--space-sm);
+  font-size: var(--font-xs);
+  white-space: nowrap;
+  transition: opacity 0.1s ease;
 }
 
 .hbar-value {
+  grid-column: 3;
   font-size: var(--font-sm);
   font-weight: 700;
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .hbar-sets {
@@ -352,6 +337,29 @@ select {
   line-height: 14px;
   color: var(--text-faint);
   width: 14px;
+}
+
+/* 曜日列の先頭に置く、月ラベル行と同じ高さの空き。セルの行位置を揃える。 */
+.heatmap-month-spacer {
+  height: 16px;
+}
+
+/* 月ラベル行。列（週）と同じ幅・間隔で並べ、月が変わった列にだけ文字が入る。 */
+.heatmap-months {
+  display: flex;
+  gap: var(--space-xxs);
+  height: 16px;
+  margin-bottom: var(--space-xxs);
+}
+
+.heatmap-month {
+  width: 14px;
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  line-height: 14px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: visible;
 }
 
 .heatmap-grid {
@@ -386,6 +394,58 @@ select {
 .heatmap-future {
   background: transparent;
   border: 1px solid var(--surface-raised);
+}
+
+/* ヒートマップの凡例（部位色 → 部位名） */
+.heatmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+}
+
+.heatmap-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.heatmap-legend-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+/* AI フィードバック */
+.feedback-item {
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.feedback-item:first-child {
+  border-top: none;
+}
+
+.feedback-week {
+  margin: 0;
+  color: var(--accent-text);
+  font-size: var(--font-sm);
+  font-weight: 700;
+}
+
+summary.feedback-week {
+  cursor: pointer;
+}
+
+/* body はプレーンテキスト。改行を保ったまま表示する（HTML として解釈しない） */
+.feedback-body {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .error-text {

@@ -5,6 +5,7 @@ import { BodyLogSection } from './sections/BodyLogSection';
 import { BodyPartSection } from './sections/BodyPartSection';
 import { ContinuitySection } from './sections/ContinuitySection';
 import { ExerciseSection } from './sections/ExerciseSection';
+import { FeedbackSection } from './sections/FeedbackSection';
 import { PlanSection } from './sections/PlanSection';
 import { TrendSection } from './sections/TrendSection';
 import { Viewer } from './components/Viewer';
@@ -53,6 +54,7 @@ const App = () => {
         <div key={reloadCount}>
           <ContinuitySection />
           <PlanSection exercisesState={exercisesState} />
+          <FeedbackSection />
           <TrendSection />
           <BodyPartSection />
           <ExerciseSection exercisesState={exercisesState} />

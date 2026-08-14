@@ -1,4 +1,15 @@
-// 依存ライブラリなしの軽量 SVG 折れ線グラフ（モバイル側 TrendChart と同方針）。
+import type { ChartData, ChartOptions } from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+import './chartSetup';
+import { readCssColor } from './chartTheme';
+
+// Chart.js の折れ線グラフ（種目別推移・ボディログ用）。
+//
+// 縦軸はデータ範囲基準で描く（DESIGN.md「縦軸は 0 を基準にしない」）。
+// Chart.js の linear スケールは既定で 0 起点にならず、grace で上下に余白を足して
+// 表示範囲を使い切る。目標線（goalValue）はデータセットとして描くため、
+// スケール計算に自動で含まれ、目標が値域の外でも線が見える。
 
 export type LinePoint = {
   label: string;
@@ -7,78 +18,96 @@ export type LinePoint = {
 
 type LineChartProps = {
   points: LinePoint[];
-  color?: string;
-  // 体重のように変化幅が小さい系列は false にして非ゼロ基準で描く。
-  scaleFromZero?: boolean;
+  /** 系列色の CSS カスタムプロパティ名。canvas へは実値へ解決して渡す。 */
+  colorVariable?: string;
   formatValue?: (value: number) => string;
+  /** 水平の目標線（破線・第2系列色）。null なら描かない。 */
+  goalValue?: number | null;
 };
 
-const VIEW_WIDTH = 640;
-const VIEW_HEIGHT = 200;
-const PADDING_X = 8;
-const PADDING_Y = 16;
+/** 縦軸の余白（データ範囲に対する割合）。0 起点をやめた分、線が枠に張り付かないようにする。 */
+const AXIS_GRACE = '10%';
+const MAX_Y_TICKS = 7;
+const MAX_X_TICKS = 8;
 
 const defaultFormat = (value: number): string => String(Math.round(value));
 
 export const LineChart = ({
   points,
-  color = 'var(--accent)',
-  scaleFromZero = true,
+  colorVariable = '--chart-primary',
   formatValue = defaultFormat,
+  goalValue = null,
 }: LineChartProps) => {
   if (points.length < 2) {
     return <p className="chart-empty">グラフ表示には2回以上の記録が必要です</p>;
   }
 
-  const values = points.map((point) => point.value);
-  const maxValue = Math.max(...values);
-  const minValue = scaleFromZero ? 0 : Math.min(...values);
-  const valueRange = maxValue - minValue || 1;
+  const lineColor = readCssColor(colorVariable);
+  const goalColor = readCssColor('--chart-secondary');
+  const faintColor = readCssColor('--text-faint');
+  const hairlineColor = readCssColor('--hairline');
 
-  const innerWidth = VIEW_WIDTH - PADDING_X * 2;
-  const innerHeight = VIEW_HEIGHT - PADDING_Y * 2;
-  // 上で points.length < 2 を弾いているため、除数が 0 になることはない。
-  const xAt = (index: number): number =>
-    PADDING_X + (index / (points.length - 1)) * innerWidth;
-  const yAt = (value: number): number =>
-    PADDING_Y + innerHeight - ((value - minValue) / valueRange) * innerHeight;
+  const data: ChartData<'line', number[], string> = {
+    labels: points.map((point) => point.label),
+    datasets: [
+      {
+        data: points.map((point) => point.value),
+        borderColor: lineColor,
+        backgroundColor: lineColor,
+        borderWidth: 2.5,
+        pointRadius: 2.5,
+      },
+      ...(goalValue !== null
+        ? [
+            {
+              data: points.map(() => goalValue),
+              borderColor: goalColor,
+              backgroundColor: goalColor,
+              borderWidth: 1.5,
+              borderDash: [6, 6],
+              pointRadius: 0,
+            },
+          ]
+        : []),
+    ],
+  };
 
-  const polylinePoints = points
-    .map((point, index) => `${xAt(index).toFixed(1)},${yAt(point.value).toFixed(1)}`)
-    .join(' ');
-  const lastPoint = points[points.length - 1];
+  const options: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      tooltip: {
+        // 目標線は一定値の補助線なので、ツールチップは実データの系列だけに出す。
+        filter: (item) => item.datasetIndex === 0,
+        callbacks: {
+          label: (item) => (item.parsed.y === null ? '' : formatValue(item.parsed.y)),
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: faintColor, maxRotation: 0, autoSkip: true, maxTicksLimit: MAX_X_TICKS },
+        grid: { display: false },
+        border: { color: hairlineColor },
+      },
+      y: {
+        grace: AXIS_GRACE,
+        ticks: {
+          color: faintColor,
+          maxTicksLimit: MAX_Y_TICKS,
+          callback: (value) => formatValue(Number(value)),
+        },
+        grid: { color: hairlineColor },
+        border: { display: false },
+      },
+    },
+  };
 
   return (
-    <div className="chart">
-      <div className="chart-scale">
-        <span>{formatValue(maxValue)}</span>
-        <span>{formatValue(minValue)}</span>
-      </div>
-      <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" className="chart-svg">
-        <line
-          x1={PADDING_X}
-          y1={VIEW_HEIGHT - PADDING_Y}
-          x2={VIEW_WIDTH - PADDING_X}
-          y2={VIEW_HEIGHT - PADDING_Y}
-          stroke="var(--hairline)"
-        />
-        <polyline points={polylinePoints} fill="none" stroke={color} strokeWidth={2.5} />
-        {points.map((point, index) => (
-          <circle
-            key={`${point.label}-${index}`}
-            cx={xAt(index)}
-            cy={yAt(point.value)}
-            r={3}
-            fill={color}
-          />
-        ))}
-      </svg>
-      <div className="chart-axis">
-        <span>{points[0].label}</span>
-        <span className="chart-last-value">
-          {lastPoint.label}: {formatValue(lastPoint.value)}
-        </span>
-      </div>
+    <div className="chart-canvas">
+      <Line data={data} options={options} />
     </div>
   );
 };

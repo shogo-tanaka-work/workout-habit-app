@@ -10,7 +10,8 @@ import { formatBodyFat, formatBodyWeight } from '../utils/number';
 import type { ToggleOption } from '../components/ToggleGroup';
 import { ToggleGroup } from '../components/ToggleGroup';
 
-// ボディログ: /analytics/body-logs の体重・体脂肪率推移。変化幅が小さいため非ゼロ基準で描く。
+// ボディログ: /analytics/body-logs の体重・体脂肪率推移。
+// 縦軸は LineChart 共通のデータ範囲基準（非ゼロ基準）で描く。
 
 type BodyMetricMode = 'weight' | 'fat';
 
@@ -49,12 +50,7 @@ export const BodyLogSection = () => {
             }))
             .filter((point): point is LinePoint => point.value !== null);
           return (
-            <LineChart
-              points={points}
-              color="var(--chart-secondary)"
-              scaleFromZero={false}
-              formatValue={formatValue}
-            />
+            <LineChart points={points} colorVariable="--chart-secondary" formatValue={formatValue} />
           );
         }}
       </Loadable>

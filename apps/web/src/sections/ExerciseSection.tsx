@@ -4,14 +4,20 @@ import { LineChart, type LinePoint } from '../components/LineChart';
 import { Loadable } from '../components/Loadable';
 import { Section } from '../components/Section';
 import { useApiData, type ApiDataState } from '../hooks/useApiData';
-import type { ExerciseDetailResponse, ExercisesResponse } from '../types/api';
+import type {
+  ExerciseDetailResponse,
+  ExerciseGoal,
+  ExercisesResponse,
+  GoalsResponse,
+} from '../types/api';
 import { formatDateKey, formatShortDate } from '../utils/datetime';
-import { formatVolume, formatWeight } from '../utils/number';
+import { formatVolume, formatWeight, safeDivide } from '../utils/number';
 import type { ToggleOption } from '../components/ToggleGroup';
 import { ToggleGroup } from '../components/ToggleGroup';
 
 // 種目別グラフ: /analytics/exercises で種目を選び、
 // /analytics/exercises/:id のセッション推移を表示する。
+// /goals に選択中種目の目標があれば、水平の目標線と達成率を重ねる。
 
 type SeriesMode = 'topWeight' | 'oneRepMax' | 'volume';
 
@@ -22,6 +28,37 @@ const SERIES_OPTIONS: readonly ToggleOption<SeriesMode>[] = [
 ];
 
 const DETAIL_MONTHS = 12;
+
+const seriesValueOf = (
+  session: ExerciseDetailResponse['sessions'][number],
+  seriesMode: SeriesMode,
+): number => {
+  switch (seriesMode) {
+    case 'topWeight':
+      return session.topWeightKg;
+    case 'oneRepMax':
+      return session.bestOneRepMax;
+    case 'volume':
+      return session.totalVolume;
+  }
+};
+
+type GoalSummaryProps = {
+  goal: ExerciseGoal;
+  sessions: ExerciseDetailResponse['sessions'];
+};
+
+/** 「目標 100kg / 現在トップ 90kg（90%）」の達成率表示。 */
+const GoalSummary = ({ goal, sessions }: GoalSummaryProps) => {
+  const bestTopWeightKg = Math.max(...sessions.map((session) => session.topWeightKg), 0);
+  const achievedPercent = Math.round(safeDivide(bestTopWeightKg, goal.targetWeightKg) * 100);
+  return (
+    <p className="goal-summary">
+      目標 {formatWeight(goal.targetWeightKg)} / 現在トップ {formatWeight(bestTopWeightKg)}（
+      {achievedPercent}%）
+    </p>
+  );
+};
 
 type ExerciseSectionProps = {
   /** 種目一覧。PlanSection と共用するため App が一度だけ取得して配る。 */
@@ -44,6 +81,9 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
       ? `/analytics/exercises/${encodeURIComponent(effectiveExerciseId)}?months=${DETAIL_MONTHS}&today=${todayKey}`
       : null,
   );
+  // 目標は補助表示。取得に失敗しても目標線を出さないだけにし、グラフ本体は壊さない
+  // （Loadable で包まず data だけを見る）。
+  const goalsState = useApiData<GoalsResponse>('/goals');
 
   return (
     <Section
@@ -77,15 +117,26 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
               {(detail) => {
                 const points: LinePoint[] = detail.sessions.map((session) => ({
                   label: formatShortDate(session.date),
-                  value:
-                    seriesMode === 'topWeight'
-                      ? session.topWeightKg
-                      : seriesMode === 'oneRepMax'
-                        ? session.bestOneRepMax
-                        : session.totalVolume,
+                  value: seriesValueOf(session, seriesMode),
                 }));
                 const formatValue = seriesMode === 'volume' ? formatVolume : formatWeight;
-                return <LineChart points={points} formatValue={formatValue} />;
+                // 目標は重量に対するもの。ボリューム表示では意味を持たないため出さない。
+                const goal =
+                  seriesMode === 'volume'
+                    ? null
+                    : (goalsState.data?.goals.find(
+                        (candidate) => candidate.exerciseId === detail.exercise.id,
+                      ) ?? null);
+                return (
+                  <>
+                    {goal ? <GoalSummary goal={goal} sessions={detail.sessions} /> : null}
+                    <LineChart
+                      points={points}
+                      formatValue={formatValue}
+                      goalValue={goal ? goal.targetWeightKg : null}
+                    />
+                  </>
+                );
               }}
             </Loadable>
           )

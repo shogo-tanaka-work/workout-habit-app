@@ -59,8 +59,11 @@ export const ContinuitySection = () => {
                 habit.currentStreakWeeks >= STREAK_LOOKBACK_WEEKS
                   ? `${STREAK_LOOKBACK_WEEKS}+`
                   : String(habit.currentStreakWeeks);
-              const volumeMap = new Map(
-                daily.days.map((day) => [day.date, day.totalVolume]),
+              const dayMap = new Map(
+                daily.days.map((day) => [
+                  day.date,
+                  { totalVolume: day.totalVolume, topBodyPartId: day.topBodyPartId },
+                ]),
               );
               return (
                 <>
@@ -90,7 +93,7 @@ export const ContinuitySection = () => {
                   <div className="goal-bar">
                     <div className="goal-bar-fill" style={{ width: `${goalRatio * 100}%` }} />
                   </div>
-                  <CalendarHeatmap volumeMap={volumeMap} weekCount={HEATMAP_WEEKS} />
+                  <CalendarHeatmap dayMap={dayMap} weekCount={HEATMAP_WEEKS} />
                 </>
               );
             }}

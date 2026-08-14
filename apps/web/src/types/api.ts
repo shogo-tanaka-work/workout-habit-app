@@ -20,12 +20,22 @@ export type MonthlyResponse = {
   months: ({ month: string } & PeriodSummary)[];
 };
 
+/** 部位内の種目ごとの内訳（積み上げバー用）。 */
+export type BodyPartExerciseTotal = {
+  exerciseId: string;
+  name: string;
+  setCount: number;
+  totalVolume: number;
+};
+
 export type BodyPartTotal = {
   bodyPartId: string;
   name: string;
   setCount: number;
   totalVolume: number;
   totalReps: number;
+  /** 種目ごとの内訳。デプロイ順の自由度のため、旧 API（フィールドなし）でも壊れないよう省略可で受ける。 */
+  exercises?: BodyPartExerciseTotal[];
 };
 
 /** 部位ごとの期間合計。`bodyParts` はボリューム降順で返る。 */
@@ -88,7 +98,37 @@ export type DailyResponse = {
   today: string;
   since: string;
   totalWorkouts: number;
-  days: { date: string; workoutCount: number; setCount: number; totalVolume: number }[];
+  days: {
+    date: string;
+    workoutCount: number;
+    setCount: number;
+    totalVolume: number;
+    /** その日の最大ボリューム部位。旧 API（フィールドなし）でも壊れないよう省略可で受ける。 */
+    topBodyPartId?: string | null;
+  }[];
+};
+
+/** 種目ごとの目標重量（exercise_goals）。目標が無い種目は配列に含まれない。 */
+export type ExerciseGoal = {
+  exerciseId: string;
+  targetWeightKg: number;
+  memo: string | null;
+  updatedAt: string;
+};
+
+export type GoalsResponse = {
+  goals: ExerciseGoal[];
+};
+
+/** 週単位の AI フィードバック（weekly_feedback）。新しい順で返る。 */
+export type WeeklyFeedback = {
+  weekStart: string;
+  body: string;
+  updatedAt: string;
+};
+
+export type FeedbackResponse = {
+  feedback: WeeklyFeedback[];
 };
 
 export type BodyLogsResponse = {

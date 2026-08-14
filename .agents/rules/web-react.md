@@ -50,6 +50,15 @@ paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts,apps/web/worker/**/*.ts"
 - 視覚表現の判断は `.agents/DESIGN.md` に従う。色・余白は `styles.css` の CSS カスタムプロパティを使う
 
 ## グラフ
-- 外部チャートライブラリは未導入。`components/{LineChart,BarChart,CalendarHeatmap}.tsx` の自作 SVG を使う
-- ライブラリ導入は方針判断が必要。勝手に追加しない
-- SVG の座標計算はコンポーネント内の純粋関数に切り出す。JSX 内へ計算式を埋め込まない
+- 折れ線・バーは Chart.js（react-chartjs-2）を使う。導入は方針判断済み（Step 9）。
+  `components/{LineChart,BarChart,HorizontalStackedBars}.tsx` を通し、
+  `sections/` から Chart.js を直接呼ばない
+- ヒートマップは自作の `components/CalendarHeatmap.tsx` のまま（Chart.js に適する形が無いため）
+- `'chart.js/auto'` を import しない。`components/chartSetup.ts` で必要なコントローラ・要素・
+  スケールだけを register する（tree-shaking を効かせる）
+- canvas は CSS カスタムプロパティを解決できない。チャートへ渡す色は
+  `components/chartTheme.ts` の `readCssColor()` で `styles.css` から読む。色を直書きしない
+- 部位色は `styles.css` の `--body-part-*`（正本は `.agents/DESIGN.md`「カテゴリ色（部位）」）。
+  部位 ID との対応・未知 ID のフォールバックは `utils/bodyParts.ts` を通す
+- 縦軸は折れ線がデータ範囲基準（`grace` で余白）、バーが 0 起点（`DESIGN.md` のグラフ節）
+- 別のチャートライブラリの追加・置き換えは方針判断が必要。勝手に変えない

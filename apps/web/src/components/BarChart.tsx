@@ -1,4 +1,11 @@
-// 依存ライブラリなしの軽量 SVG 縦棒グラフ（週次・月次推移用）。
+import type { ChartData, ChartOptions } from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+import './chartSetup';
+import { readCssColor } from './chartTheme';
+
+// Chart.js の縦棒グラフ（週次・月次推移用）。
+// バーは長さで量を表すため、折れ線と違い 0 起点のまま描く。
 
 export type BarPoint = {
   label: string;
@@ -11,11 +18,7 @@ type BarChartProps = {
   formatValue?: (value: number) => string;
 };
 
-const VIEW_WIDTH = 640;
-const VIEW_HEIGHT = 200;
-const PADDING_TOP = 24;
-const PADDING_BOTTOM = 24;
-const BAR_GAP_RATIO = 0.3;
+const MAX_Y_TICKS = 6;
 
 const defaultFormat = (value: number): string => String(Math.round(value));
 
@@ -28,55 +31,54 @@ export const BarChart = ({ points, formatValue = defaultFormat }: BarChartProps)
     );
   }
 
-  const maxValue = Math.max(...points.map((point) => point.value), 1);
-  const innerHeight = VIEW_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
-  const slotWidth = VIEW_WIDTH / points.length;
-  const barWidth = slotWidth * (1 - BAR_GAP_RATIO);
-  // ラベルが多いときは間引いて重なりを防ぐ。
-  const labelStep = Math.ceil(points.length / 8);
+  const accentColor = readCssColor('--accent');
+  const pastBarColor = readCssColor('--accent-surface-strong');
+  const faintColor = readCssColor('--text-faint');
+  const hairlineColor = readCssColor('--hairline');
+
+  const data: ChartData<'bar', number[], string> = {
+    labels: points.map((point) => point.label),
+    datasets: [
+      {
+        data: points.map((point) => point.value),
+        backgroundColor: points.map((point) => (point.isCurrent ? accentColor : pastBarColor)),
+      },
+    ],
+  };
+
+  const options: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: (item) => (item.parsed.y === null ? '' : formatValue(item.parsed.y)),
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: faintColor, maxRotation: 0, autoSkip: true },
+        grid: { display: false },
+        border: { color: hairlineColor },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: faintColor,
+          maxTicksLimit: MAX_Y_TICKS,
+          callback: (value) => formatValue(Number(value)),
+        },
+        grid: { color: hairlineColor },
+        border: { display: false },
+      },
+    },
+  };
 
   return (
-    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" className="chart-svg">
-      <line
-        x1={0}
-        y1={VIEW_HEIGHT - PADDING_BOTTOM}
-        x2={VIEW_WIDTH}
-        y2={VIEW_HEIGHT - PADDING_BOTTOM}
-        stroke="var(--hairline)"
-      />
-      {points.map((point, index) => {
-        const barHeight = (point.value / maxValue) * innerHeight;
-        const barX = index * slotWidth + (slotWidth - barWidth) / 2;
-        const barY = VIEW_HEIGHT - PADDING_BOTTOM - barHeight;
-        const showLabel = index % labelStep === 0 || index === points.length - 1;
-        const showValue = point.value > 0 && (point.isCurrent || point.value === maxValue);
-        return (
-          <g key={`${point.label}-${index}`}>
-            <rect
-              x={barX}
-              y={barY}
-              width={barWidth}
-              height={Math.max(barHeight, point.value > 0 ? 2 : 0)}
-              fill={point.isCurrent ? 'var(--accent)' : 'var(--accent-surface-strong)'}
-            />
-            {showValue ? (
-              <text x={barX + barWidth / 2} y={barY - 6} textAnchor="middle" className="chart-text">
-                {formatValue(point.value)}
-              </text>
-            ) : null}
-            {showLabel ? (
-              <text
-                x={barX + barWidth / 2}
-                y={VIEW_HEIGHT - 6}
-                textAnchor="middle"
-                className="chart-text chart-text-faint"
-              >
-                {point.label}
-              </text>
-            ) : null}
-          </g>
-        );
-      })}
-    </svg>
+    <div className="chart-canvas">
+      <Bar data={data} options={options} />
+    </div>
   );
 };

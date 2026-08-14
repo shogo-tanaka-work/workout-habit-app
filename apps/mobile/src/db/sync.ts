@@ -29,6 +29,9 @@ const RESTORE_ORDER: readonly SyncEntity[] = [
   'templates',
   'template_exercises',
   'body_logs',
+  'weekly_feedback',
+  // exercise_goals は exercises を親に持つため、exercises より後に復元する。
+  'exercise_goals',
 ];
 
 // SQLite のバインド値へ安全に変換する（JSON経由の unknown を絞り込む）。

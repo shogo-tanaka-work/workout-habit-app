@@ -18,7 +18,9 @@ export type SyncEntity =
   | 'timer_events'
   | 'templates'
   | 'template_exercises'
-  | 'body_logs';
+  | 'body_logs'
+  | 'weekly_feedback'
+  | 'exercise_goals';
 
 export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
   exercises: [
@@ -101,6 +103,10 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
     'created_at',
     'updated_at',
   ],
+  // 週次の AI フィードバック。user_id はサーバが埋めるので端末は持たない。
+  weekly_feedback: ['id', 'week_start', 'body', 'created_at', 'updated_at'],
+  // 種目別の目標重量。親は exercises。
+  exercise_goals: ['id', 'exercise_id', 'target_weight_kg', 'memo', 'created_at', 'updated_at'],
 };
 
 /**

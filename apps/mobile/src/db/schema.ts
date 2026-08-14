@@ -123,6 +123,23 @@ export const SCHEMA_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS weekly_feedback (
+    id TEXT PRIMARY KEY NOT NULL,
+    week_start TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (week_start)
+  );
+  CREATE TABLE IF NOT EXISTS exercise_goals (
+    id TEXT PRIMARY KEY NOT NULL,
+    exercise_id TEXT NOT NULL REFERENCES exercises(id),
+    target_weight_kg REAL NOT NULL,
+    memo TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (exercise_id)
+  );
   CREATE INDEX IF NOT EXISTS idx_workout_sets_workout_exercise_id
     ON workout_sets(workout_exercise_id);
   CREATE INDEX IF NOT EXISTS idx_workout_exercises_workout_id

@@ -88,6 +88,30 @@ export const MIGRATIONS: readonly Migration[] = [
         ON sync_outbox(entity, row_id)`,
     ],
   },
+  {
+    version: 6,
+    description: '週次フィードバック（weekly_feedback）と種目別目標（exercise_goals）を追加',
+    statements: [
+      // 端末は単一ユーザーのため user_id 列は持たない（user_exercise_settings と同じ流儀）。
+      `CREATE TABLE IF NOT EXISTS weekly_feedback (
+        id TEXT PRIMARY KEY NOT NULL,
+        week_start TEXT NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (week_start)
+      )`,
+      `CREATE TABLE IF NOT EXISTS exercise_goals (
+        id TEXT PRIMARY KEY NOT NULL,
+        exercise_id TEXT NOT NULL REFERENCES exercises(id),
+        target_weight_kg REAL NOT NULL,
+        memo TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (exercise_id)
+      )`,
+    ],
+  },
 ];
 
 /** 適用済みの user_version。 */

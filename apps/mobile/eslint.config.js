@@ -36,6 +36,14 @@ module.exports = defineConfig([
     files: ['**/*.js'],
     extends: [tseslint.configs.disableTypeChecked],
   },
+  // config plugin は Expo の prebuild（Node）が読むビルド時のコードで、アプリのバンドルには入らない。
+  // CommonJS で書く必要があるため require を許す。
+  {
+    files: ['plugins/**/*.js'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
   // Prettier と競合する整形系ルールを無効化（整形は prettier に一任）
   eslintConfigPrettier,
 ]);

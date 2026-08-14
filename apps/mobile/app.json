@@ -26,10 +26,13 @@
     "plugins": [
       "expo-sqlite",
       "expo-audio",
+      "./plugins/withoutPushEntitlement",
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/timer-complete.wav"]
+          "sounds": [
+            "./assets/timer-complete.wav"
+          ]
         }
       ],
       "@react-native-google-signin/google-signin"

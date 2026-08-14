@@ -33,7 +33,9 @@ paths: "apps/web/src/**/*.tsx,apps/web/src/**/*.ts,apps/web/worker/**/*.ts"
 ## 配信元 Worker（worker/index.ts）
 
 - 役割は「dist の配信」と「`/api/*` の中継」だけ。**集計・認可・データ加工を持ち込まない**
-- 中継時にヘッダを加工しない。Access の JWT はそのまま渡し、検証は API Worker が行う
+- 中継時にヘッダを加工しない。Access の JWT はそのまま渡し、検証は API Worker が行う。
+  これは Access の JWT を落とさないための規則であり、**アセット配信レスポンスへの
+  セキュリティヘッダ付与（CSP 等）は中継ではないため該当しない**
 - ここに新しいエンドポイントを生やさない。API が必要なら `apps/api` へ追加する
 
 ## コンポーネント設計

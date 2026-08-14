@@ -1,6 +1,6 @@
 import { Loadable } from '../components/Loadable';
 import { Section } from '../components/Section';
-import { useApiData } from '../hooks/useApiData';
+import { useApiData, type ApiDataState } from '../hooks/useApiData';
 import type { ExercisesResponse, PlansResponse } from '../types/api';
 import { addDays, formatDateKey, formatShortDate } from '../utils/datetime';
 
@@ -12,14 +12,17 @@ import { addDays, formatDateKey, formatShortDate } from '../utils/datetime';
 /** 何日先まで見るか。モバイルの取り込み範囲（28日先）と揃える。 */
 const DAYS_AHEAD = 28;
 
-export const PlanSection = () => {
+type PlanSectionProps = {
+  /** 種目名の解決用。ExerciseSection と共用するため App が一度だけ取得して配る。 */
+  exercisesState: ApiDataState<ExercisesResponse>;
+};
+
+export const PlanSection = ({ exercisesState }: PlanSectionProps) => {
   const now = new Date();
   const today = formatDateKey(now);
   const plansState = useApiData<PlansResponse>(
     `/plans?from=${today}&to=${formatDateKey(addDays(now, DAYS_AHEAD))}`,
   );
-  // 種目名の解決用。予定に出てくる種目は分析 API の一覧に含まれる。
-  const exercisesState = useApiData<ExercisesResponse>(`/analytics/exercises?today=${today}`);
 
   return (
     <Section title="これからの予定" subtitle={`今日から${DAYS_AHEAD}日先までの計画`}>

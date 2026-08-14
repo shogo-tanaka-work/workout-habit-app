@@ -5,7 +5,7 @@ import { Loadable } from '../components/Loadable';
 import { Section } from '../components/Section';
 import { useApiData } from '../hooks/useApiData';
 import type { BodyLogsResponse } from '../types/api';
-import { formatShortDate } from '../utils/datetime';
+import { formatDateKey, formatShortDate } from '../utils/datetime';
 import { formatBodyFat, formatBodyWeight } from '../utils/number';
 import type { ToggleOption } from '../components/ToggleGroup';
 import { ToggleGroup } from '../components/ToggleGroup';
@@ -19,9 +19,15 @@ const METRIC_OPTIONS: readonly ToggleOption<BodyMetricMode>[] = [
   { value: 'fat', label: '体脂肪率' },
 ];
 
+/** 何か月分を取得するか。種目別グラフの期間（DETAIL_MONTHS）と揃える。 */
+const BODY_LOG_MONTHS = 12;
+
 export const BodyLogSection = () => {
   const [metricMode, setMetricMode] = useState<BodyMetricMode>('weight');
-  const state = useApiData<BodyLogsResponse>('/analytics/body-logs');
+  const todayKey = formatDateKey(new Date());
+  const state = useApiData<BodyLogsResponse>(
+    `/analytics/body-logs?months=${BODY_LOG_MONTHS}&today=${todayKey}`,
+  );
 
   const formatValue = (value: number): string =>
     metricMode === 'weight' ? formatBodyWeight(value) : formatBodyFat(value);

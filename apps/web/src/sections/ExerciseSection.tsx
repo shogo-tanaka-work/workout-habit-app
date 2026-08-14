@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { LineChart, type LinePoint } from '../components/LineChart';
 import { Loadable } from '../components/Loadable';
 import { Section } from '../components/Section';
-import { useApiData } from '../hooks/useApiData';
+import { useApiData, type ApiDataState } from '../hooks/useApiData';
 import type { ExerciseDetailResponse, ExercisesResponse } from '../types/api';
 import { formatDateKey, formatShortDate } from '../utils/datetime';
 import { formatVolume, formatWeight } from '../utils/number';
@@ -23,20 +23,25 @@ const SERIES_OPTIONS: readonly ToggleOption<SeriesMode>[] = [
 
 const DETAIL_MONTHS = 12;
 
-export const ExerciseSection = () => {
+type ExerciseSectionProps = {
+  /** 種目一覧。PlanSection と共用するため App が一度だけ取得して配る。 */
+  exercisesState: ApiDataState<ExercisesResponse>;
+};
+
+export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
   const [selectedExerciseId, setSelectedExerciseId] = useState('');
   const [seriesMode, setSeriesMode] = useState<SeriesMode>('topWeight');
   const todayKey = formatDateKey(new Date());
 
-  const listState = useApiData<ExercisesResponse>('/analytics/exercises');
-  const options = (listState.data?.exercises ?? []).filter(
+  const options = (exercisesState.data?.exercises ?? []).filter(
     (exercise) => exercise.sessionCount > 0,
   );
   // 未選択時は実施回数最多の種目（API がソート済み）を初期表示にする。
   const effectiveExerciseId = selectedExerciseId || options[0]?.id || '';
+  // 種目 ID は外部入力（API レスポンス）由来のため、パスへ埋め込む前にエンコードする。
   const detailState = useApiData<ExerciseDetailResponse>(
     effectiveExerciseId
-      ? `/analytics/exercises/${effectiveExerciseId}?months=${DETAIL_MONTHS}&today=${todayKey}`
+      ? `/analytics/exercises/${encodeURIComponent(effectiveExerciseId)}?months=${DETAIL_MONTHS}&today=${todayKey}`
       : null,
   );
 
@@ -61,7 +66,7 @@ export const ExerciseSection = () => {
         </div>
       }
     >
-      <Loadable state={listState}>
+      <Loadable state={exercisesState}>
         {() =>
           options.length === 0 ? (
             <p className="chart-empty">

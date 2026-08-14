@@ -10,6 +10,7 @@ import { goals } from './routes/goals';
 import { me } from './routes/me';
 import { plans } from './routes/plans';
 import { sync } from './routes/sync';
+import { trainingPhases } from './routes/trainingPhases';
 
 // workout-habit の API。この Worker は API 専用で、静的アセットを持たない。
 //
@@ -30,6 +31,7 @@ import { sync } from './routes/sync';
 // - GET  /analytics/* … 読み取り専用の分析API（src/routes/analytics.ts）
 // - GET  /feedback    … 週次 AI フィードバックのアーカイブ（src/routes/feedback.ts）
 // - GET  /goals       … 種目別の目標重量（src/routes/goals.ts）
+// - GET  /training-phases … 減量期・増量期・中断の履歴（src/routes/trainingPhases.ts）
 // - /admin/api-tokens … CLI トークンの発行・一覧・失効（admin のみ）
 
 const app = new Hono<AppEnv>();
@@ -45,6 +47,7 @@ app.route('/me', me);
 app.route('/analytics', analytics);
 app.route('/feedback', feedback);
 app.route('/goals', goals);
+app.route('/training-phases', trainingPhases);
 app.route('/admin/api-tokens', apiTokens);
 
 export default app;

@@ -192,7 +192,78 @@ id は決定的に組み立てる。`wf-{userId}-{week_start}` / `goal-{userId}-
 - `exercise_goals` は1種目1件。目標を更新するときは同じ id へ upsert する。
   親の `exercise_id` は共有プリセット（`bench-press` 等）でもカスタム種目でもよい
 
-### 5. 端末へ反映する
+### 5. フェーズを読む・書く（Step 10）
+
+**計画立案の前に `GET /training-phases` を読む。** 減量期か増量期か、いつからか、
+ブランクに理由があるかを知らずに実績だけを見ると、データを誤読する。
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/training-phases"
+```
+
+```json
+{
+  "phases": [
+    { "phase": "cut", "startedOn": "2026-07-08", "endedOn": null, "note": "断酒中", "updatedAt": "2026-07-08T09:00:00.000Z" },
+    { "phase": "break", "startedOn": "2026-04-01", "endedOn": "2026-05-31", "note": "引っ越しでジムに行けず", "updatedAt": "2026-06-01T09:00:00.000Z" }
+  ]
+}
+```
+
+**開始日の新しい順**。現在のフェーズは先頭の行（`endedOn` が `null` のうち `startedOn` が最大）。
+
+| `phase` | 意味 |
+|---|---|
+| `cut` | 減量期 |
+| `bulk` | 増量期 |
+| `maintain` | 維持期 |
+| `break` | 中断（引っ越し・怪我・多忙）。**期間として記録するためにある** |
+
+#### 実績データの読み方
+
+- **減量期（`cut`）は重量更新より維持を成功と評価する。** 摂取カロリーが足りない状態で
+  重量が伸びないのは想定どおりであり、失敗ではない
+- **`break` 期間を停滞と判定しない。** 記録が少ないのはジムへ行けなかったからで、
+  トレーニングの内容が悪かったわけではない。この期間を含む前後比較は避ける
+- 増量期（`bulk`）は重量とボリュームの更新を、維持期（`maintain`）は頻度の維持を見る
+- `note` はそのフェーズの方針・制約（「断酒中」「回復優先」など）。計画の制約として扱う
+
+#### 書き方
+
+書き込みは他と同じ `POST /sync/operations`（entity: `training_phases`）。
+id は決定的に組み立てる（`phase-{userId}-{started_on}`、userId は `GET /me` の `id`）。
+別の id で同じ開始日を書くと `UNIQUE(user_id, started_on)` に当たって失敗する。
+
+**フェーズを切り替えるときは、前のフェーズへ `ended_on` を入れてから新しい行を作る。**
+`ended_on` が NULL のまま新しい行を足すと、進行中のフェーズが2本になり現在のフェーズが定まらない。
+
+```jsonc
+{
+  "operations": [
+    // 1. 前のフェーズを閉じる（既存行の id へ upsert）
+    { "id": "<一意なID>", "at": "2026-07-08T09:00:00.000Z", "op": "upsert",
+      "entity": "training_phases",
+      "row": { "id": "phase-usr-owner-2026-04-01", "phase": "break",
+               "started_on": "2026-04-01", "ended_on": "2026-05-31",
+               "note": "引っ越しでジムに行けず",
+               "created_at": "2026-04-01T09:00:00.000Z",
+               "updated_at": "2026-07-08T09:00:00.000Z" } },
+    // 2. 新しいフェーズを開く（ended_on は入れない＝進行中）
+    { "id": "<一意なID>", "at": "2026-07-08T09:00:00.000Z", "op": "upsert",
+      "entity": "training_phases",
+      "row": { "id": "phase-usr-owner-2026-07-08", "phase": "cut",
+               "started_on": "2026-07-08", "note": "断酒中",
+               "created_at": "2026-07-08T09:00:00.000Z",
+               "updated_at": "2026-07-08T09:00:00.000Z" } }
+  ]
+}
+```
+
+- `phase` は4値のいずれか。DB の CHECK 制約に当たるため、それ以外の値は書けない
+- `started_on` / `ended_on` は `YYYY-MM-DD`（日付のみ。時刻を含めない）
+- 期間は重ねない。切り替えの `ended_on` は新しいフェーズの前日を入れる
+
+### 6. 端末へ反映する
 
 モバイルは起動時とアプリ復帰時に `GET /plans` を叩き、
 **今日の 7 日前から 28 日後まで**の予定を取り込む（`apps/mobile/src/hooks/useWorkoutData.ts`）。
@@ -209,6 +280,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/plans?from=2026-08-11&to=202
 | 予定の取得 | `apps/api/src/routes/plans.ts` |
 | フィードバックの取得 | `apps/api/src/routes/feedback.ts`（読み出しは `src/feedback/queries.ts`） |
 | 目標の取得 | `apps/api/src/routes/goals.ts`（読み出しは `src/goals/queries.ts`） |
+| フェーズの取得 | `apps/api/src/routes/trainingPhases.ts`（読み出しは `src/trainingPhases/queries.ts`） |
 | CLI トークンの検証 | `apps/api/src/auth/apiToken.ts` |
 | トークンの発行・失効 | `apps/api/src/routes/apiTokens.ts` |
 | 端末の取り込み | `apps/mobile/src/db/plans.ts` |

@@ -189,6 +189,20 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     parents: [{ column: 'exercise_id', table: 'exercises' }],
   },
   {
+    // トレーニングのフェーズ履歴（migration 0006）。Claude Code が計画立案の前提として書く。
+    // ended_on が NULL の行が進行中。同じ開始日の書き直しは同じ id を再利用する。
+    name: 'training_phases',
+    ownerColumn: 'user_id',
+    columns: [
+      { name: 'id', type: 'text' },
+      { name: 'phase', type: 'text' },
+      { name: 'started_on', type: 'text' },
+      { name: 'ended_on', type: 'text', nullable: true, optional: true },
+      { name: 'note', type: 'text', optional: true },
+      ...timestamps,
+    ],
+  },
+  {
     name: 'body_logs',
     ownerColumn: 'user_id',
     columns: [

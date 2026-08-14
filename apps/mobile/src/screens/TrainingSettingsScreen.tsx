@@ -75,16 +75,15 @@ export function TrainingSettingsScreen({
             })}
           </View>
 
-          <View style={styles.inputGrid}>
-            <LabeledNumber
-              label="身長"
-              value={heightCm}
-              suffix="cm"
-              step={HEIGHT_STEP_CM}
-              onChange={setHeightCm}
-            />
-          </View>
-          <Text style={styles.faint}>
+          {/* 単独の入力欄なので inputGrid（横並び用）へは入れない。列方向の親の下で全幅になる。 */}
+          <LabeledNumber
+            label="身長"
+            value={heightCm}
+            suffix="cm"
+            step={HEIGHT_STEP_CM}
+            onChange={setHeightCm}
+          />
+          <Text style={styles.muted}>
             任意。体組成の指標（FFMI）にだけ使います。0 のままなら未設定として保存します。
           </Text>
 

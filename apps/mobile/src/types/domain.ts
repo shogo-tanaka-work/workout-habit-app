@@ -111,7 +111,7 @@ export type BodyLog = {
 export type TrainingGoal = 'strength' | 'hypertrophy' | 'endurance' | 'general';
 
 /** フェーズの種別（training_phases.phase の契約値）。書き込み時はここまで狭める。 */
-export type TrainingPhaseKind = 'cut' | 'bulk' | 'maintain' | 'break';
+export type TrainingPhaseKind = 'cut' | 'bulk' | 'lean_bulk' | 'maintain' | 'break';
 
 /**
  * 恒常的に持つ基本情報（1端末1行）。

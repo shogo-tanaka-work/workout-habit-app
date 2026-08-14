@@ -16,6 +16,9 @@ const GOAL_LABELS: Record<TrainingGoal, string> = {
 const PHASE_LABELS: Record<TrainingPhaseKind, string> = {
   cut: '減量期',
   bulk: '増量期',
+  // 通常の増量と分けている。緩やかなカロリー余剰で脂肪増を抑える進め方のため、
+  // 体重・重量の伸びは bulk より緩やかになる（伸びの鈍さを停滞と読まないため）。
+  lean_bulk: 'リーンバルク',
   maintain: '維持期',
   break: '中断',
 };
@@ -27,7 +30,7 @@ export const TRAINING_GOAL_OPTIONS: readonly { value: TrainingGoal; label: strin
 
 /** フェーズの選択肢（表示順）。 */
 export const TRAINING_PHASE_OPTIONS: readonly { value: TrainingPhaseKind; label: string }[] = (
-  ['cut', 'bulk', 'maintain', 'break'] as const
+  ['cut', 'lean_bulk', 'bulk', 'maintain', 'break'] as const
 ).map((value) => ({ value, label: PHASE_LABELS[value] }));
 
 /** 未設定・契約外の値のときに出すラベル。空欄にすると何も選ばれていないのか読み取れない。 */

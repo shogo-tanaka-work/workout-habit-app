@@ -237,13 +237,17 @@ function RmCalculator({
       </View>
       <View style={styles.sectionBody}>
         <View style={styles.inputGrid}>
-          <LabeledNumber label="重量" value={weightKg} suffix="kg" onChange={setWeightKg} />
-          <LabeledNumber
-            label="回数"
-            value={reps}
-            suffix="回"
-            onChange={(value) => setReps(Math.max(0, Math.round(value)))}
-          />
+          <View style={styles.inputGridItem}>
+            <LabeledNumber label="重量" value={weightKg} suffix="kg" onChange={setWeightKg} />
+          </View>
+          <View style={styles.inputGridItem}>
+            <LabeledNumber
+              label="回数"
+              value={reps}
+              suffix="回"
+              onChange={(value) => setReps(Math.max(0, Math.round(value)))}
+            />
+          </View>
         </View>
         <View style={styles.setTable}>
           <View style={styles.setTableRow}>

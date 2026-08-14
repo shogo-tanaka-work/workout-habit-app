@@ -89,18 +89,22 @@ export const SetEditor = memo(function SetEditor({
         </View>
       </View>
       <View style={styles.inputGrid}>
-        <LabeledNumber
-          label="重量"
-          value={set.weightKg}
-          suffix="kg"
-          onChange={(value) => onPatchSet(set.id, { weightKg: value })}
-        />
-        <LabeledNumber
-          label="回数"
-          value={set.reps}
-          suffix="回"
-          onChange={(value) => onPatchSet(set.id, { reps: Math.max(0, Math.round(value)) })}
-        />
+        <View style={styles.inputGridItem}>
+          <LabeledNumber
+            label="重量"
+            value={set.weightKg}
+            suffix="kg"
+            onChange={(value) => onPatchSet(set.id, { weightKg: value })}
+          />
+        </View>
+        <View style={styles.inputGridItem}>
+          <LabeledNumber
+            label="回数"
+            value={set.reps}
+            suffix="回"
+            onChange={(value) => onPatchSet(set.id, { reps: Math.max(0, Math.round(value)) })}
+          />
+        </View>
       </View>
       <TextInput
         value={memoDraft}

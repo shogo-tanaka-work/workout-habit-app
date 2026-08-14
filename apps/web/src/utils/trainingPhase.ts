@@ -7,6 +7,7 @@ import { countDaysBetween } from './datetime';
 const LABEL_BY_PHASE: Record<TrainingPhaseKind, string> = {
   cut: '減量期',
   bulk: '増量期',
+  lean_bulk: 'リーンバルク',
   maintain: '維持期',
   break: '中断',
 };

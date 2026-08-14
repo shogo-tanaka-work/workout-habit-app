@@ -129,6 +129,8 @@ export const styles = StyleSheet.create({
   },
   panelText: {
     color: colors.textPrimary,
+    // 本文サイズを明示する。未指定だと RN 既定の 14 になり、muted（sm）より小さく見える。
+    fontSize: fontSize.sm,
     lineHeight: 20,
   },
   muted: {
@@ -781,8 +783,13 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  // inputGrid の中で横に並べる1枠。**幅は親のレイアウトの責務**なので numberField には持たせない
+  // （持たせると、単独で置いたときも半分の幅になり数値が見切れる）。
+  inputGridItem: {
+    flexGrow: 1,
+    flexBasis: '48%',
+  },
   numberField: {
-    width: '48%',
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.sm,
     borderColor: colors.hairline,

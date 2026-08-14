@@ -132,7 +132,7 @@ export type FeedbackResponse = {
 };
 
 /** フェーズの種別（training_phases.phase の契約値）。ラベル対応は utils/trainingPhase.ts に置く。 */
-export type TrainingPhaseKind = 'cut' | 'bulk' | 'maintain' | 'break';
+export type TrainingPhaseKind = 'cut' | 'bulk' | 'lean_bulk' | 'maintain' | 'break';
 
 /**
  * トレーニングのフェーズ1件（training_phases）。`endedOn` が null なら進行中。

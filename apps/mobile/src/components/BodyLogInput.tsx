@@ -44,20 +44,24 @@ export function BodyLogInput({
       </View>
       <View style={styles.sectionBody}>
         <View style={styles.inputGrid}>
-          <LabeledNumber
-            label="体重"
-            value={bodyWeightKg}
-            suffix="kg"
-            step={BODY_WEIGHT_STEP_KG}
-            onChange={setBodyWeightKg}
-          />
-          <LabeledNumber
-            label="体脂肪率"
-            value={bodyFatPercentage}
-            suffix="%"
-            step={BODY_FAT_STEP_PERCENT}
-            onChange={setBodyFatPercentage}
-          />
+          <View style={styles.inputGridItem}>
+            <LabeledNumber
+              label="体重"
+              value={bodyWeightKg}
+              suffix="kg"
+              step={BODY_WEIGHT_STEP_KG}
+              onChange={setBodyWeightKg}
+            />
+          </View>
+          <View style={styles.inputGridItem}>
+            <LabeledNumber
+              label="体脂肪率"
+              value={bodyFatPercentage}
+              suffix="%"
+              step={BODY_FAT_STEP_PERCENT}
+              onChange={setBodyFatPercentage}
+            />
+          </View>
         </View>
         <Pressable
           style={styles.secondaryButton}

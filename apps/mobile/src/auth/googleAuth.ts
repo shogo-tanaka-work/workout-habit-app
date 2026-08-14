@@ -60,10 +60,7 @@ const ensureConfigured = (): void => {
 
 export const isGoogleSignInConfigured = (): boolean => Boolean(WEB_CLIENT_ID);
 
-const toAccount = (user: {
-  email: string;
-  name?: string | null;
-}): GoogleAccount => ({
+const toAccount = (user: { email: string; name?: string | null }): GoogleAccount => ({
   email: user.email,
   displayName: user.name ?? null,
 });

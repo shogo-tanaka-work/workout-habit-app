@@ -102,6 +102,8 @@ export const pushPendingOperations = async (
   const attemptsById = new Map(sendable.map((entry) => [entry.id, entry.attempts]));
   const settledIds: string[] = [];
   const givenUpIds: string[] = [];
+  const retryIds: string[] = [];
+  let representativeError: string | null = null;
   let failed = 0;
 
   for (const result of body.results) {
@@ -111,15 +113,24 @@ export const pushPendingOperations = async (
       continue;
     }
     failed += 1;
+    representativeError ??= result.error ?? null;
     const attempts = (attemptsById.get(result.id) ?? 0) + 1;
     if (attempts >= MAX_ATTEMPTS) {
       console.warn(`[sync] ${MAX_ATTEMPTS}回拒否された操作を破棄します: ${result.error ?? ''}`);
       givenUpIds.push(result.id);
       continue;
     }
-    await recordFailure(database, result.id, result.error ?? 'rejected');
+    retryIds.push(result.id);
   }
 
+  if (retryIds.length > 0) {
+    // last_error は全件共通の文言になるが、件数と代表エラーが分かれば調査の起点には足りる。
+    await recordFailure(
+      database,
+      retryIds,
+      `${failed}件拒否（例: ${representativeError ?? 'rejected'}）`,
+    );
+  }
   await removeOperations(database, [...settledIds, ...givenUpIds]);
 
   return {

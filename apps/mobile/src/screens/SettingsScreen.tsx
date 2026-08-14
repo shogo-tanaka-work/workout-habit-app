@@ -38,9 +38,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
   },
   {
     title: 'ツール',
-    items: [
-      { route: 'plates', description: 'バーに付けるプレートの内訳' },
-    ],
+    items: [{ route: 'plates', description: 'バーに付けるプレートの内訳' }],
   },
   {
     title: '設定',
@@ -71,9 +69,7 @@ export function SettingsScreen({ onOpen }: { onOpen: (route: SettingsRoute) => v
             >
               <View style={styles.exercisePickerRow}>
                 <View style={styles.flex}>
-                  <Text style={styles.exercisePickerName}>
-                    {SETTINGS_TITLES[item.route]}
-                  </Text>
+                  <Text style={styles.exercisePickerName}>{SETTINGS_TITLES[item.route]}</Text>
                   <Text style={styles.faint}>{item.description}</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>

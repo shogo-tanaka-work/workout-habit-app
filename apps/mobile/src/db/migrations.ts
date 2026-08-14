@@ -11,6 +11,14 @@ import { SCHEMA_SQL } from './schema';
 //
 // version 1 は初期スキーマ。`CREATE TABLE IF NOT EXISTS` なので、
 // user_version を持たない既存端末（この機構の導入前に作られたDB）へ当てても既存データを壊さない。
+//
+// 「既存エントリを書き換えない」規則の例外について:
+// version 1（= SCHEMA_SQL）にはかつて `PRAGMA journal_mode = WAL` が含まれていたが、削除した。
+// この migration は withTransactionAsync の中で実行され、SQLite はトランザクション中の
+// WAL 化をエラーにするため、新規インストールの初期化が失敗し得た。
+// 適用済み端末（旧実装で WAL 化済み）には二度と実行されず、未適用端末にとっては
+// 失敗要因の除去なので、既存エントリの書き換えだが正当と判断した。
+// WAL 化は接続セットアップ（hooks/useWorkoutStore.ts）が担う。
 
 export type Migration = {
   /** 適用後の user_version。1 から始めて 1 ずつ増やす。 */
@@ -64,6 +72,20 @@ export const MIGRATIONS: readonly Migration[] = [
         updated_at TEXT NOT NULL,
         UNIQUE (exercise_id)
       )`,
+    ],
+  },
+  {
+    version: 5,
+    description: '読み取りと同期キューの検索を速くするインデックスを追加',
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_workout_sets_workout_exercise_id
+        ON workout_sets(workout_exercise_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_workout_exercises_workout_id
+        ON workout_exercises(workout_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_workouts_status_performed_at
+        ON workouts(status, performed_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_sync_outbox_entity_row_id
+        ON sync_outbox(entity, row_id)`,
     ],
   },
 ];

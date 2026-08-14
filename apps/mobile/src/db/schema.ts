@@ -1,7 +1,11 @@
 // SQLite のスキーマ定義（DDL）。アプリ起動時に execAsync で一括適用する。
 // CREATE TABLE IF NOT EXISTS なので既存データを壊さず再実行できる。
+//
+// PRAGMA journal_mode = WAL はここに書かない。この SQL は migration v1 として
+// withTransactionAsync の中で実行されるが、SQLite はトランザクション中の WAL 化を
+// エラーにするため、新規インストールの初期化が失敗する。
+// WAL 化は接続セットアップ（hooks/useWorkoutStore.ts）でトランザクション外に行う。
 export const SCHEMA_SQL = `
-  PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS body_parts (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
@@ -119,4 +123,12 @@ export const SCHEMA_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS idx_workout_sets_workout_exercise_id
+    ON workout_sets(workout_exercise_id);
+  CREATE INDEX IF NOT EXISTS idx_workout_exercises_workout_id
+    ON workout_exercises(workout_id);
+  CREATE INDEX IF NOT EXISTS idx_workouts_status_performed_at
+    ON workouts(status, performed_at);
+  CREATE INDEX IF NOT EXISTS idx_sync_outbox_entity_row_id
+    ON sync_outbox(entity, row_id);
 `;

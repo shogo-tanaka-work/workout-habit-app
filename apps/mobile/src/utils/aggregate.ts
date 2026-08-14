@@ -38,10 +38,7 @@ export const summarizeSets = (sets: WorkoutSet[], rmDivisor?: number): SetSummar
     totalReps += set.reps;
     maxReps = Math.max(maxReps, set.reps);
     totalVolume += set.weightKg * set.reps;
-    bestOneRepMax = Math.max(
-      bestOneRepMax,
-      estimateOneRepMax(set.weightKg, set.reps, rmDivisor),
-    );
+    bestOneRepMax = Math.max(bestOneRepMax, estimateOneRepMax(set.weightKg, set.reps, rmDivisor));
   }
   return { setCount, warmupCount, totalReps, maxReps, totalVolume, bestOneRepMax };
 };

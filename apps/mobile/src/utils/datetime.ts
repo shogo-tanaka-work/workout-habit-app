@@ -74,7 +74,8 @@ export const startOfWeekIso = (date: Date): string => {
 };
 
 // ISO 日付が属する週（月曜はじまり）の開始日。履歴の推移グラフを週単位でまとめるのに使う。
-export const startOfWeekIsoDate = (isoDate: string): string => startOfWeekIso(parseIsoDate(isoDate));
+export const startOfWeekIsoDate = (isoDate: string): string =>
+  startOfWeekIso(parseIsoDate(isoDate));
 
 /**
  * 期間の起点（この日以降を対象にする）。`months` が 0 なら今週の月曜、null なら制限なし。

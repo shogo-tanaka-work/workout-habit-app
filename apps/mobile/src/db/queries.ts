@@ -149,6 +149,52 @@ export const insertWorkout = async (
 };
 
 /**
+ * ワークアウトと種目の並びをまとめて開始する（テンプレートからの開始用）。
+ *
+ * insertWorkout + insertWorkoutExercise を繰り返すと種目数ぶんトランザクションが
+ * 分かれ、途中で失敗したとき中途半端なワークアウトが残る。1トランザクションで行う。
+ */
+export const insertWorkoutDeep = async (
+  database: SQLite.SQLiteDatabase,
+  params: {
+    id: string;
+    performedAt: string;
+    exerciseEntries: { id: string; exerciseId: string }[];
+  },
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeInTransaction(database, 'insertWorkoutDeep', async () => {
+    await database.runAsync(
+      'INSERT INTO workouts (id, performed_at, status, memo, last_saved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      params.id,
+      params.performedAt,
+      'active',
+      '',
+      timestamp,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'workouts', params.id);
+    for (const [index, entry] of params.exerciseEntries.entries()) {
+      await database.runAsync(
+        `INSERT INTO workout_exercises
+        (id, workout_id, exercise_id, order_index, rest_seconds_override, memo, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        entry.id,
+        params.id,
+        entry.exerciseId,
+        index + 1,
+        null,
+        '',
+        timestamp,
+        timestamp,
+      );
+      await enqueueUpsert(database, 'workout_exercises', entry.id);
+    }
+  });
+};
+
+/**
  * 予定を開始して実績へ移す。
  *
  * **performed_at は開始した日で上書きする。** 予定日と違う日に実施しても、

@@ -115,13 +115,14 @@ export const replacePlannedWorkouts = async (
     await database.withTransactionAsync(async () => {
       // 置き換えの前に「端末が先へ進めた予定」を調べる。削除してからでは判別できない。
       const startedIds = new Set<string>();
-      for (const workoutId of incomingIds) {
-        const row = await database.getFirstAsync<{ status: string }>(
-          'SELECT status FROM workouts WHERE id = ?',
-          workoutId,
+      if (incomingIds.length > 0) {
+        const placeholders = incomingIds.map(() => '?').join(', ');
+        const startedRows = await database.getAllAsync<{ id: string }>(
+          `SELECT id FROM workouts WHERE id IN (${placeholders}) AND status != 'planned'`,
+          ...incomingIds,
         );
-        if (row && row.status !== 'planned') {
-          startedIds.add(workoutId);
+        for (const startedRow of startedRows) {
+          startedIds.add(startedRow.id);
         }
       }
 

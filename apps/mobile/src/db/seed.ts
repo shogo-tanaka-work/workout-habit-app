@@ -335,31 +335,41 @@ export const seedExercises: Exercise[] = [
 ];
 
 // マスタ（部位・種目）の初期投入。INSERT OR IGNORE のため何度実行しても重複しない。
+// 毎起動で走るため、1トランザクションでまとめて42文ぶんの個別コミットを避ける。
 export const seedMasters = async (database: SQLite.SQLiteDatabase): Promise<void> => {
-  for (const bodyPart of seedBodyParts) {
-    await database.runAsync(
-      'INSERT OR IGNORE INTO body_parts (id, name, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-      bodyPart.id,
-      bodyPart.name,
-      bodyPart.orderIndex,
-      nowIso(),
-      nowIso(),
-    );
-  }
-  for (const exercise of seedExercises) {
-    await database.runAsync(
-      `INSERT OR IGNORE INTO exercises
-        (id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      exercise.id,
-      exercise.name,
-      exercise.primaryBodyPartId,
-      exercise.defaultRestSeconds,
-      exercise.defaultBarWeightKg,
-      exercise.category,
-      exercise.isArchived ? 1 : 0,
-      nowIso(),
-      nowIso(),
+  try {
+    await database.withTransactionAsync(async () => {
+      for (const bodyPart of seedBodyParts) {
+        await database.runAsync(
+          'INSERT OR IGNORE INTO body_parts (id, name, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+          bodyPart.id,
+          bodyPart.name,
+          bodyPart.orderIndex,
+          nowIso(),
+          nowIso(),
+        );
+      }
+      for (const exercise of seedExercises) {
+        await database.runAsync(
+          `INSERT OR IGNORE INTO exercises
+            (id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          exercise.id,
+          exercise.name,
+          exercise.primaryBodyPartId,
+          exercise.defaultRestSeconds,
+          exercise.defaultBarWeightKg,
+          exercise.category,
+          exercise.isArchived ? 1 : 0,
+          nowIso(),
+          nowIso(),
+        );
+      }
+    });
+  } catch (error) {
+    throw new Error(
+      `seedMasters failed: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 };

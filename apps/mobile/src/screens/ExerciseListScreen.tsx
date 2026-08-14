@@ -199,7 +199,10 @@ function ExerciseRow({
     <Pressable style={styles.exerciseRow} onPress={onSelect}>
       <View style={styles.exercisePickerRow}>
         <View
-          style={[styles.exerciseDot, { backgroundColor: bodyPartColor(exercise.primaryBodyPartId) }]}
+          style={[
+            styles.exerciseDot,
+            { backgroundColor: bodyPartColor(exercise.primaryBodyPartId) },
+          ]}
         />
         <View style={styles.flex}>
           <Text style={styles.exercisePickerName}>{exercise.name}</Text>

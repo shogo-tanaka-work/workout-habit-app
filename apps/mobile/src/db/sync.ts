@@ -87,6 +87,15 @@ export const applyBackupPayload = async (
 
 const normalizeBaseUrl = (apiUrl: string): string => apiUrl.trim().replace(/\/+$/, '');
 
+// 復元はローカルを全消ししてから流し込むため、形を確かめてから通す
+// （壊れた応答を as で名乗らせると「消してから気づく」ことになる）。
+const isBackupPayload = (value: unknown): value is BackupPayload => {
+  if (!isRecord(value) || typeof value.exportedAt !== 'string' || !isRecord(value.tables)) {
+    return false;
+  }
+  return Object.values(value.tables).every((rows) => Array.isArray(rows));
+};
+
 // サーバに保存されている自分のデータを取得する。
 export const fetchBackupFromCloud = async (
   apiUrl: string,
@@ -98,11 +107,9 @@ export const fetchBackupFromCloud = async (
   if (!response.ok) {
     throw new Error(`データの取得に失敗しました (HTTP ${response.status})`);
   }
-  // 復元はローカルを全消ししてから流し込む。形を確かめる前に as で名乗らせると、
-  // 壊れた応答でも「消してから気づく」ことになる。
   const payload: unknown = await response.json();
-  if (!isRecord(payload) || !isRecord(payload.tables)) {
+  if (!isBackupPayload(payload)) {
     throw new Error('取得したデータの形式が不正です');
   }
-  return payload as BackupPayload;
+  return payload;
 };

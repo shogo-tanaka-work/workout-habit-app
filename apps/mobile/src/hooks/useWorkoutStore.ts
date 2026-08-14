@@ -170,16 +170,14 @@ export function useWorkoutStore() {
         const database = await SQLite.openDatabaseAsync('workout-habit.db');
         // 参照整合性を効かせるため、接続ごとに有効化する（既定は OFF）。
         await database.execAsync('PRAGMA foreign_keys = ON');
+        // WAL 化。DB ファイルに永続する冪等な設定だが、migration のトランザクション内では
+        // 実行できない（SQLite がエラーにする）ため、必ずここ（トランザクション外）で行う。
+        await database.execAsync('PRAGMA journal_mode = WAL');
         await runMigrations(database);
         await seedMasters(database);
 
-        // ログイン状態はネイティブ SDK が保持している。復元できなければ未ログインのまま進む
-        // （記録・閲覧・タイマーはログイン不要で動く）。
-        const restored = await restoreAccount();
-
         if (mounted) {
           setDb(database);
-          setAccount(restored);
           await reloadData(database);
           setIsReady(true);
         }
@@ -189,7 +187,17 @@ export function useWorkoutStore() {
         }
       }
     };
+    // ログイン状態の復元（silent sign-in）。記録・閲覧・タイマーはログイン不要のため、
+    // DB 準備の直列に入れず並行して走らせ、結果だけを後から反映する。
+    // restoreAccount は失敗を内部でログして null を返すので、ここで throw は起きない。
+    const restoreSignIn = async () => {
+      const restored = await restoreAccount();
+      if (mounted && restored) {
+        setAccount(restored);
+      }
+    };
     void setup();
+    void restoreSignIn();
     return () => {
       mounted = false;
     };

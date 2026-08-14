@@ -4,10 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Vibration } from 'react-native';
 
 import timerCompleteSound from '../../assets/timer-complete.wav';
-import {
-  loadRestTimer,
-  saveRestTimer,
-} from '../db/appSettings';
+import { loadRestTimer, saveRestTimer } from '../db/appSettings';
 import { cancelRestFinished, scheduleRestFinished } from '../notifications/restTimer';
 import type { TimerSettings, TimerState } from '../types/domain';
 

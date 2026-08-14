@@ -9,6 +9,7 @@ import {
   insertTemplateDeep,
   insertTimerEvent,
   insertWorkout,
+  insertWorkoutDeep,
   insertWorkoutExercise,
   insertWorkoutSet,
   setExerciseRest,
@@ -368,19 +369,17 @@ export function useWorkoutData() {
         await reloadTables(database, ['workouts']);
         return;
       }
-      const workoutId = newId('workout');
-      await insertWorkout(database, { id: workoutId, performedAt: formatDate(new Date()) });
       const entries = templateExercises
         .filter((item) => item.templateId === template.id)
         .sort((a, b) => a.orderIndex - b.orderIndex);
-      for (const [index, entry] of entries.entries()) {
-        await insertWorkoutExercise(database, {
+      await insertWorkoutDeep(database, {
+        id: newId('workout'),
+        performedAt: formatDate(new Date()),
+        exerciseEntries: entries.map((entry) => ({
           id: newId('workout-exercise'),
-          workoutId,
           exerciseId: entry.exerciseId,
-          orderIndex: index + 1,
-        });
-      }
+        })),
+      });
       await reloadTables(database, ['workouts', 'workout_exercises']);
     },
     [ensureDb, reloadTables, templateExercises],

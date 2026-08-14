@@ -159,15 +159,22 @@ export const removeOperations = async (
   await database.runAsync(`DELETE FROM sync_outbox WHERE id IN (${placeholders})`, ...operationIds);
 };
 
-/** 失敗した操作に理由を残す。次回の送信でも再挑戦する。 */
+/**
+ * 失敗した操作に理由を残す。次回の送信でも再挑戦する。
+ * last_error は全件共通の文言になるため、呼び出し側が件数と代表エラーを含めて渡す。
+ */
 export const recordFailure = async (
   database: SQLite.SQLiteDatabase,
-  operationId: string,
+  operationIds: readonly string[],
   message: string,
 ): Promise<void> => {
+  if (operationIds.length === 0) {
+    return;
+  }
+  const placeholders = operationIds.map(() => '?').join(', ');
   await database.runAsync(
-    'UPDATE sync_outbox SET attempts = attempts + 1, last_error = ? WHERE id = ?',
+    `UPDATE sync_outbox SET attempts = attempts + 1, last_error = ? WHERE id IN (${placeholders})`,
     message,
-    operationId,
+    ...operationIds,
   );
 };

@@ -55,9 +55,15 @@ export function useSync(store: WorkoutStore) {
   // サーバの接続先を保存する。認証情報は端末に置かない。
   const updateSyncConnection = useCallback(
     async (apiUrl: string) => {
+      const trimmedUrl = apiUrl.trim();
+      // ID トークンを平文で送る先なので https 以外は保存しない。
+      // 空文字は「接続解除」として従来どおり許す（同期が未設定の状態に戻る）。
+      if (trimmedUrl !== '' && !trimmedUrl.startsWith('https://')) {
+        throw new Error('API URL は https:// で始まる必要があります');
+      }
       const openDatabase = ensureDb();
-      await upsertSyncConnection(openDatabase, { apiUrl: apiUrl.trim() });
-      setSyncSettings((previous) => ({ ...previous, apiUrl: apiUrl.trim() }));
+      await upsertSyncConnection(openDatabase, { apiUrl: trimmedUrl });
+      setSyncSettings((previous) => ({ ...previous, apiUrl: trimmedUrl }));
     },
     [ensureDb, setSyncSettings],
   );

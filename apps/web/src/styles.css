@@ -538,3 +538,10 @@ summary.feedback-week {
   font-size: var(--font-xs);
   text-align: right;
 }
+
+/* 月の区切り線。ラベル行（.heatmap-month）と升目行（.heatmap-week）の両方の
+   月始まり列へ同じ幅を足し、列の位置ずれを防ぐ。 */
+.heatmap-month-start {
+  border-left: 1px solid var(--hairline);
+  padding-left: var(--space-xxs);
+}

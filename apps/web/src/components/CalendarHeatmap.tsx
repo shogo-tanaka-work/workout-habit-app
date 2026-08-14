@@ -53,21 +53,31 @@ const intensityOpacity = (volume: number, maxVolume: number): number => {
   return 0.45;
 };
 
+const monthOfDateKey = (dateKey: string): number => Number(dateKey.slice(5, 7));
+
+/** 月が変わる列かどうか。ラベルと区切り線の両方がこの判定を使う。 */
+const isMonthStartColumn = (weekColumns: string[][], index: number): boolean =>
+  index > 0 &&
+  monthOfDateKey(weekColumns[index][0]) !== monthOfDateKey(weekColumns[index - 1][0]);
+
 /**
  * 週列ごとの月ラベル。月が変わった列に「6月」のように出す。
  * 先頭列にも出すが、直後の列で月が変わる場合は重なりを避けて省く。
  */
 const buildMonthLabels = (weekColumns: string[][]): string[] => {
-  const monthOf = (dateKey: string): number => Number(dateKey.slice(5, 7));
   return weekColumns.map((days, index) => {
-    const month = monthOf(days[0]);
+    const month = monthOfDateKey(days[0]);
     if (index === 0) {
       const nextColumn = weekColumns[1];
-      return nextColumn && monthOf(nextColumn[0]) !== month ? '' : `${month}月`;
+      return nextColumn && monthOfDateKey(nextColumn[0]) !== month ? '' : `${month}月`;
     }
-    return month !== monthOf(weekColumns[index - 1][0]) ? `${month}月` : '';
+    return isMonthStartColumn(weekColumns, index) ? `${month}月` : '';
   });
 };
+
+/** 月の区切り線。ラベル行と升目行の両方へ同じクラスを付け、列の位置ずれを防ぐ。 */
+const columnClass = (base: string, weekColumns: string[][], index: number): string =>
+  isMonthStartColumn(weekColumns, index) ? `${base} heatmap-month-start` : base;
 
 const cellStyle = (day: HeatmapDay, maxVolume: number): CSSProperties => ({
   background: `var(${bodyPartColorVariable(day.topBodyPartId ?? null)})`,
@@ -146,14 +156,17 @@ export const CalendarHeatmap = ({
         <div>
           <div className="heatmap-months">
             {monthLabels.map((label, index) => (
-              <span key={weekColumns[index][0]} className="heatmap-month">
+              <span
+                key={weekColumns[index][0]}
+                className={columnClass('heatmap-month', weekColumns, index)}
+              >
                 {label}
               </span>
             ))}
           </div>
           <div className="heatmap-grid">
-            {weekColumns.map((columnDays) => (
-              <div key={columnDays[0]} className="heatmap-week">
+            {weekColumns.map((columnDays, index) => (
+              <div key={columnDays[0]} className={columnClass('heatmap-week', weekColumns, index)}>
                 {columnDays.map(renderCell)}
               </div>
             ))}

@@ -1,4 +1,4 @@
-import type { ChartData, ChartOptions } from 'chart.js';
+import type { ChartData, ChartOptions, Plugin } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
 import './chartSetup';
@@ -47,6 +47,33 @@ export const LineChart = ({
   const faintColor = readCssColor('--text-faint');
   const hairlineColor = readCssColor('--hairline');
 
+  // 期間平均の水平線。各点が平均の上下どちらにあるかで、伸びているか落ちているかを
+  // 直感で読めるようにする。表示中の点から出す値なので、集計ではなく表示整形の範囲
+  // （バー幅を最大値基準で決めるのと同じ扱い）。
+  const averageValue = points.reduce((sum, point) => sum + point.value, 0) / points.length;
+
+  // 平均線の右端へ「平均 xx」を描く。datalabels 系のプラグインは追加しない方針のため、
+  // この1テキストだけ自前で描画する。
+  const averageLabelPlugin: Plugin<'line'> = {
+    id: 'averageLabel',
+    afterDatasetsDraw: (chart) => {
+      const yScale = chart.scales.y;
+      if (!yScale) {
+        return;
+      }
+      const yPixel = yScale.getPixelForValue(averageValue);
+      const labelY = Math.max(yPixel - 4, chart.chartArea.top + 12);
+      const context = chart.ctx;
+      context.save();
+      context.font = '11px sans-serif';
+      context.fillStyle = faintColor;
+      context.textAlign = 'right';
+      context.textBaseline = 'bottom';
+      context.fillText(`平均 ${formatValue(averageValue)}`, chart.chartArea.right - 4, labelY);
+      context.restore();
+    },
+  };
+
   const data: ChartData<'line', number[], string> = {
     labels: points.map((point) => point.label),
     datasets: [
@@ -69,6 +96,15 @@ export const LineChart = ({
             },
           ]
         : []),
+      {
+        // 期間平均。目標線（長い破線・第2系列色）と見分けられるよう、細い短破線にする。
+        data: points.map(() => averageValue),
+        borderColor: faintColor,
+        backgroundColor: faintColor,
+        borderWidth: 1,
+        borderDash: [3, 4],
+        pointRadius: 0,
+      },
     ],
   };
 
@@ -107,7 +143,7 @@ export const LineChart = ({
 
   return (
     <div className="chart-canvas">
-      <Line data={data} options={options} />
+      <Line data={data} options={options} plugins={[averageLabelPlugin]} />
     </div>
   );
 };

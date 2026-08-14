@@ -112,6 +112,24 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    version: 7,
+    description: 'トレーニングのフェーズ（training_phases）を追加',
+    statements: [
+      // 減量・増量・維持・中断の履歴。ended_on が NULL なら進行中。
+      // 端末は単一ユーザーのため user_id 列は持たない。
+      `CREATE TABLE IF NOT EXISTS training_phases (
+        id TEXT PRIMARY KEY NOT NULL,
+        phase TEXT NOT NULL,
+        started_on TEXT NOT NULL,
+        ended_on TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (started_on)
+      )`,
+    ],
+  },
 ];
 
 /** 適用済みの user_version。 */

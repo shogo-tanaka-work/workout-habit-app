@@ -546,3 +546,43 @@ Step 7（UI 作り直し）とは別軸の改修。進め方は「リサーチ �
    初回起動（WAL 修正の検証。修正前は新規インストールが失敗し得た）
 3. レート制限の疎通: 429 が返ることの確認は本番でしかできない（wrangler dev では
    limiter が常に成功する場合がある）。無理に叩かず、Observability で観察する程度でよい
+
+## Step 9: 分析ダッシュボードの強化と AI フィードバック（2026-08-14 開始）
+
+Step 5 の発展。決定済みの方針:
+
+- **Chart.js を導入する**（本人承認済み。web の「チャートライブラリ導入は方針判断」を解決）。
+  折れ線・積み上げバーを Chart.js へ、ヒートマップは自作 SVG のまま改善
+- 色分けの単位は**部位**。ヒートマップは「その日の最大ボリューム部位」の色、
+  部位別ボリュームは部位色の濃淡で種目を積み上げ。部位色は `DESIGN.md` を正本にする
+- **web 先行、mobile は後続**（目標入力 UI とフィードバックのアプリ内表示は別スコープ）
+- **AI フィードバックはアーカイブ形式**。週単位で残し、過去分も一覧から参照できる
+- 書き込みは既存方針どおり `POST /sync/operations`（Claude Code 専用 API は作らない）
+
+### スキーマ（D1 migration 0005 / 端末 v6。同期対象に追加）
+
+- `weekly_feedback` — id / user_id / week_start / body / created_at / updated_at、
+  UNIQUE(user_id, week_start)。Claude Code が計画立案時に書く
+- `exercise_goals` — id / user_id / exercise_id / target_weight_kg / memo /
+  created_at / updated_at、UNIQUE(user_id, exercise_id)。親は exercises
+
+### API 契約
+
+- `GET /feedback?months=&today=` → `{ feedback: [{ weekStart, body, updatedAt }] }`（新しい順）
+- `GET /goals` → `{ goals: [{ exerciseId, targetWeightKg, memo, updatedAt }] }`
+- `/analytics/body-parts` の各部位に `exercises: [{ exerciseId, name, setCount, totalVolume }]` を追加
+- `/analytics/daily` の各日に `topBodyPartId` を追加
+- いずれも既存フィールドは不変（追加のみ）。デプロイは api → web の順
+
+### Step 9 の実装状態（2026-08-14）
+
+api / web / mobile（同期対の追従のみ）を実装しコミット済み。web は旧 API レスポンスへの
+フォールバックを持つため、デプロイ順の制約は「**D1 migration 0005 → api → web**」だけ
+（migration 前に api を出すと /feedback・/goals が 500 になる）。
+
+- 部位色はモバイルの `theme.ts` の `bodyPartColors` と同値を web の `styles.css` に定義
+  （2アプリで表現を揃える。正本の対応は `DESIGN.md` の部位色の節）
+- フィードバック・目標の書き込み手順（決定的 id の規則含む）は
+  `claude-code-integration.md` の「4. 週次フィードバックと目標を書く」
+- 残: mobile の表示と目標入力 UI（後続スコープ）、Step 5 から残っている
+  計画と実績の差分表示・汎用の差分同期（`?since=` + tombstone）

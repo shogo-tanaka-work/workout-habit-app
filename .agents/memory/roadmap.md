@@ -633,3 +633,63 @@ api / web / mobile（同期対の追従のみ）を実装し、本番へ反映�
 `GET /training-phases` を読むこと（手順と解釈の指針は `claude-code-integration.md`）。
 
 残: モバイルでのフェーズ表示と切り替え UI（後続スコープ。現状は Claude Code 経由で書く）
+
+## Step 11: 基本情報（user_profile）とトレーニング設定画面（2026-08-14 開始）
+
+Step 10 のフェーズに続き、**期間ではなく恒常的に持つ属性**を置く場所を作る。
+
+### 調査で確定したこと（2026-08-14、出典は下記）
+
+- **筋力の体格補正に身長は不要。** Wilks / DOTS / IPF GL はいずれも体重のみを入力とし、
+  身長を使わない。筋力は体重の約 0.67 乗にスケールする（アロメトリックスケーリング）。
+  「体格込みで伸びているか」は **1RM ÷ 体重（体重比）** で足りる
+- **身長が要るのは体組成の評価（FFMI = 除脂肪体重 ÷ 身長²）。** ただし
+  **同一人物の時系列では身長は定数**のため、推移の形は除脂肪体重(kg) と相似になる。
+  身長が効くのは**一般基準・他者と比べるとき**だけ（正規化 FFMI で 20〜21.9 が良い等）
+- したがって **`height_cm` は任意入力**とする（本人判断で入力済み）。
+  無くても体重比・除脂肪体重は計算でき、分析の主要部分は動く
+
+### スキーマ（D1 migration 0007 / 端末 v8。同期対象）
+
+```
+user_profile:
+  id TEXT PK / user_id TEXT NOT NULL UNIQUE / training_goal TEXT NOT NULL /
+  height_cm REAL(NULL 可・任意入力) / note TEXT NOT NULL DEFAULT '' /
+  created_at / updated_at
+```
+
+- `training_goal` は `strength`（筋力向上）/ `hypertrophy`（筋肥大）/
+  `endurance`（持久力）/ `general`（総合）の4値。CHECK を付ける
+- 1ユーザー1行。決定的 id は `profile-{userId}`
+- 読みは `GET /profile`。書きは既存どおり `POST /sync/operations`
+
+### 効かせ方
+
+- **Claude Code は計画立案の前にこれを読む。** 目的が `strength` なら
+  **評価の主指標はトップ重量と推定1RM**であり、総ボリュームではない
+  （低レップ高重量ではボリュームは伸びにくい。ボリュームの増減で良し悪しを判断しない）
+- モバイルに「トレーニング設定」画面を作り、**目的・身長・メモの編集**と
+  **フェーズの切り替え**を本人ができるようにする（現状は Claude Code 経由でしか書けない）
+
+### 後続（body_logs にデータが入ってから）
+
+分析の追加。**先に体重の記録が要る**（現状 `body_logs` は0件で、これが本当のボトルネック）。
+
+- 種目別グラフに体重比（1RM ÷ 直近体重）
+- ボディログに除脂肪体重（体重 ×(1 − 体脂肪率/100)）と、身長があれば FFMI
+
+出典: Wilks/DOTS/IPF GL は https://rpe.training/guides/wilks-dots-ipf-gl-explained/ 、
+アロメトリックスケーリングは https://pubmed.ncbi.nlm.nih.gov/18172672/ 、
+FFMI は https://www.omnicalculator.com/health/ffmi と https://pubmed.ncbi.nlm.nih.gov/7496846/
+
+### Step 11 の実装状態と既知の制約（2026-08-14）
+
+api / mobile を実装（web は今回スコープ外。表示すべき新情報が「目的」だけのため）。
+
+**既知の制約（Step 6 Phase 4 の `user_exercise_settings` と同種）:**
+モバイルがフェーズを作るときの id は `newId('phase')` のランダム値で、Claude Code が使う
+決定的 id（`phase-{userId}-{started_on}`）とは異なる。**端末に無い開始日の行がサーバに
+あると、別 id で送ることになり UNIQUE(user_id, started_on) に当たって拒否される**
+（5回で破棄）。端末が同期済みなら `ON CONFLICT(started_on)` が既存 id を保つため起きない。
+端末が userId を知らない以上、決定的 id は組めない（id は全ユーザーで一意である必要がある）。
+1端末運用のため現状は許容する。

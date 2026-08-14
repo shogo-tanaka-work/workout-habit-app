@@ -56,12 +56,21 @@ export const loadWorkoutAggregates = async (
 };
 
 // 部位ごとの期間合計。並びはボリューム降順（同値は部位名順）。
+// exercises は部位内の種目別内訳（ボリューム降順）。積み上げバーの区分に使う。
+export type BodyPartExerciseTotal = {
+  exerciseId: string;
+  name: string;
+  setCount: number;
+  totalVolume: number;
+};
+
 export type BodyPartTotal = {
   bodyPartId: string;
   name: string;
   setCount: number;
   totalVolume: number;
   totalReps: number;
+  exercises: BodyPartExerciseTotal[];
 };
 
 export const loadBodyPartTotals = async (
@@ -76,8 +85,15 @@ export const loadBodyPartTotals = async (
     volume: number | null;
     reps: number | null;
   };
+  type BodyPartExerciseRow = {
+    body_part_id: string;
+    exercise_id: string;
+    exercise_name: string;
+    sets: number;
+    volume: number | null;
+  };
   const scope = scopeForUser(user, 'w.user_id');
-  const result = await database
+  const totalsStatement = database
     .prepare(
       `SELECT COALESCE(bp.id, 'unknown') AS body_part_id,
               COALESCE(bp.name, '未分類') AS body_part_name,
@@ -94,23 +110,64 @@ export const loadBodyPartTotals = async (
        GROUP BY bp.id
        ORDER BY volume DESC, body_part_name`,
     )
-    .bind(since, ...scope.params)
-    .all<BodyPartTotalRow>();
-  return result.results.map((row) => ({
+    .bind(since, ...scope.params);
+  const exercisesStatement = database
+    .prepare(
+      `SELECT COALESCE(bp.id, 'unknown') AS body_part_id,
+              e.id AS exercise_id,
+              e.name AS exercise_name,
+              COUNT(s.id) AS sets,
+              SUM(s.weight_kg * s.reps) AS volume
+       FROM workout_sets s
+       JOIN workout_exercises we ON s.workout_exercise_id = we.id
+       JOIN workouts w ON we.workout_id = w.id
+       JOIN exercises e ON we.exercise_id = e.id
+       LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
+       WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND ${countedSetsCondition('s')}
+         AND w.performed_at >= ? AND ${scope.condition}
+       GROUP BY bp.id, e.id
+       ORDER BY volume DESC, exercise_name`,
+    )
+    .bind(since, ...scope.params);
+
+  // 独立した2クエリを1往復にまとめる（loadDailySummary と同じ理由の境界型付け）。
+  const [totalsResult, exercisesResult] = (await database.batch([
+    totalsStatement,
+    exercisesStatement,
+  ])) as [D1Result<BodyPartTotalRow>, D1Result<BodyPartExerciseRow>];
+
+  // 種目内訳はボリューム降順で並んでいるため、部位ごとに振り分けても降順が保たれる。
+  const exercisesByBodyPart = new Map<string, BodyPartExerciseTotal[]>();
+  for (const row of exercisesResult.results) {
+    const entries = exercisesByBodyPart.get(row.body_part_id) ?? [];
+    entries.push({
+      exerciseId: row.exercise_id,
+      name: row.exercise_name,
+      setCount: row.sets,
+      totalVolume: row.volume ?? 0,
+    });
+    exercisesByBodyPart.set(row.body_part_id, entries);
+  }
+
+  return totalsResult.results.map((row) => ({
     bodyPartId: row.body_part_id,
     name: row.body_part_name,
     setCount: row.sets,
     totalVolume: row.volume ?? 0,
     totalReps: row.reps ?? 0,
+    exercises: exercisesByBodyPart.get(row.body_part_id) ?? [],
   }));
 };
 
 // 日別サマリ（ヒートマップ用）と全期間の累計回数。
+// topBodyPartId はその日の最大ボリューム部位（ヒートマップの色分け用）。
+// 集計対象のセットが無い日は null、部位未設定の種目しか無い日は 'unknown'。
 export type DailySummary = {
   date: string;
   workoutCount: number;
   setCount: number;
   totalVolume: number;
+  topBodyPartId: string | null;
 };
 
 export const loadDailySummary = async (
@@ -120,6 +177,7 @@ export const loadDailySummary = async (
 ): Promise<{ totalWorkouts: number; days: DailySummary[] }> => {
   type DailyRow = { date: string; workouts: number; sets: number; volume: number | null };
   type TotalRow = { workouts: number };
+  type DailyBodyPartRow = { date: string; body_part_id: string; volume: number | null };
   const scope = scopeForUser(user, 'w.user_id');
   const dailyStatement = database
     .prepare(
@@ -142,13 +200,40 @@ export const loadDailySummary = async (
        WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND ${totalScope.condition}`,
     )
     .bind(...totalScope.params);
+  // 日×部位のボリューム。日ごとにボリューム降順で返し、先頭行をその日の最大部位として使う。
+  // 同値の並びが実行ごとに揺れないよう body_part_id で並びを固定する。
+  const dailyBodyPartStatement = database
+    .prepare(
+      `SELECT w.performed_at AS date,
+              COALESCE(bp.id, 'unknown') AS body_part_id,
+              SUM(s.weight_kg * s.reps) AS volume
+       FROM workouts w
+       JOIN workout_exercises we ON we.workout_id = w.id
+       JOIN workout_sets s ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')}
+       JOIN exercises e ON we.exercise_id = e.id
+       LEFT JOIN body_parts bp ON e.primary_body_part_id = bp.id
+       WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND w.performed_at >= ? AND ${scope.condition}
+       GROUP BY w.performed_at, bp.id
+       ORDER BY w.performed_at, volume DESC, body_part_id`,
+    )
+    .bind(since, ...scope.params);
 
-  // 独立した2クエリを1往復にまとめる。batch() の結果はステートメント順で返る。
+  // 独立した3クエリを1往復にまとめる。batch() の結果はステートメント順で返る。
   // batch は型引数を1つしか取れないため、境界の型付けは all<T>() と同じ扱いでここで行う。
-  const [dailyResult, totalResult] = (await database.batch([dailyStatement, totalStatement])) as [
-    D1Result<DailyRow>,
-    D1Result<TotalRow>,
-  ];
+  const [dailyResult, totalResult, dailyBodyPartResult] = (await database.batch([
+    dailyStatement,
+    totalStatement,
+    dailyBodyPartStatement,
+  ])) as [D1Result<DailyRow>, D1Result<TotalRow>, D1Result<DailyBodyPartRow>];
+
+  // 日ごとの先頭行（ボリューム降順の1件目）だけを採る。
+  const topBodyPartByDate = new Map<string, string>();
+  for (const row of dailyBodyPartResult.results) {
+    if (!topBodyPartByDate.has(row.date)) {
+      topBodyPartByDate.set(row.date, row.body_part_id);
+    }
+  }
+
   return {
     totalWorkouts: totalResult.results[0]?.workouts ?? 0,
     days: dailyResult.results.map((row) => ({
@@ -156,6 +241,7 @@ export const loadDailySummary = async (
       workoutCount: row.workouts,
       setCount: row.sets,
       totalVolume: roundToOneDecimal(row.volume ?? 0),
+      topBodyPartId: topBodyPartByDate.get(row.date) ?? null,
     })),
   };
 };

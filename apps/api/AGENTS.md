@@ -40,16 +40,19 @@ src/
   index.ts      Hono アプリ本体（認証ミドルウェア・/health・route のマウント）
   env.ts        Bindings と Hono の型引数
   analytics/    集計の中身。sql（条件と式）/ period（期間の解釈）/ aggregate（取得と集計）
+  feedback/     週次 AI フィードバック（weekly_feedback）の読み出し
+  goals/        種目別の目標重量（exercise_goals）の読み出し
   backup.ts     /backup の読み出しと置換（本人スコープ）
   tables.ts     同期対象エンティティの定義（列の型・親参照）。apps/mobile/src/db/syncTables.ts と対になる
   sync/         操作（intent）ベースの同期。validate（形式検証）・apply（冪等な適用）
   auth/         認証と認可。types / jwt / access / google / apiToken / users
   middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
   db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
-  routes/       ドメイン単位の route（analytics / sync / plans / me / apiTokens）
+  routes/       ドメイン単位の route（analytics / sync / plans / me / apiTokens / feedback / goals）
   utils/isoDate.ts  ISO 日付の計算。apps/mobile の utils/datetime.ts と同じ定義を保つ
 migrations/     D1 のマイグレーション。0001 初期スキーマ / 0002 マルチユーザー化 /
-                0003 操作ベース同期の台帳 / 0004 種目の上書き設定
+                0003 操作ベース同期の台帳 / 0004 種目の上書き設定 /
+                0005 週次フィードバックと種目別目標
                 **共有プリセット種目は migrations に入っていない**（seed.ts と D1 を直接揃える）
 wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
@@ -69,6 +72,8 @@ route には「入力の解釈 → 呼び出し → JSON 化」だけを残す�
 | `GET /plans` | 必要 | 期間内の予定（`status='planned'`）を本人分だけ返す。Step 5 の受信経路 |
 | `GET /me` | 必要 | 自分の id / 表示名 / ロール。ユーザー一覧の経路は作らない |
 | `GET /analytics/weekly` ほか | 必要 | 読み取り専用の集計。詳細は `src/routes/analytics.ts` |
+| `GET /feedback` | 必要 | 週次 AI フィードバックのアーカイブ（週の新しい順）。書き込みは `/sync/operations` |
+| `GET /goals` | 必要 | 種目別の目標重量。書き込みは `/sync/operations` |
 | `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
 
 端末からサーバへの反映は `POST /sync/operations`（操作ベース）に一本化してある。

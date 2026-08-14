@@ -5,6 +5,8 @@ import { backup } from './backup';
 import type { AppEnv } from './env';
 import { authenticate } from './middleware/authenticate';
 import { apiTokens } from './routes/apiTokens';
+import { feedback } from './routes/feedback';
+import { goals } from './routes/goals';
 import { me } from './routes/me';
 import { plans } from './routes/plans';
 import { sync } from './routes/sync';
@@ -26,6 +28,8 @@ import { sync } from './routes/sync';
 // - GET  /me         … 自分の id / 表示名 / ロール（src/routes/me.ts）
 // - GET  /plans       … 期間内の予定（status='planned'）を返す（src/routes/plans.ts）
 // - GET  /analytics/* … 読み取り専用の分析API（src/routes/analytics.ts）
+// - GET  /feedback    … 週次 AI フィードバックのアーカイブ（src/routes/feedback.ts）
+// - GET  /goals       … 種目別の目標重量（src/routes/goals.ts）
 // - /admin/api-tokens … CLI トークンの発行・一覧・失効（admin のみ）
 
 const app = new Hono<AppEnv>();
@@ -39,6 +43,8 @@ app.route('/sync', sync);
 app.route('/plans', plans);
 app.route('/me', me);
 app.route('/analytics', analytics);
+app.route('/feedback', feedback);
+app.route('/goals', goals);
 app.route('/admin/api-tokens', apiTokens);
 
 export default app;

@@ -163,6 +163,32 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     parents: [{ column: 'exercise_id', table: 'exercises' }],
   },
   {
+    // 週次 AI フィードバックのアーカイブ（migration 0005）。Claude Code が計画立案時に書く。
+    // week_start は月曜はじまりの週開始日（YYYY-MM-DD）。同一週の上書きは同じ id を再利用する。
+    name: 'weekly_feedback',
+    ownerColumn: 'user_id',
+    columns: [
+      { name: 'id', type: 'text' },
+      { name: 'week_start', type: 'text' },
+      { name: 'body', type: 'text' },
+      ...timestamps,
+    ],
+  },
+  {
+    // 種目ごとの目標重量（migration 0005）。親は共有プリセットでも参照できる
+    // （user_exercise_settings と同じ扱い。parentIsUsable が owner === null を許可している）。
+    name: 'exercise_goals',
+    ownerColumn: 'user_id',
+    columns: [
+      { name: 'id', type: 'text' },
+      { name: 'exercise_id', type: 'text' },
+      { name: 'target_weight_kg', type: 'real' },
+      { name: 'memo', type: 'text', optional: true },
+      ...timestamps,
+    ],
+    parents: [{ column: 'exercise_id', table: 'exercises' }],
+  },
+  {
     name: 'body_logs',
     ownerColumn: 'user_id',
     columns: [

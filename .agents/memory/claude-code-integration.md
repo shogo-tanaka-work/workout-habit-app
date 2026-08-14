@@ -150,7 +150,49 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 - 部分成功する。HTTP 200 でも `results` の各要素を見て `rejected` を確認する
 - 未知の列は通らない。列の正本は `apps/api/src/tables.ts`
 
-### 4. 端末へ反映する
+### 4. 週次フィードバックと目標を書く（Step 9）
+
+計画を書いたら、同じ `POST /sync/operations` で週次フィードバック（`weekly_feedback`）と
+種目別の目標（`exercise_goals`）も書ける。専用の書き込み API は無い。読む向きは
+`GET /feedback?months=&today=`（週の新しい順、months は 1〜24・既定 6）と `GET /goals`。
+
+id は決定的に組み立てる。`wf-{userId}-{week_start}` / `goal-{userId}-{exercise_id}`
+（userId は `GET /me` の `id`）。同期は `ON CONFLICT(id)` で上書きするため、
+**同じ対象へ別の id で書くと UNIQUE(user_id, week_start) / UNIQUE(user_id, exercise_id) に
+当たって失敗する。** 決定的な id なら再実行しても同じ行に収束する。
+ユーザー ID を含めるのは、id が全ユーザーで一意である必要があるため（migration 0005 冒頭のコメント）。
+
+```jsonc
+{
+  "operations": [
+    { "id": "<一意なID>", "at": "2026-08-11T09:00:00.000Z", "op": "upsert",
+      "entity": "weekly_feedback",
+      "row": { "id": "wf-usr-owner-2026-08-10",
+               "week_start": "2026-08-10",
+               "body": "先週はベンチのボリュームが伸びた。\n今週は脚を1回増やす。\n睡眠を7時間確保する。",
+               "created_at": "2026-08-11T09:00:00.000Z",
+               "updated_at": "2026-08-11T09:00:00.000Z" } },
+    { "id": "<一意なID>", "at": "2026-08-11T09:00:00.000Z", "op": "upsert",
+      "entity": "exercise_goals",
+      "row": { "id": "goal-usr-owner-bench-press", "exercise_id": "bench-press",
+               "target_weight_kg": 100, "memo": "年内に100kg",
+               "created_at": "2026-08-11T09:00:00.000Z",
+               "updated_at": "2026-08-11T09:00:00.000Z" } }
+  ]
+}
+```
+
+書くときの決まりごと（計画と共通の規則に加えて）。
+
+- `week_start` は**月曜はじまりの週開始日（YYYY-MM-DD）**。API の `weekStartIso` /
+  モバイルの `startOfWeekIso` と同じ定義。週の途中の日付を入れない
+- `body` はプレーンテキスト。項目は改行で区切る（Markdown 記法に依存しない）
+- **フィードバックはアーカイブ。過去週の行を上書きしない。** 上書きしてよいのは
+  同一週（今週ぶんの書き直し）だけ。過去週を直したくなっても新しい週へ書く
+- `exercise_goals` は1種目1件。目標を更新するときは同じ id へ upsert する。
+  親の `exercise_id` は共有プリセット（`bench-press` 等）でもカスタム種目でもよい
+
+### 5. 端末へ反映する
 
 モバイルは起動時とアプリ復帰時に `GET /plans` を叩き、
 **今日の 7 日前から 28 日後まで**の予定を取り込む（`apps/mobile/src/hooks/useWorkoutData.ts`）。
@@ -165,6 +207,8 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/plans?from=2026-08-11&to=202
 | 何 | どこ |
 |---|---|
 | 予定の取得 | `apps/api/src/routes/plans.ts` |
+| フィードバックの取得 | `apps/api/src/routes/feedback.ts`（読み出しは `src/feedback/queries.ts`） |
+| 目標の取得 | `apps/api/src/routes/goals.ts`（読み出しは `src/goals/queries.ts`） |
 | CLI トークンの検証 | `apps/api/src/auth/apiToken.ts` |
 | トークンの発行・失効 | `apps/api/src/routes/apiTokens.ts` |
 | 端末の取り込み | `apps/mobile/src/db/plans.ts` |

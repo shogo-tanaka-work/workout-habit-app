@@ -9,6 +9,7 @@ import { feedback } from './routes/feedback';
 import { goals } from './routes/goals';
 import { me } from './routes/me';
 import { plans } from './routes/plans';
+import { profile } from './routes/profile';
 import { sync } from './routes/sync';
 import { trainingPhases } from './routes/trainingPhases';
 
@@ -32,6 +33,7 @@ import { trainingPhases } from './routes/trainingPhases';
 // - GET  /feedback    … 週次 AI フィードバックのアーカイブ（src/routes/feedback.ts）
 // - GET  /goals       … 種目別の目標重量（src/routes/goals.ts）
 // - GET  /training-phases … 減量期・増量期・中断の履歴（src/routes/trainingPhases.ts）
+// - GET  /profile     … 基本情報（目的・身長・メモ）。未設定なら null（src/routes/profile.ts）
 // - /admin/api-tokens … CLI トークンの発行・一覧・失効（admin のみ）
 
 const app = new Hono<AppEnv>();
@@ -48,6 +50,7 @@ app.route('/analytics', analytics);
 app.route('/feedback', feedback);
 app.route('/goals', goals);
 app.route('/training-phases', trainingPhases);
+app.route('/profile', profile);
 app.route('/admin/api-tokens', apiTokens);
 
 export default app;

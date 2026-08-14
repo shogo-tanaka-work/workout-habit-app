@@ -196,6 +196,8 @@ id は決定的に組み立てる。`wf-{userId}-{week_start}` / `goal-{userId}-
 
 **計画立案の前に `GET /training-phases` を読む。** 減量期か増量期か、いつからか、
 ブランクに理由があるかを知らずに実績だけを見ると、データを誤読する。
+**あわせて次節の `GET /profile`（目的・身長）も読む。** 期間の状態と恒常的な属性は
+片方だけでは実績を解釈できない。
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/training-phases"
@@ -263,7 +265,74 @@ id は決定的に組み立てる（`phase-{userId}-{started_on}`、userId は `
 - `started_on` / `ended_on` は `YYYY-MM-DD`（日付のみ。時刻を含めない）
 - 期間は重ねない。切り替えの `ended_on` は新しいフェーズの前日を入れる
 
-### 6. 端末へ反映する
+### 6. 基本情報を読む・書く（Step 11）
+
+**計画立案の前に `GET /profile` も読む。** フェーズ（期間の状態）と基本情報（恒常的な属性）は
+両方読んで初めて実績を正しく解釈できる。目的を知らずに実績だけを見ると、
+伸ばすべき指標を取り違える。
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/profile"
+```
+
+```json
+{
+  "profile": {
+    "trainingGoal": "strength",
+    "heightCm": 172,
+    "note": "腰に持病あり。デッドリフトは慎重に",
+    "updatedAt": "2026-08-14T09:00:00.000Z"
+  }
+}
+```
+
+**未設定なら `profile` は `null`**（404 にはならない）。その場合は目的を仮定せず、
+ユーザーに確認してから計画を立てる。
+
+| `training_goal` | 意味 | 評価の主指標 |
+|---|---|---|
+| `strength` | 筋力向上 | **トップ重量と推定1RM** |
+| `hypertrophy` | 筋肥大 | 総ボリューム（重量 × レップ × セット）と週あたりのセット数 |
+| `endurance` | 持久力 | レップ数と、同重量での反復の伸び |
+| `general` | 総合 | 頻度の維持と、上記のバランス |
+
+#### 実績データの読み方
+
+- **`strength` なら評価の主指標はトップ重量と推定1RM であり、総ボリュームではない。**
+  低レップ高重量ではボリュームは伸びにくいため、**ボリュームの増減で良し悪しを判断しない。**
+  目的どおりに進んでいても総ボリュームは横ばいか減ることがある
+- `hypertrophy` では逆に、1RM が横ばいでもボリュームが積み上がっていれば順調と見る
+- `height_cm` は任意入力で、無いことが普通。**身長が無いから分析できない、としない。**
+  筋力の体格補正は体重比（1RM ÷ 体重）で足り、身長が要るのは FFMI を一般基準と
+  比べるときだけ
+- `note` は恒常的な制約（持病・可用時間など）。フェーズの `note`（その期間の方針）とは別物で、
+  どちらも計画の制約として扱う
+
+#### 書き方
+
+書き込みは他と同じ `POST /sync/operations`（entity: `user_profile`）。
+**1ユーザー1行**で、id は決定的に組み立てる（`profile-{userId}`、userId は `GET /me` の `id`）。
+別の id で2行目を書くと `UNIQUE(user_id)` に当たって失敗する。
+
+```jsonc
+{
+  "operations": [
+    { "id": "<一意なID>", "at": "2026-08-14T09:00:00.000Z", "op": "upsert",
+      "entity": "user_profile",
+      "row": { "id": "profile-usr-owner", "training_goal": "strength",
+               "height_cm": 172, "note": "腰に持病あり。デッドリフトは慎重に",
+               "created_at": "2026-08-14T09:00:00.000Z",
+               "updated_at": "2026-08-14T09:00:00.000Z" } }
+  ]
+}
+```
+
+- `training_goal` は4値のいずれか。DB の CHECK 制約に当たるため、それ以外の値は書けない
+- `height_cm` は省略可（未入力は NULL）。cm 単位の実数
+- **目的はユーザーのものであり、Claude Code が勝手に変えない。** 書くのは本人の
+  明示的な指示があったときだけ（通常の編集経路はモバイルの「トレーニング設定」画面）
+
+### 7. 端末へ反映する
 
 モバイルは起動時とアプリ復帰時に `GET /plans` を叩き、
 **今日の 7 日前から 28 日後まで**の予定を取り込む（`apps/mobile/src/hooks/useWorkoutData.ts`）。
@@ -281,6 +350,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/plans?from=2026-08-11&to=202
 | フィードバックの取得 | `apps/api/src/routes/feedback.ts`（読み出しは `src/feedback/queries.ts`） |
 | 目標の取得 | `apps/api/src/routes/goals.ts`（読み出しは `src/goals/queries.ts`） |
 | フェーズの取得 | `apps/api/src/routes/trainingPhases.ts`（読み出しは `src/trainingPhases/queries.ts`） |
+| 基本情報の取得 | `apps/api/src/routes/profile.ts`（読み出しは `src/profile/queries.ts`） |
 | CLI トークンの検証 | `apps/api/src/auth/apiToken.ts` |
 | トークンの発行・失効 | `apps/api/src/routes/apiTokens.ts` |
 | 端末の取り込み | `apps/mobile/src/db/plans.ts` |

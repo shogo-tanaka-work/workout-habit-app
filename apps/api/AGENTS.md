@@ -43,6 +43,7 @@ src/
   feedback/     週次 AI フィードバック（weekly_feedback）の読み出し
   goals/        種目別の目標重量（exercise_goals）の読み出し
   trainingPhases/  フェーズ履歴（training_phases）の読み出し
+  profile/      基本情報（user_profile）の読み出し
   backup.ts     /backup の読み出しと置換（本人スコープ）
   tables.ts     同期対象エンティティの定義（列の型・親参照）。apps/mobile/src/db/syncTables.ts と対になる
   sync/         操作（intent）ベースの同期。validate（形式検証）・apply（冪等な適用）
@@ -50,11 +51,12 @@ src/
   middleware/   authenticate（経路の振り分け）・authorize（ロール判定）
   db/scope.ts   行スコープの条件生成。WHERE user_id = ? を route へ散らさない
   routes/       ドメイン単位の route（analytics / sync / plans / me / apiTokens / feedback /
-                goals / trainingPhases）
+                goals / trainingPhases / profile）
   utils/isoDate.ts  ISO 日付の計算。apps/mobile の utils/datetime.ts と同じ定義を保つ
 migrations/     D1 のマイグレーション。0001 初期スキーマ / 0002 マルチユーザー化 /
                 0003 操作ベース同期の台帳 / 0004 種目の上書き設定 /
-                0005 週次フィードバックと種目別目標 / 0006 トレーニングのフェーズ
+                0005 週次フィードバックと種目別目標 / 0006 トレーニングのフェーズ /
+                0007 基本情報（user_profile）
                 **共有プリセット種目は migrations に入っていない**（seed.ts と D1 を直接揃える）
 wrangler.jsonc  Worker 設定（D1 binding・migrations_dir）。assets は持たない
 worker-configuration.d.ts  wrangler types の生成型
@@ -77,6 +79,7 @@ route には「入力の解釈 → 呼び出し → JSON 化」だけを残す�
 | `GET /feedback` | 必要 | 週次 AI フィードバックのアーカイブ（週の新しい順）。書き込みは `/sync/operations` |
 | `GET /goals` | 必要 | 種目別の目標重量。書き込みは `/sync/operations` |
 | `GET /training-phases` | 必要 | 減量期・増量期・維持・中断の履歴（開始日の新しい順）。書き込みは `/sync/operations` |
+| `GET /profile` | 必要 | 基本情報（目的・身長・メモ）。1ユーザー1行で未設定なら `null`。書き込みは `/sync/operations` |
 | `/admin/api-tokens` | admin のみ | Claude Code 用トークンの発行・一覧・失効 |
 
 端末からサーバへの反映は `POST /sync/operations`（操作ベース）に一本化してある。

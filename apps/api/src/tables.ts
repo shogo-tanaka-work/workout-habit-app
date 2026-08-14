@@ -203,6 +203,19 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     ],
   },
   {
+    // 基本情報（migration 0007）。1ユーザー1行で、決定的 id は profile-{userId}。
+    // height_cm は任意入力のため NULL 可。書き直しは同じ id を再利用する。
+    name: 'user_profile',
+    ownerColumn: 'user_id',
+    columns: [
+      { name: 'id', type: 'text' },
+      { name: 'training_goal', type: 'text' },
+      { name: 'height_cm', type: 'real', nullable: true, optional: true },
+      { name: 'note', type: 'text', optional: true },
+      ...timestamps,
+    ],
+  },
+  {
     name: 'body_logs',
     ownerColumn: 'user_id',
     columns: [

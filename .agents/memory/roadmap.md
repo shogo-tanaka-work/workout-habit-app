@@ -467,14 +467,85 @@ Step 7（UI 作り直し）とは別軸の改修。進め方は「リサーチ �
   `d1.md`（ループ内 `.run()` 禁止・`EXPLAIN QUERY PLAN`）、`cloudflare-workers.md`
   （`waitUntil` の使い分け）、`mobile-react-native.md`（計測は RN DevTools）へも追記
 
-### 実装課題（監査フェーズの入力。未着手）
+### 監査結果（2026-08-14。3アプリ並列で実施）
 
-規約とは別に、リサーチで挙がった「実装が要るもの」。監査で現状を確認してから優先度を決める。
+事前に挙げた実装課題5件の判定。
 
-1. **Access JWT の `aud` 検証の確認。** 同一 Cloudflare アカウントの全 Access アプリが
-   同じ鍵を共有するため、`aud` を見ていないと別アプリ向けトークンが通る。
-   `apps/api/src/auth/access.ts` あたりの実装を確認する
-2. 管理画面配信 Worker のセキュリティヘッダ（CSP / HSTS / X-Content-Type-Options）
-3. 書き込み系エンドポイントのレート制限（Workers Rate Limiting API。結果整合であることに注意）
-4. 端末 SQLite の WAL 化（`PRAGMA journal_mode = WAL`）。効果を実測してから
-5. 依存の `npm audit` 実行と lockfile 運用（`npm ci`）の確認
+1. ~~Access JWT の `aud` 検証~~ — **実装済みで対応不要。** 署名・aud・iss・exp の4点
+   すべて検証、aud クレーム無しも拒否、JWKS は動的取得＋未知 kid で再取得
+2. セキュリティヘッダ — **未実装を確認。** 現実装から逆算した CSP は
+   `script-src 'self'` / `style-src 'self' 'unsafe-inline'`（inline style が
+   `ContinuitySection` と `BodyPartSection` のバー幅2か所のみのため）で壊れない
+3. レート制限 — **未実装を確認。** 増幅点は認証前の2経路
+   （トークン総当たり→SHA-256+D1、偽 JWT→JWKS 再取得）と `/sync/operations`
+4. 端末 SQLite の WAL — **設定はあるが新規インストールで効かない（むしろ危険）。**
+   `PRAGMA journal_mode = WAL` が `SCHEMA_SQL` 先頭にあり、migration v1 として
+   **トランザクション内で実行される**。SQLite はトランザクション中の WAL 化を
+   エラーにするため、migration 機構導入（2026-08-06）以降の新規インストールは
+   初期化に失敗する可能性が高い。既存端末は旧実装（トランザクション外）で
+   WAL 化済みのため動いている。修正は接続時（`PRAGMA foreign_keys` の隣）へ移す
+5. 依存 — lockfile は3アプリともコミット済み。`npm audit` の実行時依存の指摘は
+   api の `hono`（moderate、未使用の hono/jsx）のみ。残りは開発ツール経由
+
+### 監査で見つかった課題（2026-08-14 修正完了。以下は監査時点の記録）
+
+**mobile**（高1・中4・低5）
+
+- 【高】上記4の WAL 修正
+- 【中】`seedMasters` が毎起動42文をトランザクション無しで逐次実行 → 1トランザクション化
+- 【中】起動時に `restoreAccount()`（silent sign-in、ネットワーク待ちあり）が
+  DB 準備と直列 → isReady 後の後追いへ
+- 【中】同期先 API URL に `https://` の強制が無い（ID トークンの送信先）→ 保存時に拒否
+- 【中】端末スキーマにインデックス4本不足（`workout_sets(workout_exercise_id)` /
+  `workout_exercises(workout_id)` / `workouts(status, performed_at)` /
+  `sync_outbox(entity, row_id)`。最後のは**毎書き込み**の enqueue が全走査）→ migration v5
+- 【低】`startWorkoutFromTemplate` のループ内 insert / `replacePlannedWorkouts` の
+  1件ずつ SELECT / `fetchBackupFromCloud` の浅い検証（`as` キャスト）/
+  `pusher.recordFailure` のループ内 UPDATE / `app.json` の未使用 scheme
+
+**api**（中4・低7）
+
+- 【中】レート制限の導入（上記3。認証失敗 IP キー・`/sync/operations` userId キー・
+  トークン発行の3点。結果整合＝暴走の頭打ちとして設計）
+- 【中】`sync/apply.ts` の親・所有者チェックが同一行へ操作数ぶん重複 → リクエスト内メモ化
+- 【中】認証の副作用（`last_used_at`・プロフィール補完。補完は**埋まっていても毎回
+  UPDATE 発行**）が全リクエストのレイテンシに直列 → スキップ判定＋ `waitUntil`
+- 【中】`/backup` の9テーブル逐次読み → `batch()` で1往復
+- 【低】analytics の SQL 直書き残り4本（daily / body-logs / exercises / habit）の層分離 /
+  body-logs 無制限取得（web と対）/ JWKS エラーに team domain が乗る /
+  D1 生エラーをクライアントへ返す / 古いコメント（CORS 復活を誘導）/
+  日時正規表現が緩い / daily・habit の独立2クエリ直列
+- 認可の土台（行スコープ・fail closed・BOPLA・インデックス）は問題なし
+
+**web**（高1・中2・低2）
+
+- 【高】上記2のセキュリティヘッダ実装（アセット側レスポンスのみに付与。
+  API 中継には付けない＝「中継時にヘッダを加工しない」規約と両立）
+- 【中】中継 Worker が全メソッド・全パスを API へ開放 → **GET / HEAD 限定**にして
+  読み取り専用を経路レベルで強制（CSRF 前提の曖昧さも消える）
+- 【中】`/analytics/body-logs` だけ取得上限が無い（api 側と同一課題）
+- 【低】`/analytics/exercises` を初期表示で2回取得（片方の `?today=` は API が
+  読んでおらず無意味）/ 種目 ID のパス埋め込みに `encodeURIComponent` 無し
+- XSS 面・localStorage・依存（react/react-dom のみ、gzip 66KB）・
+  ウォーターフォール無しは確認済み
+
+**依存更新**: `npm audit fix` を3アプリで実行し typecheck / build で検証（別変更セット）
+
+### 修正の完了状態（2026-08-14）
+
+上記の課題はすべて修正しコミット済み（mobile / api / web / 依存更新の4コミット）。
+意図的に見送ったもの。
+
+- `app.json` の未使用 `scheme` — ネイティブ再ビルドを伴うためスコープ外とした
+- D1 生エラーのクライアント返却 — 受け手が本人のみ・スキーマ公開済みで実害がなく、
+  端末側デバッグの利便を優先して現状維持
+- 依存の残存3件（mobile: image-size high / uuid moderate、web: esbuild low）—
+  いずれも開発ツール経由で配布物に乗らず、fix が breaking change のため見送り
+
+**残作業**
+
+1. デプロイ: api（レート制限の binding 追加を含む）と web。順序の制約は無し
+2. 実機確認: 既存端末での起動（migration v5 適用）と、アプリ削除 → 再インストールでの
+   初回起動（WAL 修正の検証。修正前は新規インストールが失敗し得た）
+3. レート制限の疎通: 429 が返ることの確認は本番でしかできない（wrangler dev では
+   limiter が常に成功する場合がある）。無理に叩かず、Observability で観察する程度でよい

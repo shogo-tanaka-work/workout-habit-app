@@ -55,23 +55,31 @@ const intensityOpacity = (volume: number, maxVolume: number): number => {
 
 const monthOfDateKey = (dateKey: string): number => Number(dateKey.slice(5, 7));
 
-/** 月が変わる列かどうか。ラベルと区切り線の両方がこの判定を使う。 */
-const isMonthStartColumn = (weekColumns: string[][], index: number): boolean =>
-  index > 0 &&
-  monthOfDateKey(weekColumns[index][0]) !== monthOfDateKey(weekColumns[index - 1][0]);
+const firstOfMonthIn = (columnDays: string[]): string | undefined =>
+  columnDays.find((dateKey) => dateKey.slice(8) === '01');
 
 /**
- * 週列ごとの月ラベル。月が変わった列に「6月」のように出す。
+ * 月が変わる列 = その月の1日を含む列。ラベルと区切り線の両方がこの判定を使う。
+ * 「月曜の月が変わった列」を境界にすると、月初が週の途中にあるとき1列ずれる
+ * （その月の週数が4か5かで線の位置が揺れて見える）。
+ */
+const isMonthStartColumn = (weekColumns: string[][], index: number): boolean =>
+  index > 0 && firstOfMonthIn(weekColumns[index]) !== undefined;
+
+/**
+ * 週列ごとの月ラベル。1日を含む列に「6月」のように出す。
  * 先頭列にも出すが、直後の列で月が変わる場合は重なりを避けて省く。
  */
 const buildMonthLabels = (weekColumns: string[][]): string[] => {
   return weekColumns.map((days, index) => {
-    const month = monthOfDateKey(days[0]);
     if (index === 0) {
-      const nextColumn = weekColumns[1];
-      return nextColumn && monthOfDateKey(nextColumn[0]) !== month ? '' : `${month}月`;
+      if (weekColumns.length > 1 && isMonthStartColumn(weekColumns, 1)) {
+        return '';
+      }
+      return `${monthOfDateKey(firstOfMonthIn(days) ?? days[0])}月`;
     }
-    return isMonthStartColumn(weekColumns, index) ? `${month}月` : '';
+    const firstOfMonth = firstOfMonthIn(days);
+    return firstOfMonth ? `${monthOfDateKey(firstOfMonth)}月` : '';
   });
 };
 

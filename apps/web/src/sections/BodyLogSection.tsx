@@ -43,12 +43,13 @@ export const BodyLogSection = () => {
     >
       <Loadable state={state}>
         {(response) => {
-          const points: LinePoint[] = response.bodyLogs
-            .map((bodyLog) => ({
-              label: formatShortDate(bodyLog.date),
-              value: metricMode === 'weight' ? bodyLog.bodyWeightKg : bodyLog.bodyFatPercentage,
-            }))
-            .filter((point): point is LinePoint => point.value !== null);
+          const points: LinePoint[] = response.bodyLogs.flatMap((bodyLog) => {
+            const value = metricMode === 'weight' ? bodyLog.bodyWeightKg : bodyLog.bodyFatPercentage;
+            if (value === null) {
+              return [];
+            }
+            return [{ label: formatShortDate(bodyLog.date), value, dateKey: bodyLog.date }];
+          });
           return (
             <LineChart points={points} colorVariable="--chart-secondary" formatValue={formatValue} />
           );

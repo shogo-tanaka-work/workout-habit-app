@@ -24,10 +24,10 @@ paths: "apps/mobile/src/db/**/*.ts,apps/mobile/src/sync/**/*.ts"
 
 ## スキーマの集約
 - テーブル DDL は `src/db/schema.ts` の `SCHEMA_SQL` に集約する。各所に散らさない
-- 現在のテーブルは15個: `body_parts` `exercises` `user_exercise_settings` `workouts`
+- 現在のテーブルは16個: `body_parts` `exercises` `user_exercise_settings` `workouts`
   `workout_exercises` `workout_sets` `timer_events` `templates` `template_exercises`
   `app_settings` `body_logs` `sync_outbox` `weekly_feedback` `exercise_goals`
-  `training_phases`
+  `training_phases` `user_profile`
 - カラム名は snake_case。`created_at` / `updated_at` を持たせ、主キーは文字列ID（`newId()` で発番）
 - `CREATE TABLE IF NOT EXISTS` で冪等に保つ。起動のたび再実行しても既存データを壊さない
 

@@ -4,7 +4,9 @@ import type {
   Exercise,
   Template,
   TemplateExercise,
+  TrainingPhase,
   UserExerciseSetting,
+  UserProfile,
   Workout,
   WorkoutExercise,
   WorkoutSet,
@@ -13,7 +15,9 @@ import type {
   BodyLogRow,
   BodyPartRow,
   ExerciseRow,
+  TrainingPhaseRow,
   UserExerciseSettingRow,
+  UserProfileRow,
   TemplateExerciseRow,
   TemplateRow,
   WorkoutRow,
@@ -73,6 +77,21 @@ export const toBodyLog = (row: BodyLogRow): BodyLog => ({
   bodyWeightKg: row.body_weight_kg,
   bodyFatPercentage: row.body_fat_percentage,
   memo: row.memo,
+});
+
+export const toUserProfile = (row: UserProfileRow): UserProfile => ({
+  id: row.id,
+  trainingGoal: row.training_goal,
+  heightCm: row.height_cm,
+  note: row.note,
+});
+
+export const toTrainingPhase = (row: TrainingPhaseRow): TrainingPhase => ({
+  id: row.id,
+  phase: row.phase,
+  startedOn: row.started_on,
+  endedOn: row.ended_on,
+  note: row.note,
 });
 
 export const toTemplate = (row: TemplateRow): Template => ({

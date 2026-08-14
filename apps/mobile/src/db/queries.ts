@@ -1,7 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
-import type { Exercise, WorkoutSet } from '../types/domain';
-import { nowIso } from '../utils/datetime';
+import type { Exercise, TrainingGoal, TrainingPhaseKind, WorkoutSet } from '../types/domain';
+import { isoDatePlusDays, nowIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 import { enqueueDelete, enqueueUpsert } from './outbox';
 
@@ -468,6 +468,99 @@ export const upsertUserExerciseSetting = async (
       timestamp,
     );
     await enqueueUpsert(database, 'user_exercise_settings', id);
+  });
+};
+
+/**
+ * 基本情報（目的・身長・メモ）を保存する。端末は1行しか持たない。
+ *
+ * **既存行があればその id を使い回す。** 毎回発番すると行が増え、
+ * 「1ユーザー1行」の前提が端末側だけ崩れる（サーバは user_id で1行に潰すため、
+ * どちらが残るかが送信順で決まってしまう）。
+ */
+export const upsertUserProfile = async (
+  database: SQLite.SQLiteDatabase,
+  profile: { trainingGoal: TrainingGoal; heightCm: number | null; note: string },
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeInTransaction(database, 'upsertUserProfile', async () => {
+    const existing = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM user_profile LIMIT 1',
+    );
+    const id = existing?.id ?? newId('profile');
+    await database.runAsync(
+      `INSERT INTO user_profile (id, training_goal, height_cm, note, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         training_goal = excluded.training_goal,
+         height_cm = excluded.height_cm,
+         note = excluded.note,
+         updated_at = excluded.updated_at`,
+      id,
+      profile.trainingGoal,
+      profile.heightCm,
+      profile.note,
+      timestamp,
+      timestamp,
+    );
+    await enqueueUpsert(database, 'user_profile', id);
+  });
+};
+
+/**
+ * フェーズを切り替える。進行中の行を閉じてから、新しい行を1トランザクションで作る。
+ *
+ * **2回の書き込みに分けない。** 途中で失敗すると進行中の行が2本（または0本）になり、
+ * 「現在のフェーズ」が決まらなくなる。フェーズは実績データの読み方を左右する情報なので、
+ * 中途半端な状態を残さない。両方の行が outbox へ積まれる。
+ *
+ * 同じ開始日の行が既にあれば、それを書き換えて進行中へ戻す（`UNIQUE(started_on)`）。
+ */
+export const startTrainingPhase = async (
+  database: SQLite.SQLiteDatabase,
+  params: { phase: TrainingPhaseKind; startedOn: string; note: string },
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeInTransaction(database, 'startTrainingPhase', async () => {
+    const openRows = await database.getAllAsync<{ id: string; started_on: string }>(
+      'SELECT id, started_on FROM training_phases WHERE ended_on IS NULL AND started_on <> ?',
+      params.startedOn,
+    );
+    // 新しいフェーズの前日で閉じ、期間を重ねない。開始日より前で閉じると
+    // ended_on < started_on の行ができるため、その場合は開始日と同じ日にする。
+    const endedOn = isoDatePlusDays(params.startedOn, -1);
+    for (const row of openRows) {
+      await database.runAsync(
+        'UPDATE training_phases SET ended_on = ?, updated_at = ? WHERE id = ?',
+        endedOn < row.started_on ? row.started_on : endedOn,
+        timestamp,
+        row.id,
+      );
+      await enqueueUpsert(database, 'training_phases', row.id);
+    }
+    await database.runAsync(
+      `INSERT INTO training_phases (id, phase, started_on, ended_on, note, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, ?, ?, ?)
+       ON CONFLICT(started_on) DO UPDATE SET
+         phase = excluded.phase,
+         ended_on = NULL,
+         note = excluded.note,
+         updated_at = excluded.updated_at`,
+      newId('phase'),
+      params.phase,
+      params.startedOn,
+      params.note,
+      timestamp,
+      timestamp,
+    );
+    // 同じ開始日の行があった場合は既存行が更新される。送るのは実際に残った行の ID。
+    const stored = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM training_phases WHERE started_on = ?',
+      params.startedOn,
+    );
+    if (stored) {
+      await enqueueUpsert(database, 'training_phases', stored.id);
+    }
   });
 };
 

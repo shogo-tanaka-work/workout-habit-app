@@ -130,6 +130,24 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    version: 8,
+    description: '基本情報（user_profile）を追加',
+    statements: [
+      // 目的・身長・メモ。端末は単一ユーザーのため user_id 列を持たず、行も1つだけ持つ
+      // （UNIQUE 制約は置かず、書き込み側が既存行の id を使い回して1行に保つ）。
+      // height_cm は任意入力（NULL 可）。体組成の指標（FFMI）にだけ使う。
+      // CHECK は付けない（workouts.status と同じ流儀。値の妥当性はサーバ側で担保する）。
+      `CREATE TABLE IF NOT EXISTS user_profile (
+        id TEXT PRIMARY KEY NOT NULL,
+        training_goal TEXT NOT NULL,
+        height_cm REAL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 /** 適用済みの user_version。 */

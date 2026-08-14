@@ -21,7 +21,8 @@ export type SyncEntity =
   | 'body_logs'
   | 'weekly_feedback'
   | 'exercise_goals'
-  | 'training_phases';
+  | 'training_phases'
+  | 'user_profile';
 
 export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
   exercises: [
@@ -110,6 +111,8 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
   exercise_goals: ['id', 'exercise_id', 'target_weight_kg', 'memo', 'created_at', 'updated_at'],
   // トレーニングのフェーズ（減量・増量・維持・中断）の履歴。ended_on が NULL なら進行中。
   training_phases: ['id', 'phase', 'started_on', 'ended_on', 'note', 'created_at', 'updated_at'],
+  // 恒常的に持つ基本情報（目的・身長・メモ）。1ユーザー1行。
+  user_profile: ['id', 'training_goal', 'height_cm', 'note', 'created_at', 'updated_at'],
 };
 
 /**

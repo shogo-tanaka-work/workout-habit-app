@@ -8,7 +8,9 @@ import type {
   Template,
   TemplateExercise,
   TimerSettings,
+  TrainingPhase,
   UserExerciseSetting,
+  UserProfile,
   Workout,
   WorkoutExercise,
   WorkoutSet,
@@ -20,7 +22,9 @@ import type {
   ExerciseRow,
   TemplateExerciseRow,
   TemplateRow,
+  TrainingPhaseRow,
   UserExerciseSettingRow,
+  UserProfileRow,
   WorkoutRow,
   WorkoutExerciseRow,
   WorkoutSetRow,
@@ -32,7 +36,9 @@ import {
   toExercise,
   toTemplate,
   toTemplateExercise,
+  toTrainingPhase,
   toUserExerciseSetting,
+  toUserProfile,
   toWorkout,
   toWorkoutExercise,
   toWorkoutSet,
@@ -57,6 +63,10 @@ export type WorkoutData = {
   timerSettings: TimerSettings;
   bodyLogs: BodyLog[];
   syncSettings: SyncSettings;
+  /** 基本情報は端末に0行または1行。未設定を null で配る。 */
+  userProfile: UserProfile | null;
+  /** フェーズ履歴（開始日の新しい順）。現在のフェーズの判定は useWorkoutStore が持つ。 */
+  trainingPhases: TrainingPhase[];
 };
 
 /** 再読込を指定できるテーブル。書き込み後は、書き込んだテーブルだけを渡す。 */
@@ -71,6 +81,8 @@ export const ALL_WORKOUT_TABLES = [
   'template_exercises',
   'app_settings',
   'body_logs',
+  'user_profile',
+  'training_phases',
 ] as const;
 
 export type WorkoutTable = (typeof ALL_WORKOUT_TABLES)[number];
@@ -95,6 +107,10 @@ const WORKOUT_SET_COLUMNS =
 const TEMPLATE_COLUMNS = 'id, name, created_at';
 
 const TEMPLATE_EXERCISE_COLUMNS = 'id, template_id, exercise_id, order_index';
+
+const USER_PROFILE_COLUMNS = 'id, training_goal, height_cm, note';
+
+const TRAINING_PHASE_COLUMNS = 'id, phase, started_on, ended_on, note';
 
 // 種目は上書き（user_exercise_settings）を畳み込んでから配るため、
 // どちらか一方だけが変わっても両テーブルを読み直す（2つのテーブルで1つのローダーを共有）。
@@ -194,6 +210,20 @@ const TABLE_LOADERS: Record<WorkoutTable, TableLoader> = {
         'SELECT id, measured_at, body_weight_kg, body_fat_percentage, memo FROM body_logs ORDER BY measured_at DESC',
       )
     ).map(toBodyLog),
+  }),
+  // 端末は1行しか持たない。未設定（0行）は null を配る。
+  user_profile: async (database) => {
+    const row = await database.getFirstAsync<UserProfileRow>(
+      `SELECT ${USER_PROFILE_COLUMNS} FROM user_profile LIMIT 1`,
+    );
+    return { userProfile: row ? toUserProfile(row) : null };
+  },
+  training_phases: async (database) => ({
+    trainingPhases: (
+      await database.getAllAsync<TrainingPhaseRow>(
+        `SELECT ${TRAINING_PHASE_COLUMNS} FROM training_phases ORDER BY started_on DESC`,
+      )
+    ).map(toTrainingPhase),
   }),
 };
 

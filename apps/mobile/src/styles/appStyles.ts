@@ -839,6 +839,20 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     fontSize: fontSize.sm,
   },
+  // 複数行の自由記述（トレーニング設定のメモ・フェーズの方針）。
+  // memoInput は1行想定の高さなので、複数行だと入力中に見えている行が動く。
+  noteInput: {
+    color: colors.textPrimary,
+    minHeight: 80,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.sm,
+    borderColor: colors.hairline,
+    borderWidth: hairlineWidth,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.sm,
+    textAlignVertical: 'top',
+  },
   textInput: {
     color: colors.textPrimary,
     minHeight: 46,

@@ -17,12 +17,15 @@ import type {
   Template,
   TemplateExercise,
   TimerSettings,
+  TrainingPhase,
   UserExerciseSetting,
+  UserProfile,
   Workout,
   WorkoutExercise,
   WorkoutSet,
 } from '../types/domain';
 import { DEFAULT_REST_PRESETS } from '../types/domain';
+import { findCurrentPhase } from '../utils/trainingProfile';
 import { exercisesInWorkout } from '../utils/workoutTree';
 
 // 端末 DB の初期化と、読み込んだデータの保持。**書き込みは持たない。**
@@ -54,6 +57,9 @@ export function useWorkoutStore() {
   });
   const [userExerciseSettings, setUserExerciseSettings] = useState<UserExerciseSetting[]>([]);
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
+  // 基本情報は0行または1行。未設定を null で表す。
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [trainingPhases, setTrainingPhases] = useState<TrainingPhase[]>([]);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
     apiUrl: '',
     lastBackupAt: null,
@@ -80,6 +86,9 @@ export function useWorkoutStore() {
     () => exercises.filter((exercise) => !exercise.isArchived),
     [exercises],
   );
+
+  // 現在のフェーズ（進行中のうち開始日が最大のもの）。画面ごとに判定させない。
+  const currentTrainingPhase = useMemo(() => findCurrentPhase(trainingPhases), [trainingPhases]);
 
   const exerciseById = useMemo(
     () => new Map(exercises.map((exercise) => [exercise.id, exercise])),
@@ -147,6 +156,9 @@ export function useWorkoutStore() {
       if (data.timerSettings) setTimerSettings(data.timerSettings);
       if (data.bodyLogs) setBodyLogs(data.bodyLogs);
       if (data.syncSettings) setSyncSettings(data.syncSettings);
+      // 基本情報は「未設定 = null」が正しい値。真偽で見ると、消えたことを反映できない。
+      if (data.userProfile !== undefined) setUserProfile(data.userProfile);
+      if (data.trainingPhases) setTrainingPhases(data.trainingPhases);
       setPendingSyncCount(await countPendingOperations(database));
       if (__DEV__) {
         // 実機計測用。書き込み後の再読込にかかった時間を粒度つきで出す。
@@ -227,6 +239,9 @@ export function useWorkoutStore() {
     userExerciseSettings,
     bodyLogs,
     syncSettings,
+    userProfile,
+    trainingPhases,
+    currentTrainingPhase,
     account,
     pendingSyncCount,
     activeWorkout,

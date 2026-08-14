@@ -15,11 +15,13 @@ import {
   setExerciseRest,
   setWorkoutStatus,
   startPlannedWorkout,
+  startTrainingPhase,
   touchWorkout,
   updateExercise,
   updateWorkoutSet,
   upsertBodyLog,
   upsertUserExerciseSetting,
+  upsertUserProfile,
 } from '../db/queries';
 import { findActiveWorkoutRow } from '../db/loadWorkoutData';
 import { upsertTimerSettings } from '../db/appSettings';
@@ -30,6 +32,8 @@ import type {
   Template,
   TimerSettings,
   TimerState,
+  TrainingGoal,
+  TrainingPhaseKind,
   WorkoutExercise,
   WorkoutSet,
 } from '../types/domain';
@@ -64,6 +68,9 @@ export function useWorkoutData() {
     timerSettings,
     userExerciseSettings,
     bodyLogs,
+    userProfile,
+    trainingPhases,
+    currentTrainingPhase,
     pendingSyncCount,
     activeWorkout,
     activeWorkoutExercises,
@@ -437,6 +444,36 @@ export function useWorkoutData() {
     [ensureDb, reloadTables],
   );
 
+  // 基本情報（目的・身長・メモ）の保存。身長は任意入力で、未入力は null のまま保つ。
+  const saveUserProfile = useCallback(
+    async (profile: {
+      trainingGoal: TrainingGoal;
+      heightCm: number | null;
+      note: string;
+    }): Promise<void> => {
+      const database = ensureDb();
+      await upsertUserProfile(database, profile);
+      await reloadTables(database, ['user_profile']);
+      void syncInBackground();
+    },
+    [ensureDb, reloadTables, syncInBackground],
+  );
+
+  // フェーズの切り替え。進行中のフェーズを閉じる処理は queries 側の1トランザクションに入っている。
+  const switchTrainingPhase = useCallback(
+    async (params: {
+      phase: TrainingPhaseKind;
+      startedOn: string;
+      note: string;
+    }): Promise<void> => {
+      const database = ensureDb();
+      await startTrainingPhase(database, params);
+      await reloadTables(database, ['training_phases']);
+      void syncInBackground();
+    },
+    [ensureDb, reloadTables, syncInBackground],
+  );
+
   return {
     // 休憩タイマーの永続化に使う（useRestTimer が直接読み書きする）。
     database: store.database,
@@ -459,6 +496,11 @@ export function useWorkoutData() {
     templateExercises,
     timerSettings,
     bodyLogs,
+    userProfile,
+    trainingPhases,
+    currentTrainingPhase,
+    saveUserProfile,
+    switchTrainingPhase,
     saveActiveWorkoutAsTemplate,
     startWorkoutFromTemplate,
     deleteTemplate,

@@ -84,3 +84,21 @@ export type BodyLogRow = {
   body_fat_percentage: number | null;
   memo: string;
 };
+
+/** 恒常的に持つ基本情報。端末は1行しか持たない（単一ユーザーのため user_id は無い）。 */
+export type UserProfileRow = {
+  id: string;
+  training_goal: string;
+  // 任意入力。体組成の指標（FFMI）にだけ使うので、無くても分析は動く。
+  height_cm: number | null;
+  note: string;
+};
+
+/** トレーニングのフェーズ履歴。ended_on が NULL なら進行中。 */
+export type TrainingPhaseRow = {
+  id: string;
+  phase: string;
+  started_on: string;
+  ended_on: string | null;
+  note: string;
+};

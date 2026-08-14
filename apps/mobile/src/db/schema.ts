@@ -141,6 +141,14 @@ export const SCHEMA_SQL = `
     updated_at TEXT NOT NULL,
     UNIQUE (started_on)
   );
+  CREATE TABLE IF NOT EXISTS user_profile (
+    id TEXT PRIMARY KEY NOT NULL,
+    training_goal TEXT NOT NULL,
+    height_cm REAL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS exercise_goals (
     id TEXT PRIMARY KEY NOT NULL,
     exercise_id TEXT NOT NULL REFERENCES exercises(id),

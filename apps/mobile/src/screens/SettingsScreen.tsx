@@ -6,7 +6,7 @@ import { styles } from '../styles/appStyles';
 //
 // 以前はタイマー設定・種目マスタ・プレート計算機・CSV・同期を1画面へ積んでいた。
 // 目的の違う設定が同じ高さで並ぶと、探す手がかりが位置しか無くなる。
-export type SettingsRoute = 'exercises' | 'timer' | 'plates' | 'sync' | 'csv';
+export type SettingsRoute = 'exercises' | 'timer' | 'plates' | 'sync' | 'csv' | 'training';
 
 type MenuItem = {
   route: SettingsRoute;
@@ -22,6 +22,7 @@ export const SETTINGS_TITLES: Record<SettingsRoute, string> = {
   exercises: 'トレーニング種目',
   plates: 'プレート計算機',
   timer: 'タイマー',
+  training: 'トレーニング設定',
   sync: 'クラウド同期',
   csv: 'CSV出力',
 };
@@ -44,6 +45,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
     title: '設定',
     items: [
       { route: 'timer', description: '休憩終了時の音と振動' },
+      { route: 'training', description: '目的・身長・メモと、今のフェーズ' },
       { route: 'sync', description: 'ログイン・バックアップ・復元' },
     ],
   },

@@ -29,6 +29,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import type { SettingsRoute } from './src/screens/SettingsScreen';
 import { SETTINGS_TITLES, SettingsScreen } from './src/screens/SettingsScreen';
 import { TimerSettingsScreen } from './src/screens/TimerSettingsScreen';
+import { TrainingSettingsScreen } from './src/screens/TrainingSettingsScreen';
 import { WorkoutEditScreen } from './src/screens/WorkoutEditScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { styles } from './src/styles/appStyles';
@@ -471,6 +472,13 @@ export default function App() {
                 <TimerSettingsScreen
                   timerSettings={data.timerSettings}
                   onUpdate={(settings) => runAction(() => data.updateTimerSettings(settings))}
+                />
+              ) : overlay.route === 'training' ? (
+                <TrainingSettingsScreen
+                  userProfile={data.userProfile}
+                  currentPhase={data.currentTrainingPhase}
+                  onSaveProfile={(profile) => runAction(() => data.saveUserProfile(profile))}
+                  onSwitchPhase={(params) => runAction(() => data.switchTrainingPhase(params))}
                 />
               ) : overlay.route === 'plates' ? (
                 <PlateCalculator />

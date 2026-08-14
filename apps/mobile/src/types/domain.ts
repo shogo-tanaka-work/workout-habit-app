@@ -107,6 +107,36 @@ export type BodyLog = {
   memo: string;
 };
 
+/** トレーニングの目的（user_profile.training_goal の契約値）。書き込み時はここまで狭める。 */
+export type TrainingGoal = 'strength' | 'hypertrophy' | 'endurance' | 'general';
+
+/** フェーズの種別（training_phases.phase の契約値）。書き込み時はここまで狭める。 */
+export type TrainingPhaseKind = 'cut' | 'bulk' | 'maintain' | 'break';
+
+/**
+ * 恒常的に持つ基本情報（1端末1行）。
+ *
+ * `trainingGoal` を `TrainingGoal` へ狭めないのは、これが検証していない外部入力だから
+ * （サーバからの復元でそのまま入る）。サーバが値を増やしても画面が黙って壊れないよう
+ * string で受け、ラベルへの解決は `utils/trainingProfile.ts` の1か所で行う。
+ */
+export type UserProfile = {
+  id: string;
+  trainingGoal: string;
+  /** 任意入力。null は未設定。体組成の指標（FFMI）にだけ使う。 */
+  heightCm: number | null;
+  note: string;
+};
+
+/** トレーニングのフェーズ1件。`endedOn` が null なら進行中。`phase` を狭めない理由は UserProfile と同じ。 */
+export type TrainingPhase = {
+  id: string;
+  phase: string;
+  startedOn: string;
+  endedOn: string | null;
+  note: string;
+};
+
 export type TimerState = {
   workoutSetId: string;
   exerciseName: string;

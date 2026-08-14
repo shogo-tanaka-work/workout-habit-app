@@ -78,7 +78,7 @@ export function CloudSyncSection({
         <Text style={styles.inputLabel}>アカウント</Text>
         {isGoogleSignInAvailable ? (
           <>
-            <Text style={styles.faint}>{account ? account.email : 'ログインしていません'}</Text>
+            <Text style={styles.muted}>{account ? account.email : 'ログインしていません'}</Text>
             <Pressable
               style={styles.ghostButton}
               disabled={isBusy}
@@ -92,7 +92,7 @@ export function CloudSyncSection({
             </Pressable>
           </>
         ) : (
-          <Text style={styles.faint}>
+          <Text style={styles.muted}>
             この端末ではGoogleサインインを設定していません（クライアントIDが未設定）。
           </Text>
         )}
@@ -101,7 +101,8 @@ export function CloudSyncSection({
         {/* 止まるのは送信役だけで、記録の保存は変わらない。
             手動の「今すぐ同期」も止めない（送り忘れを自分で作らないため）。 */}
         <View style={styles.rowBetween}>
-          <Text style={styles.faint}>
+          {/* 文字を大きくしたぶん、Switch を押し出さないよう幅を分け合う。 */}
+          <Text style={[styles.muted, styles.flex]}>
             {syncSettings.isPaused
               ? '停止中。記録は端末に溜まり、再開すると送られます。'
               : '記録した内容を自動でサーバへ送ります。'}

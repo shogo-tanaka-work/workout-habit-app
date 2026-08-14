@@ -862,6 +862,9 @@ export const styles = StyleSheet.create({
   },
   textInput: {
     color: colors.textPrimary,
+    // 他の入力欄（memoInput / noteInput）と同じサイズを明示する。
+    // 未指定だと RN 既定の 14 になり、入力欄ごとに文字サイズが揃わない。
+    fontSize: fontSize.sm,
     minHeight: 46,
     backgroundColor: colors.surfaceRaised,
     borderRadius: radius.sm,

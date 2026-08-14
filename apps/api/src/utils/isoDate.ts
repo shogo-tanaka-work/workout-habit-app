@@ -8,6 +8,13 @@
 export const DAYS_PER_WEEK = 7;
 export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * ISO 8601 の UTC 日時（例: 2026-08-14T01:23:45.678Z）。
+ * 時刻部まで桁数を固定する。緩い `[\d:.]+` だと `T::.Z` のような
+ * 文字列まで通り、辞書順比較（後勝ち判定・期限判定）が壊れる。
+ */
+export const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
 export const formatIsoDate = (date: Date): string => {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');

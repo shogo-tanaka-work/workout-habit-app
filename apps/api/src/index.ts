@@ -21,8 +21,7 @@ import { sync } from './routes/sync';
 // - Claude Code（CLI）: users に紐付いた API トークン
 //
 // - GET  /health      … 死活確認（認証不要）
-// - GET  /backup      … 本人の同期対象テーブルを返す（復元用）
-// - POST /backup      … 本人の行だけを置き換える（src/backup.ts）
+// - GET  /backup      … 本人の同期対象テーブルを返す（復元用。src/backup.ts）
 // - POST /sync/operations … 操作（intent）ベースの同期。冪等・部分成功（src/routes/sync.ts）
 // - GET  /me         … 自分の id / 表示名 / ロール（src/routes/me.ts）
 // - GET  /plans       … 期間内の予定（status='planned'）を返す（src/routes/plans.ts）

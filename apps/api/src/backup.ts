@@ -27,15 +27,18 @@ export const backup = new Hono<AppEnv>();
 
 backup.get('/', async (context) => {
   const user = context.get('user');
-  const tables: Record<string, Record<string, unknown>[]> = {};
-  for (const table of SYNC_TABLES) {
+  // 9テーブルを1文ずつ往復せず、1回の batch にまとめる（結果はステートメント順で返る）。
+  const statements = SYNC_TABLES.map((table) => {
     const scope = selectScopeOf(table, user);
-    const result = await context.env.DB.prepare(
+    return context.env.DB.prepare(
       `SELECT ${columnNamesOf(table).join(', ')} FROM ${table.name} WHERE ${scope.condition}`,
-    )
-      .bind(...scope.params)
-      .all();
-    tables[table.name] = result.results;
+    ).bind(...scope.params);
+  });
+  const batchResults = await context.env.DB.batch<Record<string, unknown>>(statements);
+
+  const tables: Record<string, Record<string, unknown>[]> = {};
+  for (const [index, table] of SYNC_TABLES.entries()) {
+    tables[table.name] = batchResults[index].results;
   }
   return context.json({ exportedAt: new Date().toISOString(), tables } satisfies BackupPayload);
 });

@@ -3,14 +3,19 @@ import { Hono } from 'hono';
 import { scopeForExercise, scopeForUser } from '../db/scope';
 import type { AppEnv } from '../env';
 import {
+  loadBodyLogs,
   loadBodyPartTotals,
+  loadDailySummary,
+  loadExerciseSummaries,
+  loadHabitCounts,
   loadWorkoutAggregates,
   roundToOneDecimal,
   summarizeByPeriod,
+  summarizeHabitWeeks,
 } from '../analytics/aggregate';
 import { monthlyPeriod, weeklyPeriod } from '../analytics/period';
 import { countedSetsCondition, COMPLETED_WORKOUT_STATUS, rmDivisorSql } from '../analytics/sql';
-import { DAYS_PER_WEEK, monthOf, shiftIsoDate, weekStartIso } from '../utils/isoDate';
+import { monthOf, weekStartIso } from '../utils/isoDate';
 
 // 読み取り専用の集計 API。
 //
@@ -58,117 +63,26 @@ analytics.get('/body-parts', async (context) => {
 // 日別サマリ: 直近 N 週の日ごとの記録回数・セット数・ボリューム（ヒートマップ用）と全期間の累計回数。
 analytics.get('/daily', async (context) => {
   const { today, since } = weeklyPeriod(context.req.query(), 16);
-
-  type DailyRow = {
-    date: string;
-    workouts: number;
-    sets: number;
-    volume: number | null;
-  };
-  const scope = scopeForUser(context.get('user'), 'w.user_id');
-  const result = await context.env.DB.prepare(
-    `SELECT w.performed_at AS date,
-            COUNT(DISTINCT w.id) AS workouts,
-            COUNT(s.id) AS sets,
-            SUM(s.weight_kg * s.reps) AS volume
-     FROM workouts w
-     JOIN workout_exercises we ON we.workout_id = w.id
-     JOIN workout_sets s ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')}
-     WHERE w.status = '${COMPLETED_WORKOUT_STATUS}' AND w.performed_at >= ? AND ${scope.condition}
-     GROUP BY w.performed_at
-     ORDER BY w.performed_at`,
-  )
-    .bind(since, ...scope.params)
-    .all<DailyRow>();
-  const totalScope = scopeForUser(context.get('user'), 'user_id');
-  const total = await context.env.DB.prepare(
-    `SELECT COUNT(*) AS workouts FROM workouts
-     WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND ${totalScope.condition}`,
-  )
-    .bind(...totalScope.params)
-    .first<{ workouts: number }>();
-
-  return context.json({
-    today,
+  const { totalWorkouts, days } = await loadDailySummary(
+    context.env.DB,
     since,
-    totalWorkouts: total?.workouts ?? 0,
-    days: result.results.map((row) => ({
-      date: row.date,
-      workoutCount: row.workouts,
-      setCount: row.sets,
-      totalVolume: roundToOneDecimal(row.volume ?? 0),
-    })),
-  });
+    context.get('user'),
+  );
+  return context.json({ today, since, totalWorkouts, days });
 });
 
-// ボディログ: 体重・体脂肪率の推移（測定日昇順）。
+// ボディログ: 体重・体脂肪率の推移（測定日昇順）。`months` は既定 12・最大 24。
+// レスポンスへ today / since は足さない（形を変えない。web 側は独立して修正中のため互換を保つ）。
 analytics.get('/body-logs', async (context) => {
-  type BodyLogRow = {
-    measured_at: string;
-    body_weight_kg: number | null;
-    body_fat_percentage: number | null;
-  };
-  const scope = scopeForUser(context.get('user'), 'user_id');
-  const result = await context.env.DB.prepare(
-    `SELECT measured_at, body_weight_kg, body_fat_percentage
-     FROM body_logs
-     WHERE ${scope.condition}
-     ORDER BY measured_at`,
-  )
-    .bind(...scope.params)
-    .all<BodyLogRow>();
-  return context.json({
-    bodyLogs: result.results.map((row) => ({
-      date: row.measured_at.slice(0, 10),
-      bodyWeightKg: row.body_weight_kg,
-      bodyFatPercentage: row.body_fat_percentage,
-    })),
-  });
+  const { since } = monthlyPeriod(context.req.query(), 12, 24);
+  const bodyLogs = await loadBodyLogs(context.env.DB, since, context.get('user'));
+  return context.json({ bodyLogs });
 });
 
-// 種目一覧: 種目ごとの実施回数・最終実施日・ベスト推定1RM（Epley式）。
+// 種目一覧: 種目ごとの実施回数・最終実施日・ベスト推定1RM。
 analytics.get('/exercises', async (context) => {
-  type ExerciseListRow = {
-    id: string;
-    name: string;
-    body_part_name: string;
-    session_count: number;
-    last_performed_at: string | null;
-    best_one_rep_max: number | null;
-  };
-  const user = context.get('user');
-  const workoutScope = scopeForUser(user, 'w.user_id');
-  const exerciseScope = scopeForExercise(user, 'e.owner_user_id');
-  const result = await context.env.DB.prepare(
-    `SELECT e.id,
-            e.name,
-            COALESCE(bp.name, '未分類') AS body_part_name,
-            COUNT(DISTINCT w.id) AS session_count,
-            MAX(w.performed_at) AS last_performed_at,
-            ROUND(MAX(s.weight_kg * (1.0 + s.reps / ${rmDivisorSql('e.id')})), 1) AS best_one_rep_max
-     FROM exercises e
-     LEFT JOIN body_parts bp ON bp.id = e.primary_body_part_id
-     LEFT JOIN workout_exercises we ON we.exercise_id = e.id
-     LEFT JOIN workouts w
-       ON w.id = we.workout_id AND w.status = '${COMPLETED_WORKOUT_STATUS}' AND ${workoutScope.condition}
-     LEFT JOIN workout_sets s
-       ON s.workout_exercise_id = we.id AND ${countedSetsCondition('s')} AND w.id IS NOT NULL
-     WHERE e.is_archived = 0 AND ${exerciseScope.condition}
-     GROUP BY e.id
-     ORDER BY session_count DESC, e.name`,
-  )
-    .bind(...workoutScope.params, ...exerciseScope.params)
-    .all<ExerciseListRow>();
-  return context.json({
-    exercises: result.results.map((row) => ({
-      id: row.id,
-      name: row.name,
-      bodyPartName: row.body_part_name,
-      sessionCount: row.session_count,
-      lastPerformedAt: row.last_performed_at,
-      bestOneRepMax: row.best_one_rep_max ?? 0,
-    })),
-  });
+  const exercises = await loadExerciseSummaries(context.env.DB, context.get('user'));
+  return context.json({ exercises });
 });
 
 // 種目別分析: セッション（実施日）ごとのボリューム・推定1RM・レップ数の推移と期間サマリ。
@@ -236,62 +150,11 @@ analytics.get('/exercises/:exerciseId', async (context) => {
 // 習慣化ステータス: 週ごとの記録状況と連続週数（今週が未記録でも進行中として扱う）。
 analytics.get('/habit', async (context) => {
   const { today, since } = weeklyPeriod(context.req.query(), 12);
-  const currentWeekStart = weekStartIso(today);
-
-  const scope = scopeForUser(context.get('user'), 'user_id');
-  const result = await context.env.DB.prepare(
-    `SELECT performed_at AS date, COUNT(*) AS workouts
-     FROM workouts
-     WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND performed_at >= ? AND ${scope.condition}
-     GROUP BY performed_at`,
-  )
-    .bind(since, ...scope.params)
-    .all<{ date: string; workouts: number }>();
-  const lastWorkout = await context.env.DB.prepare(
-    `SELECT MAX(performed_at) AS last_date FROM workouts
-     WHERE status = '${COMPLETED_WORKOUT_STATUS}' AND ${scope.condition}`,
-  )
-    .bind(...scope.params)
-    .first<{ last_date: string | null }>();
-
-  const countByWeek = new Map<string, number>();
-  for (const row of result.results) {
-    const weekStart = weekStartIso(row.date);
-    countByWeek.set(weekStart, (countByWeek.get(weekStart) ?? 0) + row.workouts);
-  }
-
-  // since から今週まで欠けなく週の配列を作る（記録なしの週は 0）。
-  const weekSeries: { weekStart: string; workoutCount: number }[] = [];
-  for (let cursor = since; cursor <= currentWeekStart; cursor = shiftIsoDate(cursor, DAYS_PER_WEEK)) {
-    weekSeries.push({ weekStart: cursor, workoutCount: countByWeek.get(cursor) ?? 0 });
-  }
-
-  // 連続週数: 今週から遡って記録のある週を数える。今週が未記録の場合は進行中とみなしスキップ。
-  let streakWeeks = 0;
-  for (let index = weekSeries.length - 1; index >= 0; index -= 1) {
-    const week = weekSeries[index];
-    if (week.workoutCount > 0) {
-      streakWeeks += 1;
-      continue;
-    }
-    if (week.weekStart === currentWeekStart) {
-      continue;
-    }
-    break;
-  }
-
-  const totalWorkouts = weekSeries.reduce((sum, week) => sum + week.workoutCount, 0);
-  const activeWeeks = weekSeries.filter((week) => week.workoutCount > 0).length;
-  return context.json({
-    today,
+  const { dailyCounts, lastWorkoutDate } = await loadHabitCounts(
+    context.env.DB,
     since,
-    currentWeekStart,
-    thisWeekCount: countByWeek.get(currentWeekStart) ?? 0,
-    lastWorkoutDate: lastWorkout?.last_date ?? null,
-    currentStreakWeeks: streakWeeks,
-    activeWeeks,
-    totalWeeks: weekSeries.length,
-    averageWorkoutsPerWeek: roundToOneDecimal(totalWorkouts / weekSeries.length),
-    weeks: weekSeries,
-  });
+    context.get('user'),
+  );
+  const summary = summarizeHabitWeeks(dailyCounts, { since, today });
+  return context.json({ today, since, lastWorkoutDate, ...summary });
 });

@@ -16,6 +16,7 @@ import { verifyGoogleIdToken } from '../auth/google';
 import type { Identity } from '../auth/types';
 import { resolveUser } from '../auth/users';
 import type { AppEnv } from '../env';
+import { clientIpOf, consumeRateLimit, rateLimitedResponse } from './rateLimit';
 
 /** 認証を要さないパス。追加時は必ず理由を伴って明示的に足す。 */
 const PUBLIC_PATHS: ReadonlySet<string> = new Set(['/health']);
@@ -33,7 +34,7 @@ const identify = async (context: Context<AppEnv>): Promise<Identity | null> => {
     return null;
   }
   if (bearer.startsWith(API_TOKEN_PREFIX)) {
-    return verifyApiToken(context.env.DB, bearer);
+    return verifyApiToken(context.env.DB, bearer, context.executionCtx);
   }
   return verifyGoogleIdToken(bearer, context.env.GOOGLE_CLIENT_IDS);
 };
@@ -47,9 +48,17 @@ export const authenticate = (): MiddlewareHandler<AppEnv> => async (context, nex
   try {
     const identity = await identify(context);
     if (!identity) {
+      // 認証の失敗だけを数える（成功リクエストは対象外）。トークン総当たりの頭打ち。
+      const withinLimit = await consumeRateLimit(
+        context.env.AUTH_FAILURE_RATE_LIMITER,
+        clientIpOf(context),
+      );
+      if (!withinLimit) {
+        return rateLimitedResponse(context);
+      }
       return context.json({ error: 'unauthorized' }, 401);
     }
-    const user = await resolveUser(context.env.DB, identity);
+    const user = await resolveUser(context.env.DB, identity, context.executionCtx);
     if (!user) {
       return context.json({ error: 'forbidden' }, 403);
     }

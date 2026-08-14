@@ -24,6 +24,14 @@ export type AuthVariables = {
 };
 
 /**
+ * レスポンス内容に影響しない後処理（プロフィール補完・last_used_at 更新）の追跡口。
+ * Hono の `context.executionCtx` をそのまま渡す（分割代入すると this が外れて実行時エラーになる。
+ * cloudflare-workers.md）。waitUntil だけに絞るのは、Hono と workerd で
+ * ExecutionContext の型定義が食い違っており、全体を要求すると互換しないため。
+ */
+export type BackgroundTasks = Pick<ExecutionContext, 'waitUntil'>;
+
+/**
  * 認証・認可に使う Secret。いずれも `wrangler secret put` で設定する。
  * 未設定の経路は利用できない（fail closed）。
  */

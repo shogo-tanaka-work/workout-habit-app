@@ -4,7 +4,7 @@
 // 代わりに users に紐付いた不透明トークンを発行し、SHA-256 のハッシュだけを D1 に置く。
 // 平文はここでもどこでも保存しない。
 
-import type { Identity } from './types';
+import type { BackgroundTasks, Identity } from './types';
 
 /** CLI トークンの接頭辞。Bearer が JWT か CLI トークンかをこれで判別する。 */
 export const API_TOKEN_PREFIX = 'whk_';
@@ -38,6 +38,25 @@ type ApiTokenRow = {
   revoked_at: string | null;
 };
 
+/** 最終利用日時を記録する。失敗しても認証には影響させない（警告のみ）。 */
+const recordTokenUsage = async (
+  database: D1Database,
+  tokenId: string,
+  usedAt: string,
+): Promise<void> => {
+  try {
+    await database
+      .prepare('UPDATE api_tokens SET last_used_at = ?, updated_at = ? WHERE id = ?')
+      .bind(usedAt, usedAt, tokenId)
+      .run();
+  } catch (error) {
+    console.warn(
+      '[auth] api_tokens.last_used_at の更新に失敗',
+      error instanceof Error ? error.message : '',
+    );
+  }
+};
+
 /**
  * CLI トークンを検証して Identity へ変換する。失効・期限切れ・未登録なら null。
  * 最終利用日時の記録は認証の成否に影響させない（失敗しても認証は通す）。
@@ -45,6 +64,7 @@ type ApiTokenRow = {
 export const verifyApiToken = async (
   database: D1Database,
   plainToken: string,
+  executionCtx: BackgroundTasks,
 ): Promise<Identity | null> => {
   const tokenHash = await hashApiToken(plainToken);
   let row: ApiTokenRow | null;
@@ -74,14 +94,8 @@ export const verifyApiToken = async (
     return null;
   }
 
-  try {
-    await database
-      .prepare('UPDATE api_tokens SET last_used_at = ?, updated_at = ? WHERE id = ?')
-      .bind(now, now, row.id)
-      .run();
-  } catch (error) {
-    console.warn('[auth] api_tokens.last_used_at の更新に失敗', error instanceof Error ? error.message : '');
-  }
+  // last_used_at はレスポンス内容に影響しない後処理。待たずに waitUntil で完了だけ追跡する。
+  executionCtx.waitUntil(recordTokenUsage(database, row.id, now));
 
   return { kind: 'apiToken', userId: row.user_id };
 };

@@ -72,16 +72,18 @@ const decodeJsonSegment = <T>(segment: string): T | null => {
   }
 };
 
+// エラーメッセージへ JWKS の URL を入れない。Access の team domain を含むため、
+// 500 レスポンス経由やログで構成情報が漏れる経路になる。
 const fetchJwks = async (jwksUrl: string): Promise<JsonWebKey[]> => {
   const response = await fetch(jwksUrl, { cf: { cacheTtl: 600 } });
   if (!response.ok) {
-    throw new Error(`JWKS の取得に失敗しました: ${jwksUrl} が ${response.status} を返しました`);
+    throw new Error(`JWKS の取得に失敗しました: HTTP ${response.status}`);
   }
   // 外部から来る JSON はアサーションで通さず、境界で形を確かめる。
   const body: unknown = await response.json();
   const keys = isRecord(body) ? body.keys : undefined;
   if (!Array.isArray(keys) || keys.length === 0) {
-    throw new Error(`JWKS の形式が不正です: ${jwksUrl}`);
+    throw new Error('JWKS の形式が不正です');
   }
   return keys as JsonWebKey[];
 };

@@ -24,6 +24,29 @@ export type OperationResult = {
 
 type OwnerRow = { owner: string | null; updated_at: string | null };
 
+/**
+ * 同一リクエスト内の行照会メモ。同じ行（親チェックで繰り返し引く workout 等）を
+ * D1 へ何度も照会しないために持つ。リクエストを超えて保持しない。
+ *
+ * 逐次適用の順序依存を壊さないよう、upsert / delete を適用した時点で
+ * エントリを適用後の状態へ更新する（updateCacheAfterApply）。
+ */
+type RowCache = {
+  /** 同期対象テーブルの行。値 null は「行が無い」ことのメモ。キーは rowKeyOf。 */
+  ownerRows: Map<string, OwnerRow | null>;
+  /** 同期対象外の共有マスタ（body_parts 等）の存在確認。キーは rowKeyOf。 */
+  sharedRowExists: Map<string, boolean>;
+};
+
+/** 適用処理がリクエスト内で持ち回る文脈。個別に渡すと引数が5つを超えるためまとめる。 */
+type ApplyContext = {
+  database: D1Database;
+  user: AuthenticatedUser;
+  rowCache: RowCache;
+};
+
+const rowKeyOf = (tableName: string, rowId: string): string => `${tableName}:${rowId}`;
+
 /** 適用済みの操作 ID を引く。再送された操作を2回適用しないための台帳。 */
 const loadAppliedOperationIds = async (
   database: D1Database,
@@ -47,47 +70,59 @@ const loadAppliedOperationIds = async (
   return applied;
 };
 
-const loadOwnerRow = (
-  database: D1Database,
+const loadOwnerRow = async (
+  context: ApplyContext,
   table: SyncTable,
   rowId: string,
-): Promise<OwnerRow | null> =>
-  database
+): Promise<OwnerRow | null> => {
+  const key = rowKeyOf(table.name, rowId);
+  if (context.rowCache.ownerRows.has(key)) {
+    return context.rowCache.ownerRows.get(key) ?? null;
+  }
+  const row = await context.database
     .prepare(
       `SELECT ${table.ownerColumn} AS owner, updated_at FROM ${table.name} WHERE id = ?`,
     )
     .bind(rowId)
     .first<OwnerRow>();
+  context.rowCache.ownerRows.set(key, row);
+  return row;
+};
 
 /**
  * 親行が使えるかを確かめる。
  * 同期対象外のテーブル（body_parts のような共有マスタ）は存在確認だけ行う。
  */
 const parentIsUsable = async (
-  database: D1Database,
-  user: AuthenticatedUser,
+  context: ApplyContext,
   parentTableName: string,
   parentRowId: string,
 ): Promise<boolean> => {
   const parentTable = findSyncTable(parentTableName);
   if (!parentTable) {
-    const row = await database
+    const key = rowKeyOf(parentTableName, parentRowId);
+    const cachedExists = context.rowCache.sharedRowExists.get(key);
+    if (cachedExists !== undefined) {
+      return cachedExists;
+    }
+    const row = await context.database
       .prepare(`SELECT 1 AS found FROM ${parentTableName} WHERE id = ?`)
       .bind(parentRowId)
       .first<{ found: number }>();
-    return row !== null;
+    const exists = row !== null;
+    context.rowCache.sharedRowExists.set(key, exists);
+    return exists;
   }
-  const row = await loadOwnerRow(database, parentTable, parentRowId);
+  const row = await loadOwnerRow(context, parentTable, parentRowId);
   if (!row) {
     return false;
   }
   // owner が NULL の行は共有プリセット（種目マスタ）。誰でも参照できる。
-  return row.owner === null || row.owner === user.id;
+  return row.owner === null || row.owner === context.user.id;
 };
 
 const buildUpsertStatement = (
-  database: D1Database,
-  user: AuthenticatedUser,
+  context: ApplyContext,
   table: SyncTable,
   row: Record<string, unknown>,
 ): D1PreparedStatement => {
@@ -99,9 +134,9 @@ const buildUpsertStatement = (
     .filter((column) => column !== 'id')
     .map((column) => `${column} = excluded.${column}`)
     .join(', ');
-  const bindings = [...providedColumns.map((column) => row[column]), user.id];
+  const bindings = [...providedColumns.map((column) => row[column]), context.user.id];
 
-  return database
+  return context.database
     .prepare(
       `INSERT INTO ${table.name} (${columns.join(', ')}) VALUES (${placeholders})
        ON CONFLICT(id) DO UPDATE SET ${assignments}
@@ -111,18 +146,17 @@ const buildUpsertStatement = (
 };
 
 const ledgerStatement = (
-  database: D1Database,
-  user: AuthenticatedUser,
+  context: ApplyContext,
   operation: SyncOperation,
   appliedAt: string,
 ): D1PreparedStatement =>
-  database
+  context.database
     .prepare(
       `INSERT INTO sync_operations (user_id, id, entity, op, row_id, occurred_at, applied_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      user.id,
+      context.user.id,
       operation.id,
       operation.table.name,
       operation.op,
@@ -133,32 +167,52 @@ const ledgerStatement = (
 
 /** 対象行が自分のものか。存在しない場合は null（新規作成とみなす）。 */
 const checkExistingOwner = async (
-  database: D1Database,
-  user: AuthenticatedUser,
+  context: ApplyContext,
   table: SyncTable,
   rowId: string,
 ): Promise<{ ok: true; existing: OwnerRow | null } | { ok: false; error: string }> => {
-  const existing = await loadOwnerRow(database, table, rowId);
+  const existing = await loadOwnerRow(context, table, rowId);
   if (!existing) {
     return { ok: true, existing: null };
   }
-  if (existing.owner !== user.id) {
+  if (existing.owner !== context.user.id) {
     // 他人の行・共有プリセットは触らせない。存在を漏らさないため理由は not found で揃える。
     return { ok: false, error: 'row not found' };
   }
   return { ok: true, existing };
 };
 
+/**
+ * 適用に成功した操作の結果をメモへ反映する。
+ * 後続の操作（同じ行への再更新、この行を親に持つ子の追加）が古い状態を読まないため。
+ */
+const updateCacheAfterApply = (
+  context: ApplyContext,
+  operation: SyncOperation,
+  existing: OwnerRow | null,
+): void => {
+  if (operation.op === 'delete') {
+    context.rowCache.ownerRows.set(rowKeyOf(operation.table.name, operation.rowId), null);
+    return;
+  }
+  const incomingUpdatedAt = operation.row.updated_at;
+  context.rowCache.ownerRows.set(rowKeyOf(operation.table.name, String(operation.row.id)), {
+    owner: context.user.id,
+    // updated_at が行に無い upsert は既存値を保つ（UPDATE 句に updated_at が含まれないため）。
+    updated_at:
+      typeof incomingUpdatedAt === 'string' ? incomingUpdatedAt : (existing?.updated_at ?? null),
+  });
+};
+
 const applyOne = async (
-  database: D1Database,
-  user: AuthenticatedUser,
+  context: ApplyContext,
   operation: SyncOperation,
   appliedAt: string,
 ): Promise<OperationResult> => {
   const table = operation.table;
   const rowId = operation.op === 'delete' ? operation.rowId : String(operation.row.id);
 
-  const ownerCheck = await checkExistingOwner(database, user, table, rowId);
+  const ownerCheck = await checkExistingOwner(context, table, rowId);
   if (!ownerCheck.ok) {
     return { id: operation.id, status: 'rejected', error: ownerCheck.error };
   }
@@ -173,7 +227,7 @@ const applyOne = async (
           error: `missing column: ${table.name}.${parent.column}`,
         };
       }
-      if (!(await parentIsUsable(database, user, parent.table, parentRowId))) {
+      if (!(await parentIsUsable(context, parent.table, parentRowId))) {
         return {
           id: operation.id,
           status: 'rejected',
@@ -189,21 +243,21 @@ const applyOne = async (
       typeof incomingUpdatedAt === 'string' &&
       ownerCheck.existing.updated_at > incomingUpdatedAt
     ) {
-      await ledgerStatement(database, user, operation, appliedAt).run();
+      await ledgerStatement(context, operation, appliedAt).run();
       return { id: operation.id, status: 'stale' };
     }
   }
 
   const mutation =
     operation.op === 'delete'
-      ? database
+      ? context.database
           .prepare(`DELETE FROM ${table.name} WHERE id = ? AND ${table.ownerColumn} = ?`)
-          .bind(rowId, user.id)
-      : buildUpsertStatement(database, user, table, operation.row);
+          .bind(rowId, context.user.id)
+      : buildUpsertStatement(context, table, operation.row);
 
   try {
     // 適用と台帳への記録は 1 バッチ（= 1 トランザクション）にまとめる。
-    await database.batch([mutation, ledgerStatement(database, user, operation, appliedAt)]);
+    await context.database.batch([mutation, ledgerStatement(context, operation, appliedAt)]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     // 理由まで残す。クライアントが結果を捨てた場合、サーバ側だけが手がかりになる
@@ -212,12 +266,14 @@ const applyOne = async (
     return { id: operation.id, status: 'rejected', error: message };
   }
 
+  updateCacheAfterApply(context, operation, ownerCheck.existing);
   return { id: operation.id, status: 'applied' };
 };
 
 /**
  * 操作を順に適用する。1件が失敗しても残りは適用し、結果を操作ごとに返す（部分成功）。
  * 端末は rejected だけを見て再送するか捨てるかを決める。
+ * 逐次であるのは意図的（前の操作の適用結果を後の操作の親チェック・後勝ち判定が読む）。
  */
 export const applyOperations = async (
   database: D1Database,
@@ -230,6 +286,11 @@ export const applyOperations = async (
     user.id,
     operations.map((operation) => operation.id),
   );
+  const context: ApplyContext = {
+    database,
+    user,
+    rowCache: { ownerRows: new Map(), sharedRowExists: new Map() },
+  };
 
   const results: OperationResult[] = [];
   for (const operation of operations) {
@@ -237,7 +298,7 @@ export const applyOperations = async (
       results.push({ id: operation.id, status: 'duplicate' });
       continue;
     }
-    results.push(await applyOne(database, user, operation, appliedAt));
+    results.push(await applyOne(context, operation, appliedAt));
   }
   return { appliedAt, results };
 };

@@ -5,12 +5,11 @@
 
 import type { SyncColumn, SyncTable } from '../tables';
 import { findSyncTable } from '../tables';
+import { ISO_DATETIME_PATTERN } from '../utils/isoDate';
 import { isRecord } from '../utils/isRecord';
 
 /** 1リクエストで受け付ける操作の上限。 */
 const MAX_OPERATIONS_PER_REQUEST = 200;
-
-const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 export type SyncOperation = {
   id: string;

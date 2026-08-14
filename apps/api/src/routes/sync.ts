@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 
 import type { AppEnv } from '../env';
+import { consumeRateLimit, rateLimitedResponse } from '../middleware/rateLimit';
 import type { OperationResult } from '../sync/apply';
 import { applyOperations } from '../sync/apply';
 import { parseOperations } from '../sync/validate';
@@ -16,6 +17,12 @@ import { parseOperations } from '../sync/validate';
 export const sync = new Hono<AppEnv>();
 
 sync.post('/operations', async (context) => {
+  // 書き込みの受け口なので、クライアント暴走（再送ループ等）を userId 単位で頭打ちにする。
+  const withinLimit = await consumeRateLimit(context.env.SYNC_RATE_LIMITER, context.get('user').id);
+  if (!withinLimit) {
+    return rateLimitedResponse(context);
+  }
+
   let body: unknown;
   try {
     body = await context.req.json();

@@ -7,14 +7,14 @@ import { Hono } from 'hono';
 
 import { generateApiToken, hashApiToken } from '../auth/apiToken';
 import { scopeForUser } from '../db/scope';
+import { ISO_DATETIME_PATTERN } from '../utils/isoDate';
 import { isRecord } from '../utils/isRecord';
 import type { AppEnv } from '../env';
 import { requireRole } from '../middleware/authorize';
+import { consumeRateLimit, rateLimitedResponse } from '../middleware/rateLimit';
 
 /** トークン名の最大長。用途がわかる短いラベルを想定する。 */
 const MAX_TOKEN_NAME_LENGTH = 64;
-
-const ISO_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 type CreateTokenInput = { name: string; expiresAt: string | null };
 
@@ -57,6 +57,15 @@ apiTokens.get('/', async (context) => {
 });
 
 apiTokens.post('/', async (context) => {
+  // トークン発行は認証境界そのものを増やす操作なので、userId 単位で発行回数を頭打ちにする。
+  const withinLimit = await consumeRateLimit(
+    context.env.TOKEN_ISSUE_RATE_LIMITER,
+    context.get('user').id,
+  );
+  if (!withinLimit) {
+    return rateLimitedResponse(context);
+  }
+
   let body: unknown;
   try {
     body = await context.req.json();

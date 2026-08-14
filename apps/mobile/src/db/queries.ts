@@ -128,24 +128,47 @@ export const touchWorkout = async (
   });
 };
 
+// ワークアウト1行の追加。トランザクションの外側は呼び出し元が張る。
+const insertWorkoutRow = async (
+  database: SQLite.SQLiteDatabase,
+  params: { id: string; performedAt: string; status: 'active' | 'completed' },
+): Promise<void> => {
+  const timestamp = nowIso();
+  await database.runAsync(
+    'INSERT INTO workouts (id, performed_at, status, memo, last_saved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    params.id,
+    params.performedAt,
+    params.status,
+    '',
+    timestamp,
+    timestamp,
+    timestamp,
+  );
+  await enqueueUpsert(database, 'workouts', params.id);
+};
+
 export const insertWorkout = async (
   database: SQLite.SQLiteDatabase,
   params: { id: string; performedAt: string },
 ): Promise<void> => {
-  const timestamp = nowIso();
-  await writeInTransaction(database, 'insertWorkout', async () => {
-    await database.runAsync(
-      'INSERT INTO workouts (id, performed_at, status, memo, last_saved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      params.id,
-      params.performedAt,
-      'active',
-      '',
-      timestamp,
-      timestamp,
-      timestamp,
-    );
-    await enqueueUpsert(database, 'workouts', params.id);
-  });
+  await writeInTransaction(database, 'insertWorkout', () =>
+    insertWorkoutRow(database, { ...params, status: 'active' }),
+  );
+};
+
+/**
+ * 過去の日付の記録を作る（後から入れ直すとき用）。
+ *
+ * **status は completed。** 過去の記録は実施済みであり、`active` で作ると
+ * 「端末に記録中は1つ」の前提が壊れる（進行中の記録を持てなくなる）。
+ */
+export const insertCompletedWorkout = async (
+  database: SQLite.SQLiteDatabase,
+  params: { id: string; performedAt: string },
+): Promise<void> => {
+  await writeInTransaction(database, 'insertCompletedWorkout', () =>
+    insertWorkoutRow(database, { ...params, status: 'completed' }),
+  );
 };
 
 /**

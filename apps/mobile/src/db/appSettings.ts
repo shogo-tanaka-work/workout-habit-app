@@ -61,10 +61,18 @@ export const toTimerSettings = (rows: AppSettingRow[]): TimerSettings => {
   };
 };
 
+// 接続先の初期値。再インストールのたびに手入力しなくて済むよう、環境変数から拾う。
+// **静的に書く。** `process.env[key]` の動的アクセスは Expo のビルド時置換が効かず、
+// 実行時に undefined になる（.agents/rules/typescript.md）。
+// Expo の環境変数は型が付かない（any）ため、文字列へ絞ってから使う（auth/googleAuth.ts と同じ扱い）。
+const envSyncApiUrl: unknown = process.env.EXPO_PUBLIC_SYNC_API_URL;
+const DEFAULT_SYNC_API_URL = typeof envSyncApiUrl === 'string' ? envSyncApiUrl : '';
+
 export const toSyncSettings = (rows: AppSettingRow[]): SyncSettings => {
   const valueByKey = new Map(rows.map((row) => [row.key, row.value]));
   return {
-    apiUrl: valueByKey.get(SYNC_API_URL_KEY) ?? '',
+    // 保存済みの値があればそれを使う。ユーザーが変えた接続先を環境変数で上書きしない。
+    apiUrl: valueByKey.get(SYNC_API_URL_KEY) ?? DEFAULT_SYNC_API_URL,
     lastBackupAt: valueByKey.get(SYNC_LAST_BACKUP_AT_KEY) ?? null,
     // 未設定は「停止していない」。自動送信が既定。
     isPaused: valueByKey.get(SYNC_PAUSED_KEY) === '1',

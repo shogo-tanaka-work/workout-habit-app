@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import {
   deleteTemplateDeep,
   deleteWorkoutDeep,
+  insertCompletedWorkout,
   insertExercise,
   insertTemplateDeep,
   insertTimerEvent,
@@ -40,7 +41,7 @@ import type {
 import { formatDate, nowMs } from '../utils/datetime';
 import { newId } from '../utils/id';
 import { restSecondsFor } from '../utils/restPresets';
-import { exerciseNameOf } from '../utils/workoutTree';
+import { exerciseNameOf, exercisesInWorkout } from '../utils/workoutTree';
 import { useSync } from './useSync';
 import { useWorkoutStore } from './useWorkoutStore';
 
@@ -109,6 +110,24 @@ export function useWorkoutData() {
     return workoutId;
   }, [ensureDb, reloadTables]);
 
+  /**
+   * 過去の日付の記録を作り、その ID を返す（後から入れ直すとき用）。
+   *
+   * 記録中として開始する `startWorkout` とは別の操作にしている。過去の記録は実施済みで、
+   * 端末が持てる `active` は1つという前提を壊さないため、完了済みとして作る。
+   */
+  const addPastWorkout = useCallback(
+    async (performedAt: string): Promise<string> => {
+      const database = ensureDb();
+      const workoutId = newId('workout');
+      await insertCompletedWorkout(database, { id: workoutId, performedAt });
+      await reloadTables(database, ['workouts']);
+      void syncInBackground();
+      return workoutId;
+    },
+    [ensureDb, reloadTables, syncInBackground],
+  );
+
   const completeWorkout = useCallback(async () => {
     if (!activeWorkout) {
       return;
@@ -159,6 +178,33 @@ export function useWorkoutData() {
       await reloadTables(database, ['workouts', 'workout_exercises']);
     },
     [activeWorkout, activeWorkoutExercises, ensureDb, reloadTables, startWorkout],
+  );
+
+  /**
+   * ホームの日詳細から開いた記録（編集画面）へ種目を足す。
+   *
+   * 記録中への追加は `addExerciseToWorkout` が持つ。あちらは記録中が無ければ開始まで行うが、
+   * ここは既にある記録が対象なので、開始も日付の決定も起きない。
+   */
+  const addExerciseToEditedWorkout = useCallback(
+    async (workoutId: string, exercise: Exercise) => {
+      const database = ensureDb();
+      const items = exercisesInWorkout(workoutId, workoutExercises);
+      if (items.some((item) => item.exerciseId === exercise.id)) {
+        Alert.alert('追加済み', `${exercise.name} はこの記録に入っています。`);
+        return;
+      }
+      await insertWorkoutExercise(database, {
+        id: newId('workout-exercise'),
+        workoutId,
+        exerciseId: exercise.id,
+        orderIndex: items.length + 1,
+      });
+      await touchWorkout(database, workoutId);
+      await reloadTables(database, ['workouts', 'workout_exercises']);
+      void syncInBackground();
+    },
+    [ensureDb, reloadTables, syncInBackground, workoutExercises],
   );
 
   const addSet = useCallback(
@@ -510,10 +556,12 @@ export function useWorkoutData() {
     ...sync,
     beginPlannedWorkout,
     startWorkout,
+    addPastWorkout,
     completeWorkout,
     pauseWorkout,
     deleteWorkout,
     addExerciseToWorkout,
+    addExerciseToEditedWorkout,
     addSet,
     patchSet,
     beginRestTimer,

@@ -99,6 +99,17 @@ EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com   # 任意
 
 値を変えたら `npx expo prebuild --clean` からやり直す（ネイティブ設定に焼き込まれる）。
 
+同期先の API も同じ `.env.local` に置ける。**接続先の URL はリポジトリへ書かない**
+（`.agents/rules/secrets.md`。API のホスト名も対象）。
+
+```
+EXPO_PUBLIC_SYNC_API_URL=https://<API のホスト>   # クラウド同期画面の初期値
+```
+
+これは**保存済みの値が無いときのフォールバック**として `db/appSettings.ts` の
+`toSyncSettings` が使う（再インストールのたびに手入力しなくて済むようにするため）。
+アプリ内で接続先を変えたらそちらが優先され、環境変数では上書きされない。
+
 ## ⚠️ app.json のプラグイン設定を変えたら prebuild を明示的に実行する
 
 **`npm run ios` は `ios/` が既にあると prebuild を再実行しない。**

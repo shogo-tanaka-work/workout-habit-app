@@ -173,9 +173,13 @@ export default function App() {
     setTab('home');
   };
 
-  // 過去の記録の編集は、タブとは別レイヤの画面として全面に出す。
+  // 記録の編集は、タブとは別レイヤの画面として全面に出す。
+  // 記録中（active）も対象にする（完了させないと削除できない状態を避けるため）。
+  // 予定（planned）は実績ではないので除く（ホームの PlannedWorkoutSection が受け持つ）。
   const editingWorkout = editingWorkoutId
-    ? (data.completedWorkouts.find((workout) => workout.id === editingWorkoutId) ?? null)
+    ? (data.workouts.find(
+        (workout) => workout.id === editingWorkoutId && workout.status !== 'planned',
+      ) ?? null)
     : null;
   const editingWorkoutExercises = useMemo(
     () => (editingWorkoutId ? exercisesInWorkout(editingWorkoutId, data.workoutExercises) : []),
@@ -288,6 +292,15 @@ export default function App() {
   // ホームで選んだ日の記録を直す。タブの上へ編集画面をかぶせる。
   const handleEditWorkoutFromHome = (workoutId: string) => {
     setEditingWorkoutId(workoutId);
+  };
+
+  // 記録の無い過去日に、その日の記録を作って続けて中身を入れられるようにする。
+  // 作った直後に編集画面を開くのは、種目とセットを入れる場所がそこだけだから。
+  const handleAddPastWorkout = (performedAt: string) => {
+    runAction(async () => {
+      const workoutId = await data.addPastWorkout(performedAt);
+      setEditingWorkoutId(workoutId);
+    });
   };
 
   // ホーム右下の主操作。記録中なら続きへ、なければ新しく始める。
@@ -427,6 +440,7 @@ export default function App() {
                 runAction(() => data.beginPlannedWorkout(workoutId).then(() => setTab('workout')));
               }}
               onEditWorkout={handleEditWorkoutFromHome}
+              onAddPastWorkout={handleAddPastWorkout}
               onSelectExercise={setSelectedExerciseId}
               onSaveBodyLog={(measuredAt, weightKg, fatPercentage) =>
                 runAction(() => data.saveBodyLog(measuredAt, weightKg, fatPercentage))
@@ -449,7 +463,15 @@ export default function App() {
                 workout={overlay.workout}
                 workoutExercises={editingWorkoutExercises}
                 visibleSets={data.visibleSets}
+                exercises={data.exercisesByUsage}
+                bodyParts={data.bodyParts}
                 exerciseById={data.exerciseById}
+                onAddExercise={(exercise) =>
+                  runAction(() => data.addExerciseToEditedWorkout(overlay.workout.id, exercise))
+                }
+                onAddCustomExercise={(name, bodyPartId) =>
+                  runAction(() => data.addCustomExercise(name, bodyPartId))
+                }
                 onAddSet={handleAddSet}
                 onPatchSet={handlePatchSet}
                 onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}

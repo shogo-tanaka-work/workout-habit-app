@@ -70,6 +70,7 @@ export function HomeScreen({
   onResume,
   onBeginPlanned,
   onEditWorkout,
+  onAddPastWorkout,
   onSelectExercise,
   onSaveBodyLog,
 }: {
@@ -84,6 +85,8 @@ export function HomeScreen({
   onResume: () => void;
   onBeginPlanned: (workoutId: string) => void;
   onEditWorkout: (workoutId: string) => void;
+  /** 過去日の記録を作って編集画面を開く（記録が無い過去日でだけ呼ばれる）。 */
+  onAddPastWorkout: (performedAt: string) => void;
   onSelectExercise: (exerciseId: string) => void;
   onSaveBodyLog: (
     measuredAt: string,
@@ -147,10 +150,13 @@ export function HomeScreen({
     [calendarWorkouts, workoutExercises, exerciseById],
   );
 
-  const dayWorkouts = completedWorkouts.filter((workout) => workout.performedAt === selectedDate);
-  const dayPlannedWorkouts = plannedWorkouts.filter(
-    (workout) => workout.performedAt === selectedDate,
-  );
+  // 記録中（active）もその日の記録として扱う。完了させないと日詳細に出ず、
+  // 編集も削除もできなかった。予定（planned）は別概念なので入れない
+  // （下の PlannedWorkoutSection が受け持つ）。
+  const isOnSelectedDate = (workout: Workout) => workout.performedAt === selectedDate;
+  const dayActiveWorkouts = activeWorkout && isOnSelectedDate(activeWorkout) ? [activeWorkout] : [];
+  const dayWorkouts = [...completedWorkouts.filter(isOnSelectedDate), ...dayActiveWorkouts];
+  const dayPlannedWorkouts = plannedWorkouts.filter(isOnSelectedDate);
   const dayItems = workoutExercises
     .filter((item) => dayWorkouts.some((workout) => workout.id === item.workoutId))
     .sort((a, b) => a.orderIndex - b.orderIndex);
@@ -158,7 +164,23 @@ export function HomeScreen({
     dayItems.some((item) => item.id === set.workoutExerciseId),
   );
   const daySummary = summarizeSets(daySets);
-  const isResumable = activeWorkout !== null && activeWorkout.performedAt === selectedDate;
+  const isResumable = dayActiveWorkouts.length > 0;
+  // 未来の実績は作れない（未来日の予定は Claude Code 連携が受け持つ）。
+  const isPastDate = selectedDate < today;
+
+  // 種目が1つも無いときの案内。記録そのものの有無と日付で、次にとる行動が変わる。
+  const emptyDetailMessage = (): string => {
+    if (dayWorkouts.length > 0) {
+      return 'この記録にはまだ種目が入っていません。「編集」から種目とセットを足せます。';
+    }
+    if (selectedDate === today) {
+      return 'この日の記録はまだありません。右下の＋から記録を始めましょう。';
+    }
+    if (isPastDate) {
+      return 'この日の記録はありません。あとから入れ直すこともできます。';
+    }
+    return 'この日の記録はありません。カレンダーで別の日を選ぶと、その日の内容を見られます。';
+  };
 
   return (
     <View
@@ -195,14 +217,21 @@ export function HomeScreen({
             {formatJapaneseDate(selectedDate)}
             {selectedDate === today ? '（今日）' : ''}
           </Text>
-          {dayWorkouts[0] ? (
-            <Pressable
-              style={styles.ghostButton}
-              onPress={() => onEditWorkout(dayWorkouts[0]?.id ?? '')}
-            >
-              <Text style={styles.ghostButtonText}>編集</Text>
-            </Pressable>
-          ) : null}
+          {/* 同じ日に完了済みと記録中が並ぶことがあるので、記録ごとに導線を出す。
+              ラベルで「どちらを直すか」を分かるようにする。 */}
+          <View style={styles.headerActions}>
+            {dayWorkouts.map((workout) => (
+              <Pressable
+                key={workout.id}
+                style={styles.ghostButton}
+                onPress={() => onEditWorkout(workout.id)}
+              >
+                <Text style={styles.ghostButtonText}>
+                  {workout.status === 'active' ? '記録中を編集' : '編集'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.homeDetailScroll}>
@@ -255,11 +284,15 @@ export function HomeScreen({
             </>
           ) : (
             <View style={styles.sectionBody}>
-              <Text style={styles.muted}>
-                {selectedDate === today
-                  ? 'この日の記録はまだありません。右下の＋から記録を始めましょう。'
-                  : 'この日の記録はありません。カレンダーで別の日を選ぶと、その日の内容を見られます。'}
-              </Text>
+              <Text style={styles.muted}>{emptyDetailMessage()}</Text>
+              {isPastDate && dayWorkouts.length === 0 ? (
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => onAddPastWorkout(selectedDate)}
+                >
+                  <Text style={styles.secondaryButtonText}>この日の記録を追加</Text>
+                </Pressable>
+              ) : null}
             </View>
           )}
 

@@ -48,7 +48,7 @@ export const BodyLogSection = () => {
             if (value === null) {
               return [];
             }
-            return [{ label: formatShortDate(bodyLog.date), value, dateKey: bodyLog.date }];
+            return [{ label: formatShortDate(bodyLog.date), value }];
           });
           return (
             <LineChart points={points} colorVariable="--chart-secondary" formatValue={formatValue} />

@@ -118,7 +118,6 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
                 const points: LinePoint[] = detail.sessions.map((session) => ({
                   label: formatShortDate(session.date),
                   value: seriesValueOf(session, seriesMode),
-                  dateKey: session.date,
                 }));
                 const formatValue = seriesMode === 'volume' ? formatVolume : formatWeight;
                 // 目標は重量に対するもの。ボリューム表示では意味を持たないため出さない。

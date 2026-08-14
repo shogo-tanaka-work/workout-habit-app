@@ -1,4 +1,4 @@
-import type { ChartData, ChartOptions, Plugin } from 'chart.js';
+import type { ChartData, ChartOptions } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
 import './chartSetup';
@@ -14,34 +14,6 @@ import { readCssColor } from './chartTheme';
 export type LinePoint = {
   label: string;
   value: number;
-  /** YYYY-MM-DD。月平均の補助線に使う。無い点が1つでもあれば補助線は描かない。 */
-  dateKey?: string;
-};
-
-/**
- * 各点へ「その点が属する月の平均」を割り当てた系列。段状に描くと月単位の水準の
- * 増減が読める（全期間一本の平均線では伸びているか落ちているかが読めない）。
- * 表示中の点から出す値であり、集計ではなく表示整形（トレンド線）の範囲。
- */
-const buildMonthlyAverages = (points: LinePoint[]): number[] | null => {
-  const monthKeys: string[] = [];
-  for (const point of points) {
-    if (point.dateKey === undefined) {
-      return null;
-    }
-    monthKeys.push(point.dateKey.slice(0, 7));
-  }
-  const totalByMonth = new Map<string, { sum: number; count: number }>();
-  points.forEach((point, index) => {
-    const entry = totalByMonth.get(monthKeys[index]) ?? { sum: 0, count: 0 };
-    entry.sum += point.value;
-    entry.count += 1;
-    totalByMonth.set(monthKeys[index], entry);
-  });
-  return monthKeys.map((monthKey) => {
-    const entry = totalByMonth.get(monthKey) ?? { sum: 0, count: 1 };
-    return entry.sum / entry.count;
-  });
 };
 
 type LineChartProps = {
@@ -75,31 +47,6 @@ export const LineChart = ({
   const faintColor = readCssColor('--text-faint');
   const hairlineColor = readCssColor('--hairline');
 
-  const monthlyAverages = buildMonthlyAverages(points);
-
-  // 月平均線の右端へ「月平均 xx」（最新月の値）を描く。datalabels 系のプラグインは
-  // 追加しない方針のため、この1テキストだけ自前で描画する。
-  const averageLabelPlugin: Plugin<'line'> = {
-    id: 'averageLabel',
-    afterDatasetsDraw: (chart) => {
-      const yScale = chart.scales.y;
-      if (!yScale || monthlyAverages === null || monthlyAverages.length === 0) {
-        return;
-      }
-      const latestAverage = monthlyAverages[monthlyAverages.length - 1];
-      const yPixel = yScale.getPixelForValue(latestAverage);
-      const labelY = Math.max(yPixel - 4, chart.chartArea.top + 12);
-      const context = chart.ctx;
-      context.save();
-      context.font = '11px sans-serif';
-      context.fillStyle = faintColor;
-      context.textAlign = 'right';
-      context.textBaseline = 'bottom';
-      context.fillText(`月平均 ${formatValue(latestAverage)}`, chart.chartArea.right - 4, labelY);
-      context.restore();
-    },
-  };
-
   const data: ChartData<'line', number[], string> = {
     labels: points.map((point) => point.label),
     datasets: [
@@ -119,20 +66,6 @@ export const LineChart = ({
               borderWidth: 1.5,
               borderDash: [6, 6],
               pointRadius: 0,
-            },
-          ]
-        : []),
-      ...(monthlyAverages !== null
-        ? [
-            {
-              // 月平均（段状）。目標線（長い破線・第2系列色）と見分けられるよう、細い短破線にする。
-              data: monthlyAverages,
-              borderColor: faintColor,
-              backgroundColor: faintColor,
-              borderWidth: 1,
-              borderDash: [3, 4],
-              pointRadius: 0,
-              stepped: true as const,
             },
           ]
         : []),
@@ -174,7 +107,7 @@ export const LineChart = ({
 
   return (
     <div className="chart-canvas">
-      <Line data={data} options={options} plugins={[averageLabelPlugin]} />
+      <Line data={data} options={options} />
     </div>
   );
 };

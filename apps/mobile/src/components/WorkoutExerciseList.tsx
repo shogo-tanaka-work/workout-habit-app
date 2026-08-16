@@ -17,6 +17,8 @@ export const WorkoutExerciseList = memo(function WorkoutExerciseList({
   isRecording,
   onAddSet,
   onPatchSet,
+  onDeleteExercise,
+  onSaveMemo,
   onStartRestTimer,
   onOpenRestPicker,
 }: {
@@ -27,6 +29,8 @@ export const WorkoutExerciseList = memo(function WorkoutExerciseList({
   isRecording: boolean;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
+  onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
@@ -41,6 +45,8 @@ export const WorkoutExerciseList = memo(function WorkoutExerciseList({
           confirmSetDelete={!isRecording}
           onAddSet={onAddSet}
           onPatchSet={onPatchSet}
+          onDeleteExercise={onDeleteExercise}
+          onSaveMemo={onSaveMemo}
           onStartRestTimer={isRecording ? onStartRestTimer : undefined}
           onOpenRestPicker={isRecording ? onOpenRestPicker : undefined}
         />

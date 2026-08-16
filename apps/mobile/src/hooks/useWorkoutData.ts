@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import {
   deleteTemplateDeep,
   deleteWorkoutDeep,
+  deleteWorkoutExerciseDeep,
   insertCompletedWorkout,
   insertExercise,
   insertTemplateDeep,
@@ -19,6 +20,7 @@ import {
   startTrainingPhase,
   touchWorkout,
   updateExercise,
+  updateWorkoutExerciseMemo,
   updateWorkoutSet,
   upsertBodyLog,
   upsertUserExerciseSetting,
@@ -205,6 +207,29 @@ export function useWorkoutData() {
       void syncInBackground();
     },
     [ensureDb, reloadTables, syncInBackground, workoutExercises],
+  );
+
+  /** 記録から種目を外す。セットごと消えるので、確認は呼び出し側（UI）が済ませている前提。 */
+  const deleteWorkoutExercise = useCallback(
+    async (workoutExercise: WorkoutExercise) => {
+      const database = ensureDb();
+      await deleteWorkoutExerciseDeep(database, workoutExercise.id);
+      await touchWorkout(database, workoutExercise.workoutId);
+      await reloadTables(database, ['workouts', 'workout_exercises', 'workout_sets']);
+      void syncInBackground();
+    },
+    [ensureDb, reloadTables, syncInBackground],
+  );
+
+  /** 種目ごとのメモを保存する。入力の確定ごとに呼ばれる（打鍵ごとではない）。 */
+  const saveExerciseMemo = useCallback(
+    async (workoutExercise: WorkoutExercise, memo: string) => {
+      const database = ensureDb();
+      await updateWorkoutExerciseMemo(database, workoutExercise.id, memo);
+      await touchWorkout(database, workoutExercise.workoutId);
+      await reloadTables(database, ['workouts', 'workout_exercises']);
+    },
+    [ensureDb, reloadTables],
   );
 
   const addSet = useCallback(
@@ -562,6 +587,8 @@ export function useWorkoutData() {
     deleteWorkout,
     addExerciseToWorkout,
     addExerciseToEditedWorkout,
+    deleteWorkoutExercise,
+    saveExerciseMemo,
     addSet,
     patchSet,
     beginRestTimer,

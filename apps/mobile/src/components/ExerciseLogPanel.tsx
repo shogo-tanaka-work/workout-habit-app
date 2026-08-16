@@ -20,6 +20,8 @@ export function ExerciseLogPanel({
   recentSessions,
   onAddSet,
   onPatchSet,
+  onDeleteExercise,
+  onSaveMemo,
   onStartRestTimer,
   onOpenRestPicker,
   onBack,
@@ -32,6 +34,8 @@ export function ExerciseLogPanel({
   recentSessions: ExerciseSession[];
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
+  onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onBack: () => void;
@@ -50,6 +54,8 @@ export function ExerciseLogPanel({
         recentSessions={recentSessions}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
+        onDeleteExercise={onDeleteExercise}
+        onSaveMemo={onSaveMemo}
         onStartRestTimer={onStartRestTimer}
         onOpenRestPicker={onOpenRestPicker}
       />

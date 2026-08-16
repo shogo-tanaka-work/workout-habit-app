@@ -4,7 +4,9 @@ import { exercisesInWorkout } from './workoutTree';
 // ワークアウト記録のCSVエクスポート（Phase 2）。
 // 共有シート（Share API）でテキストとして書き出す前提のシリアライズ純粋関数。
 
-const CSV_HEADER = 'date,exercise,set,weight_kg,reps,rpe,is_warmup,memo';
+// memo はセット単位（現在は入力口が無く、過去に書いたぶんだけ残る）。
+// 種目ごとのメモは exercise_memo で、同じ種目の全行に同じ値が入る。
+const CSV_HEADER = 'date,exercise,set,weight_kg,reps,rpe,is_warmup,memo,exercise_memo';
 
 // カンマ・引用符・改行を含む値を RFC 4180 形式でエスケープする。
 const escapeCsvValue = (value: string): string =>
@@ -39,6 +41,7 @@ export const buildWorkoutCsv = (
             `${set.rpe}`,
             set.isWarmup ? '1' : '0',
             escapeCsvValue(set.memo),
+            escapeCsvValue(item.memo),
           ].join(','),
         );
       });

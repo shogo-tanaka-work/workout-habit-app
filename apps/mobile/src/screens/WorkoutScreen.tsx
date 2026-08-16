@@ -42,6 +42,8 @@ export function WorkoutScreen({
   onAddCustomExercise,
   onAddSet,
   onPatchSet,
+  onDeleteExercise,
+  onSaveMemo,
   onStartRestTimer,
   onOpenRestPicker,
 }: {
@@ -69,6 +71,8 @@ export function WorkoutScreen({
   onAddCustomExercise: (name: string, bodyPartId: string) => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
+  onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
@@ -147,6 +151,12 @@ export function WorkoutScreen({
     );
   }
 
+  // 開いている種目を消したら種目選択へ戻す。消えた種目のパネルに留まらせない。
+  const handleDeleteExercise = (workoutExercise: WorkoutExercise) => {
+    setFocusedExerciseId(null);
+    onDeleteExercise(workoutExercise);
+  };
+
   if (focused) {
     return (
       <ExerciseLogPanel
@@ -156,6 +166,8 @@ export function WorkoutScreen({
         recentSessions={recentSessionsByExerciseId.get(focused.exerciseId) ?? []}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
+        onDeleteExercise={handleDeleteExercise}
+        onSaveMemo={onSaveMemo}
         onStartRestTimer={onStartRestTimer}
         onOpenRestPicker={onOpenRestPicker}
         onBack={() => setFocusedExerciseId(null)}

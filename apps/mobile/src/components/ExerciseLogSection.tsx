@@ -1,10 +1,10 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 import { SetActionSheet } from './SetActionSheet';
 import { SetLogTable } from './SetLogTable';
 import { styles } from '../styles/appStyles';
-import { bodyPartColor } from '../styles/theme';
+import { bodyPartColor, colors } from '../styles/theme';
 import type { Exercise, SetPatch, WorkoutExercise, WorkoutSet } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { summarizeSets } from '../utils/aggregate';
@@ -32,6 +32,8 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
   confirmSetDelete = false,
   onAddSet,
   onPatchSet,
+  onDeleteExercise,
+  onSaveMemo,
   onStartRestTimer,
   onOpenRestPicker,
 }: {
@@ -45,6 +47,9 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
   confirmSetDelete?: boolean;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  /** 種目をセットごと外す。確認はこのコンポーネントが済ませてから呼ぶ。 */
+  onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
+  onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   /** 渡すと「完了」のタップでそのまま休憩に入る。 */
   onStartRestTimer?: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   /** 渡すと休憩タイマーの行を出す。休憩の秒数はここで決めない（restSecondsFor が正）。 */
@@ -54,6 +59,23 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
   const [actionTarget, setActionTarget] = useState<{ set: WorkoutSet; setNumber: number } | null>(
     null,
   );
+
+  // メモは1文字ごとに保存しない（打鍵のたびに DB 書き込みと再読込が走るため）。
+  // 数値入力（LabeledNumber）と同じ draft + 確定パターンで、入力確定時に保存する。
+  const [memoDraft, setMemoDraft] = useState(workoutExercise.memo);
+  const [lastMemo, setLastMemo] = useState(workoutExercise.memo);
+
+  // 親から渡る値が変わったら入力ドラフトを同期する（レンダー中の state 調整）。
+  if (workoutExercise.memo !== lastMemo) {
+    setLastMemo(workoutExercise.memo);
+    setMemoDraft(workoutExercise.memo);
+  }
+
+  const commitMemo = () => {
+    if (memoDraft !== workoutExercise.memo) {
+      onSaveMemo(workoutExercise, memoDraft);
+    }
+  };
 
   const sets = useMemo(
     () =>
@@ -89,6 +111,24 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
     setActionTarget({ set, setNumber });
   }, []);
 
+  // 種目ごとセットがまとめて消える。セットが1つも無くても一拍置く
+  // （追加したつもりの種目を、確認なしで消せる方が怖い）。
+  const confirmDeleteExercise = () => {
+    const exerciseName = exercise?.name ?? 'この種目';
+    Alert.alert(
+      `${exerciseName} を削除`,
+      sets.length > 0 ? `${sets.length} セットの記録も一緒に消えます。` : 'この記録から外します。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: () => onDeleteExercise(workoutExercise),
+        },
+      ],
+    );
+  };
+
   const actionSetIndex = actionTarget
     ? sets.findIndex((set) => set.id === actionTarget.set.id)
     : -1;
@@ -119,6 +159,9 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
             </Text>
           </View>
         </View>
+        <Pressable style={styles.deleteButton} onPress={confirmDeleteExercise}>
+          <Text style={styles.deleteButtonText}>削除</Text>
+        </Pressable>
       </View>
 
       {onOpenRestPicker ? (
@@ -143,6 +186,16 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
         <Pressable style={styles.primaryButton} onPress={() => onAddSet(workoutExercise)}>
           <Text style={styles.primaryButtonText}>＋ セット</Text>
         </Pressable>
+        {/* メモは種目に1つ。フォームの気づきや調子はセットごとではなく種目単位で残す。 */}
+        <TextInput
+          value={memoDraft}
+          onChangeText={setMemoDraft}
+          onEndEditing={commitMemo}
+          onSubmitEditing={commitMemo}
+          placeholder="この種目のメモ"
+          placeholderTextColor={colors.textFaint}
+          style={styles.memoInput}
+        />
       </View>
 
       {actionTarget ? (

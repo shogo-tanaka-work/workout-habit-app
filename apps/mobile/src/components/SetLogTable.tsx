@@ -19,8 +19,11 @@ import { parseNumber } from '../utils/number';
 // 1行1セットで縦に積むと、5セット目あたりで下の「過去5回分の記録」が画面外へ押し出される。
 // 列に並べれば、セットが増えても表の高さは変わらない（溢れたぶんは横スクロール）。
 //
-// ジムで触るのは「重量」「回数」「完了」の3つだけ。それ以外（ウォームアップ・コピー・
-// 削除・メモ）はセット番号のタップから開くシートへ逃がし、表にボタンを増やさない。
+// ジムで触るのは「重量」「回数」「WU」「完了」。それ以外（前回・前セットのコピー、削除）は
+// セット番号のタップから開くシートへ逃がし、表にボタンを増やさない。
+//
+// ウォームアップは表に出す。集計から外れる＝実績の見え方が変わる操作なのに、
+// シートの中にあると存在に気づけなかった。
 
 // 表内の数値セル。decimal-pad にはリターンキーが無いため、iOS ではキーボード上部の
 // 「完了」で確定できるようにする（詳細は components/LabeledNumber.tsx と同じ理由）。
@@ -130,6 +133,28 @@ export const SetLogTable = memo(function SetLogTable({
               />
               <Text style={styles.setLogUnit}>回</Text>
             </View>
+          ))}
+        </View>
+
+        {/* ウォームアップの指定。操作シートの中に置いていたころは気づけなかったので、
+            完了と同じ形で表に出す（集計から外れる＝実績の見え方が変わる操作のため）。 */}
+        <View style={styles.setLogRow}>
+          <View style={styles.setLogLabelCell}>
+            <Text style={styles.setLogLabelText}>WU</Text>
+          </View>
+          {sets.map((set, index) => (
+            <Pressable
+              key={set.id}
+              style={styles.setLogCell}
+              onPress={() => onPatchSet(set.id, { isWarmup: !set.isWarmup })}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: set.isWarmup }}
+              accessibilityLabel={`セット ${index + 1} をウォームアップにする`}
+            >
+              <Text style={[styles.setLogCheckText, set.isWarmup && styles.setLogWarmupText]}>
+                {set.isWarmup ? '✓' : '○'}
+              </Text>
+            </Pressable>
           ))}
         </View>
 

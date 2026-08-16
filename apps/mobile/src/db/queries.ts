@@ -311,6 +311,46 @@ export const insertWorkoutExercise = async (
   });
 };
 
+/**
+ * 記録から種目を1つ外す。セットごと消える。
+ *
+ * **子の特定は SQL で完結させる**（deleteWorkoutDeep と同じ理由）。呼び出し側の
+ * React state が DB より古いと、渡し漏れたセットがどの画面にも出ないまま残る。
+ *
+ * サーバ側は workout_sets が ON DELETE CASCADE を持つため、送るのは親の削除だけでよい。
+ */
+export const deleteWorkoutExerciseDeep = async (
+  database: SQLite.SQLiteDatabase,
+  workoutExerciseId: string,
+): Promise<void> => {
+  await writeInTransaction(database, 'deleteWorkoutExerciseDeep', async () => {
+    await database.runAsync(
+      'DELETE FROM workout_sets WHERE workout_exercise_id = ?',
+      workoutExerciseId,
+    );
+    await database.runAsync('DELETE FROM workout_exercises WHERE id = ?', workoutExerciseId);
+    await enqueueDelete(database, 'workout_exercises', workoutExerciseId);
+  });
+};
+
+/** 種目ごとのメモ。セット単位ではなくここに書く（.agents/rules/mobile-react-native.md）。 */
+export const updateWorkoutExerciseMemo = async (
+  database: SQLite.SQLiteDatabase,
+  workoutExerciseId: string,
+  memo: string,
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeInTransaction(database, 'updateWorkoutExerciseMemo', async () => {
+    await database.runAsync(
+      'UPDATE workout_exercises SET memo = ?, updated_at = ? WHERE id = ?',
+      memo,
+      timestamp,
+      workoutExerciseId,
+    );
+    await enqueueUpsert(database, 'workout_exercises', workoutExerciseId);
+  });
+};
+
 export const insertWorkoutSet = async (
   database: SQLite.SQLiteDatabase,
   params: {

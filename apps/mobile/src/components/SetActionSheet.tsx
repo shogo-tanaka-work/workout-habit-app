@@ -1,13 +1,14 @@
-import { useState } from 'react';
-import { Alert, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
-import { colors } from '../styles/theme';
 import type { SetPatch, WorkoutSet } from '../types/domain';
 import { nowIso } from '../utils/datetime';
 
 // セット番号をタップしたときの操作シート。
-// 行に並べるとボタンだらけになる操作（コピー・ウォームアップ・メモ・削除）をここへ集める。
+//
+// 表に並べるとボタンだらけになる操作（コピー・削除）をここへ集める。
+// **ウォームアップは表の WU 行で直接切り替える**（シートの中にあると気づけなかった）。
+// メモは種目単位へ移したので、ここでは扱わない（ExerciseLogSection のメモ欄）。
 export function SetActionSheet({
   set,
   setNumber,
@@ -28,17 +29,8 @@ export function SetActionSheet({
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onClose: () => void;
 }) {
-  // メモは1文字ごとに保存しない（打鍵のたびに DB 書き込みと再読込が走るため）。
-  // 数値入力の draft + 確定パターンと同じく、シートを閉じるときにまとめて保存する。
-  const [memoDraft, setMemoDraft] = useState(set.memo);
-
-  // 別の変更と一緒に閉じるときは1回の patch にまとめる。2回に分けると、
-  // どちらも閉じた時点の state から組み立てるため、先に送った変更が消える。
-  const withMemoDraft = (patch: SetPatch): SetPatch =>
-    memoDraft === set.memo ? patch : { ...patch, memo: memoDraft };
-
   const applyAndClose = (patch: SetPatch) => {
-    onPatchSet(set.id, withMemoDraft(patch));
+    onPatchSet(set.id, patch);
     onClose();
   };
 
@@ -62,16 +54,9 @@ export function SetActionSheet({
     );
   };
 
-  const commitMemoAndClose = () => {
-    if (memoDraft !== set.memo) {
-      onPatchSet(set.id, { memo: memoDraft });
-    }
-    onClose();
-  };
-
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={commitMemoAndClose}>
-      <Pressable style={styles.modalBackdrop} onPress={commitMemoAndClose}>
+    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
         <Pressable style={styles.modalCard} onPress={() => undefined}>
           <Text style={styles.sectionTitle}>セット {setNumber}</Text>
 
@@ -106,31 +91,13 @@ export function SetActionSheet({
             </Pressable>
           ) : null}
 
-          <Pressable
-            style={styles.sheetAction}
-            onPress={() => applyAndClose({ isWarmup: !set.isWarmup })}
-          >
-            <Text style={styles.sheetActionText}>
-              {set.isWarmup ? 'ウォームアップを解除' : 'ウォームアップにする'}
-            </Text>
-            <Text style={styles.muted}>集計に入りません</Text>
-          </Pressable>
-
-          <TextInput
-            value={memoDraft}
-            onChangeText={setMemoDraft}
-            placeholder="このセットのメモ"
-            placeholderTextColor={colors.textFaint}
-            style={styles.memoInput}
-          />
-
           <View style={styles.modalActions}>
             {/* 記録中は打ち間違いの消し直しが多いので確認を挟まない。
                 過去の記録を直すときだけ confirmDelete で一拍置く。 */}
             <Pressable style={styles.deleteButton} onPress={requestDelete}>
               <Text style={styles.deleteButtonText}>削除</Text>
             </Pressable>
-            <Pressable style={styles.primaryButtonFlat} onPress={commitMemoAndClose}>
+            <Pressable style={styles.primaryButtonFlat} onPress={onClose}>
               <Text style={styles.primaryButtonText}>閉じる</Text>
             </Pressable>
           </View>

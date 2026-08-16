@@ -256,7 +256,7 @@ export default function App() {
   // memo したコンポーネント（SetLogTable / ExerciseLogSection / MonthCalendar / TrendChart）へ
   // 届く経路のハンドラは useCallback で参照を安定させる。毎レンダー作り直すと
   // props の比較が常に不一致になり、memo が効かない。
-  const { addSet, patchSet, beginRestTimer } = data;
+  const { addSet, patchSet, beginRestTimer, deleteWorkoutExercise, saveExerciseMemo } = data;
 
   const handleStartRestTimer = useCallback(
     (set: WorkoutSet, workoutExercise: WorkoutExercise): void => {
@@ -280,6 +280,20 @@ export default function App() {
       runAction(() => patchSet(setId, patch));
     },
     [runAction, patchSet],
+  );
+
+  const handleDeleteExercise = useCallback(
+    (workoutExercise: WorkoutExercise): void => {
+      runAction(() => deleteWorkoutExercise(workoutExercise));
+    },
+    [runAction, deleteWorkoutExercise],
+  );
+
+  const handleSaveExerciseMemo = useCallback(
+    (workoutExercise: WorkoutExercise, memo: string): void => {
+      runAction(() => saveExerciseMemo(workoutExercise, memo));
+    },
+    [runAction, saveExerciseMemo],
   );
 
   const handleAddCustomExercise = async (bodyPartId: string) => {
@@ -474,6 +488,8 @@ export default function App() {
                 }
                 onAddSet={handleAddSet}
                 onPatchSet={handlePatchSet}
+                onDeleteExercise={handleDeleteExercise}
+                onSaveMemo={handleSaveExerciseMemo}
                 onStartRestTimer={handleStartRestTimer}
                 onOpenRestPicker={openRestPicker}
                 onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}
@@ -559,6 +575,8 @@ export default function App() {
                     }
                     onAddSet={handleAddSet}
                     onPatchSet={handlePatchSet}
+                    onDeleteExercise={handleDeleteExercise}
+                    onSaveMemo={handleSaveExerciseMemo}
                     onStartRestTimer={handleStartRestTimer}
                     onOpenRestPicker={openRestPicker}
                   />

@@ -27,6 +27,19 @@ const DIVISOR_BY_EXERCISE_ID = new Map<string, number>([
 export const rmDivisorFor = (exerciseId: string | undefined): number =>
   (exerciseId === undefined ? undefined : DIVISOR_BY_EXERCISE_ID.get(exerciseId)) ?? EPLEY_DIVISOR;
 
+/**
+ * この種目で推定1RM を画面に出すか。
+ *
+ * **BIG3 だけ出す。** 換算表の裏付けがあるのは BIG3 で、それ以外は Epley 式の
+ * 一般論にすぎない。マシン種目やアイソレーションの「推定1RM」は行動を変えない数字で、
+ * 記録中の一等地を占めるだけになっていた。
+ *
+ * 計算そのもの（utils/aggregate.ts）と API のレスポンスは変えない。
+ * Claude Code は分析の材料として全種目の値を読む。出さないのは人が見る画面だけ。
+ */
+export const showsOneRepMax = (exerciseId: string | undefined): boolean =>
+  exerciseId !== undefined && DIVISOR_BY_EXERCISE_ID.has(exerciseId);
+
 // 画面に出す換算式の説明。種目によって式が変わるので、根拠を必ず添える。
 export const rmFormulaNote = (exerciseId: string | undefined): string => {
   const divisor = rmDivisorFor(exerciseId);

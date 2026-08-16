@@ -54,7 +54,7 @@ export function ExerciseLogPanel({
         onOpenRestPicker={onOpenRestPicker}
       />
 
-      <RecentSessions sessions={recentSessions} />
+      <RecentSessions sessions={recentSessions} exerciseId={exercise?.id} />
     </View>
   );
 }

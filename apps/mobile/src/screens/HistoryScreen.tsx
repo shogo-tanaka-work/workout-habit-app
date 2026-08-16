@@ -21,6 +21,7 @@ import {
 } from '../utils/aggregate';
 import { formatMonthDay, periodStartIso, startOfWeekIsoDate } from '../utils/datetime';
 import { formatCount, formatVolume, formatWeight } from '../utils/number';
+import { showsOneRepMax } from '../utils/oneRepMax';
 import { setsOfWorkoutExercises } from '../utils/workoutTree';
 
 // グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
@@ -241,7 +242,10 @@ export function HistoryScreen({
                 unit: 'kg',
               }}
               items={[
-                { label: '推定1RM', value: formatWeight(item.summary.bestOneRepMax) },
+                // 推定1RM は BIG3 だけ（utils/oneRepMax.ts の showsOneRepMax）。
+                ...(showsOneRepMax(item.exerciseId)
+                  ? [{ label: '推定1RM', value: formatWeight(item.summary.bestOneRepMax) }]
+                  : []),
                 { label: 'レップ', value: formatCount(item.summary.totalReps) },
                 { label: '最大レップ', value: formatCount(item.summary.maxReps) },
               ]}

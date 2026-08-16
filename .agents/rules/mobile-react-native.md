@@ -158,6 +158,16 @@ React Navigation / Expo Router は未導入。`App.tsx` が3層の state で出�
 
 **`apps/api/src/analytics/sql.ts` の `rmDivisorSql` も同じ除数を使う。片方だけ変えない。**
 
+### 画面に出すのは BIG3 だけ
+
+`showsOneRepMax(exerciseId)` が判定する。BIG3 以外の推定1RM は Epley 式の一般論で、
+見ても次の一手が変わらない。記録中の一等地を使わない。
+
+- 対象は記録・編集・種目詳細・履歴と、管理画面（`apps/web/src/utils/oneRepMax.ts`）
+- 種目詳細の RM 計算機も BIG3 だけに出す（推定1RM を出す道具そのもののため）
+- **API のレスポンスは絞らない。** Claude Code は計画を立てる材料に全種目の値を読む。
+  出さないのは人が見る画面だけ
+
 ## 休憩タイマーは2層
 
 - **種目タイマー** … 種目ごとに1件（`exercises.default_rest_seconds` と

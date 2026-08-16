@@ -10,7 +10,7 @@ import type { ExerciseSession } from '../utils/aggregate';
 import { summarizeSets } from '../utils/aggregate';
 import { formatTimer } from '../utils/format';
 import { formatVolume, formatWeight } from '../utils/number';
-import { rmDivisorFor } from '../utils/oneRepMax';
+import { rmDivisorFor, showsOneRepMax } from '../utils/oneRepMax';
 import { restSecondsFor } from '../utils/restPresets';
 
 // 1種目ぶんの記録カード。**セットは列に並べる**（SetLogTable）。
@@ -112,7 +112,10 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
             <Text style={styles.logExerciseSummary}>
               {summary.setCount} セット
               {summary.warmupCount > 0 ? `（＋WU ${summary.warmupCount}）` : ''} ・{' '}
-              {formatVolume(summary.totalVolume)} ・ 推定1RM {formatWeight(summary.bestOneRepMax)}
+              {formatVolume(summary.totalVolume)}
+              {showsOneRepMax(workoutExercise.exerciseId)
+                ? ` ・ 推定1RM ${formatWeight(summary.bestOneRepMax)}`
+                : ''}
             </Text>
           </View>
         </View>

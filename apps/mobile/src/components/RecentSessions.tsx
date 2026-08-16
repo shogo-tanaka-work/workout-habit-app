@@ -5,12 +5,22 @@ import { styles } from '../styles/appStyles';
 import type { ExerciseSession } from '../utils/aggregate';
 import { formatJapaneseDate } from '../utils/datetime';
 import { formatCount, formatVolume, formatWeight } from '../utils/number';
+import { showsOneRepMax } from '../utils/oneRepMax';
 
 // 記録中の種目の、直近の実施記録。
 //
 // 「前回どうだったっけ」は1回ぶんでは足りない（前回が調子の悪い日だったこともある）。
 // 数回ぶんを同じ形の表で並べて、伸びているかを目で追えるようにする。
-export function RecentSessions({ sessions }: { sessions: ExerciseSession[] }) {
+export function RecentSessions({
+  sessions,
+  exerciseId,
+}: {
+  sessions: ExerciseSession[];
+  /** 推定1RM を添えるかの判定に使う（BIG3 だけ出す）。 */
+  exerciseId: string | undefined;
+}) {
+  const withOneRepMax = showsOneRepMax(exerciseId);
+
   if (sessions.length === 0) {
     return (
       <View style={styles.section}>
@@ -38,9 +48,9 @@ export function RecentSessions({ sessions }: { sessions: ExerciseSession[] }) {
           <View style={styles.sectionBody}>
             <SetTable sets={session.sets} />
             <Text style={styles.muted}>
-              ボリューム {formatVolume(session.summary.totalVolume)} ・ 推定1RM{' '}
-              {formatWeight(session.summary.bestOneRepMax)} ・ 総レップ{' '}
-              {formatCount(session.summary.totalReps)} 回
+              ボリューム {formatVolume(session.summary.totalVolume)}
+              {withOneRepMax ? ` ・ 推定1RM ${formatWeight(session.summary.bestOneRepMax)}` : ''} ・
+              総レップ {formatCount(session.summary.totalReps)} 回
             </Text>
           </View>
         </View>

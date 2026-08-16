@@ -12,6 +12,7 @@ import type {
 } from '../types/api';
 import { formatDateKey, formatShortDate } from '../utils/datetime';
 import { formatVolume, formatWeight, safeDivide } from '../utils/number';
+import { showsOneRepMax } from '../utils/oneRepMax';
 import type { ToggleOption } from '../components/ToggleGroup';
 import { ToggleGroup } from '../components/ToggleGroup';
 
@@ -26,6 +27,12 @@ const SERIES_OPTIONS: readonly ToggleOption<SeriesMode>[] = [
   { value: 'oneRepMax', label: '推定1RM' },
   { value: 'volume', label: 'ボリューム' },
 ];
+
+// 推定1RM は BIG3 だけ（utils/oneRepMax.ts）。それ以外の種目では選択肢ごと出さない。
+const seriesOptionsFor = (exerciseId: string): readonly ToggleOption<SeriesMode>[] =>
+  showsOneRepMax(exerciseId)
+    ? SERIES_OPTIONS
+    : SERIES_OPTIONS.filter((option) => option.value !== 'oneRepMax');
 
 const DETAIL_MONTHS = 12;
 
@@ -75,6 +82,11 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
   );
   // 未選択時は実施回数最多の種目（API がソート済み）を初期表示にする。
   const effectiveExerciseId = selectedExerciseId || options[0]?.id || '';
+  const seriesOptions = seriesOptionsFor(effectiveExerciseId);
+  // BIG3 から他の種目へ切り替えたときに、消えた選択肢が選ばれたままにならないようにする。
+  const effectiveSeriesMode = seriesOptions.some((option) => option.value === seriesMode)
+    ? seriesMode
+    : 'topWeight';
   // 種目 ID は外部入力（API レスポンス）由来のため、パスへ埋め込む前にエンコードする。
   const detailState = useApiData<ExerciseDetailResponse>(
     effectiveExerciseId
@@ -88,7 +100,7 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
   return (
     <Section
       title="種目別グラフ"
-      subtitle={`直近${DETAIL_MONTHS}か月のセッション推移（推定1RMはEpley式）`}
+      subtitle={`直近${DETAIL_MONTHS}か月のセッション推移（推定1RM は BIG3 のみ）`}
       actions={
         <div className="toggle-group-row">
           <select
@@ -102,7 +114,11 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
               </option>
             ))}
           </select>
-          <ToggleGroup options={SERIES_OPTIONS} selected={seriesMode} onSelect={setSeriesMode} />
+          <ToggleGroup
+            options={seriesOptions}
+            selected={effectiveSeriesMode}
+            onSelect={setSeriesMode}
+          />
         </div>
       }
     >
@@ -117,12 +133,12 @@ export const ExerciseSection = ({ exercisesState }: ExerciseSectionProps) => {
               {(detail) => {
                 const points: LinePoint[] = detail.sessions.map((session) => ({
                   label: formatShortDate(session.date),
-                  value: seriesValueOf(session, seriesMode),
+                  value: seriesValueOf(session, effectiveSeriesMode),
                 }));
-                const formatValue = seriesMode === 'volume' ? formatVolume : formatWeight;
+                const formatValue = effectiveSeriesMode === 'volume' ? formatVolume : formatWeight;
                 // 目標は重量に対するもの。ボリューム表示では意味を持たないため出さない。
                 const goal =
-                  seriesMode === 'volume'
+                  effectiveSeriesMode === 'volume'
                     ? null
                     : (goalsState.data?.goals.find(
                         (candidate) => candidate.exerciseId === detail.exercise.id,

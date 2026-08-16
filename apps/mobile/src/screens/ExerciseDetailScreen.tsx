@@ -11,7 +11,7 @@ import type { Exercise } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { formatJapaneseDate, formatMonthDay, isoDateMonthsAgo } from '../utils/datetime';
 import { estimateOneRepMax, formatCount, formatWeight, weightForReps } from '../utils/number';
-import { rmDivisorFor, rmFormulaNote } from '../utils/oneRepMax';
+import { rmDivisorFor, rmFormulaNote, showsOneRepMax } from '../utils/oneRepMax';
 
 const RECENT_SESSION_COUNT = 5;
 // グラフ1本あたりの最大プロット数（期間内でもこれ以上は古い側を間引く）。
@@ -45,6 +45,8 @@ export function ExerciseDetailScreen({
   exercise: Exercise;
   sessions: ExerciseSession[];
 }) {
+  // 推定1RM と RM 計算機は BIG3 だけに出す（utils/oneRepMax.ts の showsOneRepMax）。
+  const withOneRepMax = showsOneRepMax(exercise.id);
   const [periodKey, setPeriodKey] = useState<PeriodKey>('3m');
   const period = PERIODS.find((candidate) => candidate.key === periodKey) ?? PERIODS[1];
 
@@ -86,16 +88,18 @@ export function ExerciseDetailScreen({
           <View style={styles.sectionBody}>
             <Text style={styles.sectionTitle}>まだ記録がありません</Text>
             <Text style={styles.muted}>
-              この画面では、実施ごとのセット内容と、ボリューム・推定1RM の推移を振り返れます。
+              この画面では、実施ごとのセット内容と、ボリューム・レップ数の推移を振り返れます。
               記録画面でこの種目を追加してセットを入れると、ここに並びます。
             </Text>
           </View>
         </View>
-        <RmCalculator
-          initialWeightKg={exercise.defaultBarWeightKg}
-          initialReps={8}
-          exerciseId={exercise.id}
-        />
+        {withOneRepMax ? (
+          <RmCalculator
+            initialWeightKg={exercise.defaultBarWeightKg}
+            initialReps={8}
+            exerciseId={exercise.id}
+          />
+        ) : null}
       </View>
     );
   }
@@ -125,6 +129,7 @@ export function ExerciseDetailScreen({
       <SessionSection
         title={formatJapaneseDate(latestSession.workout.performedAt)}
         session={latestSession}
+        withOneRepMax={withOneRepMax}
       />
 
       {recentPastSessions.length > 0 ? (
@@ -138,6 +143,7 @@ export function ExerciseDetailScreen({
               key={session.workout.id}
               title={formatJapaneseDate(session.workout.performedAt)}
               session={session}
+              withOneRepMax={withOneRepMax}
             />
           ))}
         </View>
@@ -183,12 +189,14 @@ export function ExerciseDetailScreen({
         points={volumePoints}
         color={colors.chartPrimary}
       />
-      <TrendChart
-        title="推定1RM推移"
-        unit="kg"
-        points={oneRepMaxPoints}
-        color={colors.chartPrimary}
-      />
+      {withOneRepMax ? (
+        <TrendChart
+          title="推定1RM推移"
+          unit="kg"
+          points={oneRepMaxPoints}
+          color={colors.chartPrimary}
+        />
+      ) : null}
       <TrendChart
         title="総レップ数推移"
         unit="回"
@@ -202,11 +210,13 @@ export function ExerciseDetailScreen({
         color={colors.chartSecondary}
       />
 
-      <RmCalculator
-        initialWeightKg={bestRecentSet.weightKg}
-        initialReps={bestRecentSet.reps}
-        exerciseId={exercise.id}
-      />
+      {withOneRepMax ? (
+        <RmCalculator
+          initialWeightKg={bestRecentSet.weightKg}
+          initialReps={bestRecentSet.reps}
+          exerciseId={exercise.id}
+        />
+      ) : null}
     </View>
   );
 }
@@ -279,7 +289,16 @@ function RmCalculator({
   );
 }
 
-function SessionSection({ title, session }: { title: string; session: ExerciseSession }) {
+function SessionSection({
+  title,
+  session,
+  withOneRepMax,
+}: {
+  title: string;
+  session: ExerciseSession;
+  /** 推定1RM を出すか（BIG3 だけ）。 */
+  withOneRepMax: boolean;
+}) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -295,7 +314,9 @@ function SessionSection({ title, session }: { title: string; session: ExerciseSe
           unit: 'kg',
         }}
         items={[
-          { label: '推定1RM', value: formatWeight(session.summary.bestOneRepMax) },
+          ...(withOneRepMax
+            ? [{ label: '推定1RM', value: formatWeight(session.summary.bestOneRepMax) }]
+            : []),
           { label: 'レップ', value: formatCount(session.summary.totalReps) },
           { label: '最大レップ', value: formatCount(session.summary.maxReps) },
         ]}

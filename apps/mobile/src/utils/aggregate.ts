@@ -77,9 +77,12 @@ export const buildExerciseSessions = (
   return sessions;
 };
 
-// 「70kg×8 / 70kg×8」のようなセット内容の短い表記。
+// 「WU 40kg×10 / 70kg×8 / 70kg×8」のようなセット内容の短い表記。
+//
+// ウォームアップに印を付ける。集計から外れるセットが混ざっているのに同じ見た目だと、
+// 「1セット目が軽い」のか「ウォームアップを入れている」のか読めない。
 export const formatSetsInline = (sets: WorkoutSet[]): string =>
-  sets.map((set) => `${set.weightKg}kg×${set.reps}`).join(' / ');
+  sets.map((set) => `${set.isWarmup ? 'WU ' : ''}${set.weightKg}kg×${set.reps}`).join(' / ');
 
 // 期間集計（履歴タブ）。対象は渡された workouts に属するセットだけ。
 //

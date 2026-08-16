@@ -132,11 +132,17 @@ curl -s -H "Authorization: Bearer $TOKEN" \
     { "id": "<一意なID>", "at": "2026-08-10T09:00:00.000Z", "op": "upsert",
       "entity": "workout_exercises",
       "row": { "id": "we-1", "workout_id": "w-2026-08-12", "exercise_id": "bench-press",
-               "order_index": 0, "created_at": "...", "updated_at": "..." } },
+               "order_index": 0, "rest_seconds_override": 180,
+               "created_at": "...", "updated_at": "..." } },
     { "id": "<一意なID>", "at": "2026-08-10T09:00:00.000Z", "op": "upsert",
       "entity": "workout_sets",
       "row": { "id": "s-1", "workout_exercise_id": "we-1", "order_index": 0,
-               "weight_kg": 80, "reps": 5, "rpe": 0, "rest_seconds": 180,
+               "weight_kg": 40, "reps": 10, "rpe": 0, "is_warmup": 1, "rest_seconds": 180,
+               "created_at": "...", "updated_at": "..." } },
+    { "id": "<一意なID>", "at": "2026-08-10T09:00:00.000Z", "op": "upsert",
+      "entity": "workout_sets",
+      "row": { "id": "s-2", "workout_exercise_id": "we-1", "order_index": 1,
+               "weight_kg": 80, "reps": 5, "rpe": 0, "is_warmup": 0, "rest_seconds": 180,
                "created_at": "...", "updated_at": "..." } }
   ]
 }
@@ -149,6 +155,27 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 - `user_id` は送らない。所有者はサーバが認証結果から決める
 - 部分成功する。HTTP 200 でも `results` の各要素を見て `rejected` を確認する
 - 未知の列は通らない。列の正本は `apps/api/src/tables.ts`
+
+#### ウォームアップを予定に入れる
+
+**メインセットだけの予定を書かない。** 高重量の種目はウォームアップから始めるのが実際の進め方で、
+予定に無いと毎回その場で足すことになる。
+
+- ウォームアップは `workout_sets` の `is_warmup: 1` で表す。専用のテーブルは無い
+- ウォームアップは集計（ボリューム・推定1RM）に入らない。重量を軽く入れても実績は歪まない
+- 並びは `order_index` の昇順。ウォームアップを先に置く
+
+#### 休憩の目安を予定に入れる
+
+休憩は**種目ごと**に `workout_exercises.rest_seconds_override`（秒）で書く。
+端末はこの値を記録画面の休憩タイマーの初期値に使う。
+
+- **`workout_sets.rest_seconds` にも同じ値を入れる。** 表示は種目の値、実際に走る秒数は
+  セットの値を見るため、揃えないと「表示は 2:00 なのにタイマーは 3:00」になる
+- **目安であって指示ではない。** 高重量のセットやセット間の消耗が大きい日は長く取ってよい。
+  ユーザーへ伝えるときも「目安」として伝える
+- 迷ったら種目の既定値（`GET /analytics/exercises` の種目マスタ）に寄せる。
+  高重量のコンパウンド 150〜180 秒、中重量 90〜120 秒、アイソレーション 60 秒が目安
 
 ### 4. 週次フィードバックと目標を書く（Step 9）
 

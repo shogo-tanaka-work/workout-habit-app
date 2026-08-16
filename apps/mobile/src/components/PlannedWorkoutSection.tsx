@@ -4,6 +4,8 @@ import { styles } from '../styles/appStyles';
 import { bodyPartColor } from '../styles/theme';
 import type { Exercise, Workout, WorkoutExercise, WorkoutSet } from '../types/domain';
 import { formatSetsInline } from '../utils/aggregate';
+import { formatTimer } from '../utils/format';
+import { restSecondsFor } from '../utils/restPresets';
 import { exerciseNameOf, exercisesInWorkout } from '../utils/workoutTree';
 
 // Claude Code が立てた、その日の予定メニュー。予定が無いときは何も出さない
@@ -50,19 +52,25 @@ export function PlannedWorkoutSection({
                   .filter((set) => set.workoutExerciseId === item.id)
                   .sort((a, b) => a.orderIndex - b.orderIndex);
                 return (
-                  <View key={item.id} style={styles.rowBetween}>
-                    <View style={styles.inlineRow}>
-                      <View
-                        style={[
-                          styles.exerciseDot,
-                          { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
-                        ]}
-                      />
-                      <Text style={styles.panelText}>
-                        {exerciseNameOf(item.exerciseId, exerciseById)}
-                      </Text>
+                  <View key={item.id}>
+                    <View style={styles.rowBetween}>
+                      <View style={styles.inlineRow}>
+                        <View
+                          style={[
+                            styles.exerciseDot,
+                            { backgroundColor: bodyPartColor(exercise?.primaryBodyPartId) },
+                          ]}
+                        />
+                        <Text style={styles.panelText}>
+                          {exerciseNameOf(item.exerciseId, exerciseById)}
+                        </Text>
+                      </View>
+                      <Text style={styles.muted}>{formatSetsInline(itemSets)}</Text>
                     </View>
-                    <Text style={styles.muted}>{formatSetsInline(itemSets)}</Text>
+                    {/* 休憩は目安。高重量のセットで長めに取ってかまわない。 */}
+                    <Text style={styles.faint}>
+                      休憩の目安 {formatTimer(restSecondsFor(item, exercise))}
+                    </Text>
                   </View>
                 );
               })}

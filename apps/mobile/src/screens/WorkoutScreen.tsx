@@ -16,7 +16,6 @@ import type {
 } from '../types/domain';
 import type { ExerciseSession } from '../utils/aggregate';
 import { exerciseNameOf } from '../utils/workoutTree';
-import { restSecondsFor } from '../utils/restPresets';
 
 // 記録タブは2段構え。「種目を選ぶ」→「その種目だけ記録する」。
 //
@@ -80,16 +79,6 @@ export function WorkoutScreen({
   const focused = focusedExerciseId
     ? (workoutExercises.find((item) => item.exerciseId === focusedExerciseId) ?? null)
     : null;
-
-  // memo した SetLogTable が効くよう、セット表へ渡す配列は元データが変わったときだけ作り直す。
-  const focusedSets = useMemo(() => {
-    if (!focused) {
-      return [];
-    }
-    return visibleSets
-      .filter((set) => set.workoutExerciseId === focused.id)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
-  }, [focused, visibleSets]);
 
   const todaySetCountByExerciseId = useMemo(() => {
     const countByExerciseId = new Map<string, number>();
@@ -159,14 +148,12 @@ export function WorkoutScreen({
   }
 
   if (focused) {
-    const exercise = exerciseById.get(focused.exerciseId);
     return (
       <ExerciseLogPanel
         workoutExercise={focused}
-        exercise={exercise}
-        sets={focusedSets}
+        exercise={exerciseById.get(focused.exerciseId)}
+        visibleSets={visibleSets}
         recentSessions={recentSessionsByExerciseId.get(focused.exerciseId) ?? []}
-        restSeconds={restSecondsFor(focused, exercise)}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
         onStartRestTimer={onStartRestTimer}

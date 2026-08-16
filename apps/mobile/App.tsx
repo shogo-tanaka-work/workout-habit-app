@@ -253,7 +253,7 @@ export default function App() {
     }
   };
 
-  // memo したコンポーネント（SetLogTable / SetEditor / MonthCalendar / TrendChart）へ
+  // memo したコンポーネント（SetLogTable / ExerciseLogSection / MonthCalendar / TrendChart）へ
   // 届く経路のハンドラは useCallback で参照を安定させる。毎レンダー作り直すと
   // props の比較が常に不一致になり、memo が効かない。
   const { addSet, patchSet, beginRestTimer } = data;
@@ -474,6 +474,8 @@ export default function App() {
                 }
                 onAddSet={handleAddSet}
                 onPatchSet={handlePatchSet}
+                onStartRestTimer={handleStartRestTimer}
+                onOpenRestPicker={openRestPicker}
                 onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}
               />
             ) : overlay?.kind === 'settings' ? (

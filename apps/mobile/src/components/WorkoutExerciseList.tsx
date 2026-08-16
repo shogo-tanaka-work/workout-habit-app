@@ -1,102 +1,48 @@
-import { memo, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { memo } from 'react';
 
-import { styles } from '../styles/appStyles';
+import { ExerciseLogSection } from './ExerciseLogSection';
 import type { Exercise, SetPatch, WorkoutExercise, WorkoutSet } from '../types/domain';
-import { summarizeSets } from '../utils/aggregate';
-import { formatVolume, formatWeight } from '../utils/number';
-import { rmDivisorFor } from '../utils/oneRepMax';
-import { SetEditor } from './SetEditor';
-import { exerciseNameOf } from '../utils/workoutTree';
 
-// 1種目ぶんのカード。セットの絞り込みと集計を種目単位で useMemo するために、
-// リストから分けている（リスト側のループ内では useMemo を書けない）。
-const WorkoutExerciseSection = memo(function WorkoutExerciseSection({
-  workoutExercise,
-  visibleSets,
-  exerciseById,
-  onAddSet,
-  onPatchSet,
-}: {
-  workoutExercise: WorkoutExercise;
-  visibleSets: WorkoutSet[];
-  exerciseById: Map<string, Exercise>;
-  onAddSet: (workoutExercise: WorkoutExercise) => void;
-  onPatchSet: (setId: string, patch: SetPatch) => void;
-}) {
-  const exerciseName = exerciseNameOf(workoutExercise.exerciseId, exerciseById);
-  const sets = useMemo(
-    () =>
-      visibleSets
-        .filter((set) => set.workoutExerciseId === workoutExercise.id)
-        .sort((a, b) => a.orderIndex - b.orderIndex),
-    [visibleSets, workoutExercise.id],
-  );
-  // ウォームアップを除いた集計。規則は utils/aggregate.ts に集約している。
-  const summary = useMemo(
-    () => summarizeSets(sets, rmDivisorFor(workoutExercise.exerciseId)),
-    [sets, workoutExercise.exerciseId],
-  );
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <View style={styles.flex}>
-          <Text style={styles.exerciseTitle}>{exerciseName}</Text>
-          <Text style={styles.faint}>
-            {summary.setCount} セット
-            {summary.warmupCount > 0 ? `（＋WU ${summary.warmupCount}）` : ''} ・{' '}
-            {formatVolume(summary.totalVolume)} ・ 推定1RM {formatWeight(summary.bestOneRepMax)}
-          </Text>
-        </View>
-        <Pressable style={styles.smallButton} onPress={() => onAddSet(workoutExercise)}>
-          <Text style={styles.smallButtonText}>＋ セット</Text>
-        </Pressable>
-      </View>
-      <View style={styles.sectionBody}>
-        {sets.length === 0 ? (
-          <Text style={styles.muted}>セットを追加すると、すぐ保存されます。</Text>
-        ) : null}
-        {sets.map((set, index) => (
-          <SetEditor
-            key={set.id}
-            set={set}
-            setNumber={index + 1}
-            workoutExercise={workoutExercise}
-            onPatchSet={onPatchSet}
-          />
-        ))}
-      </View>
-    </View>
-  );
-});
-
-// 過去の記録を直すときの種目リスト（WorkoutEditScreen 専用）。
+// 記録の編集画面（WorkoutEditScreen）の種目リスト。
 //
-// 記録中の入力は ExerciseLogPanel が受け持つ。こちらは編集だけなので、
-// 休憩タイマーと前回実績は持たない（どちらも「これからやる」ための表示）。
+// カード1枚ぶんの中身は記録タブと同じ ExerciseLogSection を使う。
+// 入り口が違うだけで、やることは「セットを入れる」で同じため。
+//
+// 記録中（active）のワークアウトなら休憩タイマーも出す。過去日の記録には出さない
+// （これから休む場面が無く、代わりに削除の確認を挟む）。
 export const WorkoutExerciseList = memo(function WorkoutExerciseList({
   workoutExercises,
   visibleSets,
   exerciseById,
+  isRecording,
   onAddSet,
   onPatchSet,
+  onStartRestTimer,
+  onOpenRestPicker,
 }: {
   workoutExercises: WorkoutExercise[];
   visibleSets: WorkoutSet[];
   exerciseById: Map<string, Exercise>;
+  /** 記録中のワークアウトを開いているか。休憩タイマーの出し分けに使う。 */
+  isRecording: boolean;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
+  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
 }) {
   return (
     <>
       {workoutExercises.map((workoutExercise) => (
-        <WorkoutExerciseSection
+        <ExerciseLogSection
           key={workoutExercise.id}
           workoutExercise={workoutExercise}
+          exercise={exerciseById.get(workoutExercise.exerciseId)}
           visibleSets={visibleSets}
-          exerciseById={exerciseById}
+          confirmSetDelete={!isRecording}
           onAddSet={onAddSet}
           onPatchSet={onPatchSet}
+          onStartRestTimer={isRecording ? onStartRestTimer : undefined}
+          onOpenRestPicker={isRecording ? onOpenRestPicker : undefined}
         />
       ))}
     </>

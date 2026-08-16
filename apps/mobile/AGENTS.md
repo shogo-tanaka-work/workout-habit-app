@@ -75,7 +75,8 @@ apps/mobile/
     utils/        datetime / format / number / workoutTree / aggregate / oneRepMax
                   plates / calendar / calendarMarks / csv / id
     components/   記録: ExercisePicker / ExerciseLogPanel / SetLogTable / SetActionSheet / RecentSessions
-                  編集: WorkoutExerciseList / SetEditor
+                  記録と編集で共有: ExerciseLogSection（1種目ぶんのセット入力カード）
+                  編集: WorkoutExerciseList
                   共通: TimerBanner / TrendChart / StatSummary / MonthCalendar / PlateCalculator ほか
     screens/      HomeScreen / WorkoutScreen / HistoryScreen / SettingsScreen
                   ExerciseListScreen / ExerciseDetailScreen / TimerSettingsScreen / WorkoutEditScreen

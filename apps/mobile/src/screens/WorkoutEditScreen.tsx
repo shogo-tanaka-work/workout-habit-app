@@ -21,8 +21,9 @@ import { setsOfWorkoutExercises } from '../utils/workoutTree';
 //
 // 履歴タブには置かない。履歴は期間の集計を見る場所で、日単位の記録はホームが持つ。
 //
-// 記録中（active）のワークアウトもここから直せる。休憩タイマーと前回実績は持たないので、
-// 実施しながらの入力は記録タブ（ExerciseLogPanel）を使う。
+// 記録中（active）のワークアウトもここから直せる。セットの入力は記録タブと同じ
+// ExerciseLogSection で、記録中なら休憩タイマーも出す。前回実績は持たないので、
+// 「前回どうだったか」を見ながら進めたいときは記録タブを使う。
 export function WorkoutEditScreen({
   workout,
   workoutExercises,
@@ -34,6 +35,8 @@ export function WorkoutEditScreen({
   onAddCustomExercise,
   onAddSet,
   onPatchSet,
+  onStartRestTimer,
+  onOpenRestPicker,
   onDeleteWorkout,
 }: {
   workout: Workout;
@@ -48,6 +51,8 @@ export function WorkoutEditScreen({
   onAddCustomExercise: (name: string, bodyPartId: string) => void;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onPatchSet: (setId: string, patch: SetPatch) => void;
+  onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
+  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
   onDeleteWorkout: (workoutId: string) => void;
 }) {
   // 種目を選ぶ一覧は開いたときだけ出す。常に出すと、直したいセットが下へ流れる。
@@ -105,8 +110,11 @@ export function WorkoutEditScreen({
         workoutExercises={workoutExercises}
         visibleSets={visibleSets}
         exerciseById={exerciseById}
+        isRecording={isRecording}
         onAddSet={onAddSet}
         onPatchSet={onPatchSet}
+        onStartRestTimer={onStartRestTimer}
+        onOpenRestPicker={onOpenRestPicker}
       />
 
       <View style={styles.section}>

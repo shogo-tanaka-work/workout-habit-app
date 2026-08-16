@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, Text, TextInput, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
@@ -13,6 +13,7 @@ export function SetActionSheet({
   setNumber,
   previousSet,
   previousSessionSet,
+  confirmDelete = false,
   onPatchSet,
   onClose,
 }: {
@@ -22,6 +23,8 @@ export function SetActionSheet({
   previousSet: WorkoutSet | null;
   /** 前回この種目をやったときの、同じ番号のセット。無ければ null。 */
   previousSessionSet: WorkoutSet | null;
+  /** 削除の前に確認を挟むか。過去の記録を直すときだけ true にする。 */
+  confirmDelete?: boolean;
   onPatchSet: (setId: string, patch: SetPatch) => void;
   onClose: () => void;
 }) {
@@ -37,6 +40,26 @@ export function SetActionSheet({
   const applyAndClose = (patch: SetPatch) => {
     onPatchSet(set.id, withMemoDraft(patch));
     onClose();
+  };
+
+  // 過去の記録は消えると取り返しがつかない。まず一拍置く（記録中は即削除）。
+  const requestDelete = () => {
+    if (!confirmDelete) {
+      applyAndClose({ deletedAt: nowIso() });
+      return;
+    }
+    Alert.alert(
+      `セット ${setNumber} を削除`,
+      `${set.weightKg}kg × ${set.reps} 回 の記録を削除します。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: () => applyAndClose({ deletedAt: nowIso() }),
+        },
+      ],
+    );
   };
 
   const commitMemoAndClose = () => {
@@ -102,12 +125,9 @@ export function SetActionSheet({
           />
 
           <View style={styles.modalActions}>
-            {/* 記録中は打ち間違いの消し直しが多い。確認を挟まず即削除する
-                （消えて困る過去の記録は履歴タブ側で確認を挟む）。 */}
-            <Pressable
-              style={styles.deleteButton}
-              onPress={() => applyAndClose({ deletedAt: nowIso() })}
-            >
+            {/* 記録中は打ち間違いの消し直しが多いので確認を挟まない。
+                過去の記録を直すときだけ confirmDelete で一拍置く。 */}
+            <Pressable style={styles.deleteButton} onPress={requestDelete}>
               <Text style={styles.deleteButtonText}>削除</Text>
             </Pressable>
             <Pressable style={styles.primaryButtonFlat} onPress={commitMemoAndClose}>

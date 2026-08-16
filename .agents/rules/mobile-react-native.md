@@ -122,20 +122,23 @@ React Navigation / Expo Router は未導入。`App.tsx` が3層の state で出�
 - 同期の失敗はユーザーに見える形で伝える。無言でリトライだけして黙らない
 - 詳細は [auth.md](auth.md) と [secrets.md](secrets.md)
 
-## 記録と編集で部品を分ける
+## セットの入力は入口が違っても同じ部品を使う
 
-同じ「セットを直す」でも、記録中と過去記録では要るものが違う。混ぜない。
+同じ「セットを入れる」であり、入口で別の UI にしない。
+かつて編集側だけ別部品（`SetEditor` の縦積み）にしていたため、記録タブを刷新したあとも
+編集画面だけ古い UI のまま取り残された。
 
 | 場面 | 入口 | 使う部品 |
 |---|---|---|
-| 記録中の入力 | 記録タブ → 種目を選ぶ | `ExercisePicker` → `ExerciseLogPanel` → `SetLogTable` |
-| 過去記録の編集 | ホームの日詳細 →「編集」 | `WorkoutEditScreen` → `WorkoutExerciseList` → `SetEditor` |
+| 記録中の入力 | 記録タブ → 種目を選ぶ | `ExercisePicker` → `ExerciseLogPanel` → `ExerciseLogSection` |
+| 記録の編集 | ホームの日詳細 →「編集」 | `WorkoutEditScreen` → `WorkoutExerciseList` → `ExerciseLogSection` |
 
 - `ExerciseLogPanel` は**1種目だけ**を見せる。今日の全種目を1画面に積み上げない
   （一日の全体像はホームのカレンダー、期間の集計は履歴タブが受け持つ）
-- `SetEditor` に休憩タイマーの開始ボタンを置かない。過去記録の編集にタイマーは要らない
+- 場面ごとの違いは `ExerciseLogSection` の props で出し分ける。部品を分けない
+- 休憩タイマーは**記録中だけ**出す（過去日の記録にこれから休む場面は無い）
 - 記録中の削除は確認を挟まない（打ち間違いの消し直しが多い）。
-  過去記録の削除は確認を挟む（1日ぶんがまとめて消えるため）
+  過去記録の削除は確認を挟む（`confirmSetDelete`）。1日ぶんの記録の削除も確認を挟む
 
 ## 推定1RM は種目で式が変わる
 

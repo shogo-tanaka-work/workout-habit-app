@@ -4,6 +4,7 @@ import type { Exercise, TrainingGoal, TrainingPhaseKind, WorkoutSet } from '../t
 import { isoDatePlusDays, nowIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 import { enqueueDelete, enqueueUpsert } from './outbox';
+import { runSerialized } from './writeQueue';
 
 /**
  * 書き込みを1トランザクションで実行し、失敗したら操作名つきのエラーへ包む。
@@ -15,6 +16,9 @@ import { enqueueDelete, enqueueUpsert } from './outbox';
  *
  * 端末の書き込みは「ローカルへ即時反映 ＋ 送信キューへ積む」をひとまとまりで行う。
  * 画面はローカルの結果だけを見て進み、送信は src/sync/pusher.ts が契機ごとに引き受ける。
+ *
+ * 実行は db/writeQueue.ts のキューに載せ、他の書き込みと重ならないようにする
+ * （理由はそちらのコメント）。
  */
 const writeInTransaction = async (
   database: SQLite.SQLiteDatabase,
@@ -22,7 +26,7 @@ const writeInTransaction = async (
   write: () => Promise<void>,
 ): Promise<void> => {
   try {
-    await database.withTransactionAsync(write);
+    await runSerialized(database, () => database.withTransactionAsync(write));
   } catch (error) {
     throw new Error(
       `${operationName} failed: ${error instanceof Error ? error.message : String(error)}`,

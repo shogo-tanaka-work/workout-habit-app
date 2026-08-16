@@ -3,6 +3,8 @@ import type * as SQLite from 'expo-sqlite';
 import type { BodyPart, Exercise } from '../types/domain';
 import { nowIso } from '../utils/datetime';
 
+import { runSerialized } from './writeQueue';
+
 export const seedBodyParts: BodyPart[] = [
   { id: 'chest', name: '胸', orderIndex: 1 },
   { id: 'back', name: '背中', orderIndex: 2 },
@@ -337,35 +339,38 @@ export const seedExercises: Exercise[] = [
 // マスタ（部位・種目）の初期投入。INSERT OR IGNORE のため何度実行しても重複しない。
 // 毎起動で走るため、1トランザクションでまとめて42文ぶんの個別コミットを避ける。
 export const seedMasters = async (database: SQLite.SQLiteDatabase): Promise<void> => {
-  try {
-    await database.withTransactionAsync(async () => {
-      for (const bodyPart of seedBodyParts) {
-        await database.runAsync(
-          'INSERT OR IGNORE INTO body_parts (id, name, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-          bodyPart.id,
-          bodyPart.name,
-          bodyPart.orderIndex,
-          nowIso(),
-          nowIso(),
-        );
-      }
-      for (const exercise of seedExercises) {
-        await database.runAsync(
-          `INSERT OR IGNORE INTO exercises
+  // 記録の書き込みと同じキューに載せる（理由は db/writeQueue.ts）。
+  const insertMasters = async () => {
+    for (const bodyPart of seedBodyParts) {
+      await database.runAsync(
+        'INSERT OR IGNORE INTO body_parts (id, name, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        bodyPart.id,
+        bodyPart.name,
+        bodyPart.orderIndex,
+        nowIso(),
+        nowIso(),
+      );
+    }
+    for (const exercise of seedExercises) {
+      await database.runAsync(
+        `INSERT OR IGNORE INTO exercises
             (id, name, primary_body_part_id, default_rest_seconds, default_bar_weight_kg, category, is_archived, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          exercise.id,
-          exercise.name,
-          exercise.primaryBodyPartId,
-          exercise.defaultRestSeconds,
-          exercise.defaultBarWeightKg,
-          exercise.category,
-          exercise.isArchived ? 1 : 0,
-          nowIso(),
-          nowIso(),
-        );
-      }
-    });
+        exercise.id,
+        exercise.name,
+        exercise.primaryBodyPartId,
+        exercise.defaultRestSeconds,
+        exercise.defaultBarWeightKg,
+        exercise.category,
+        exercise.isArchived ? 1 : 0,
+        nowIso(),
+        nowIso(),
+      );
+    }
+  };
+
+  try {
+    await runSerialized(database, () => database.withTransactionAsync(insertMasters));
   } catch (error) {
     throw new Error(
       `seedMasters failed: ${error instanceof Error ? error.message : String(error)}`,

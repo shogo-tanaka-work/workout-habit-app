@@ -4,6 +4,7 @@ import { isRecord } from '../utils/isRecord';
 
 import type { SyncEntity } from './syncTables';
 import { SYNC_COLUMNS } from './syncTables';
+import { runSerialized } from './writeQueue';
 
 // サーバ（apps/api）からの取り込み。
 //
@@ -63,25 +64,28 @@ export const applyBackupPayload = async (
   database: SQLite.SQLiteDatabase,
   payload: BackupPayload,
 ): Promise<void> => {
+  // 復元も記録の書き込みと同じキューに載せる（理由は db/writeQueue.ts）。
+  const restoreAll = async () => {
+    // 子から消す（外部キーの順序）。
+    for (const entity of [...RESTORE_ORDER].reverse()) {
+      await database.runAsync(`DELETE FROM ${entity}`);
+    }
+    for (const entity of RESTORE_ORDER) {
+      const columns = SYNC_COLUMNS[entity];
+      const rows = payload.tables[entity] ?? [];
+      const placeholders = columns.map(() => '?').join(', ');
+      for (const row of rows) {
+        await database.runAsync(
+          `INSERT INTO ${entity} (${columns.join(', ')}) VALUES (${placeholders})`,
+          ...columns.map((column) => toSqlValue(row[column])),
+        );
+      }
+    }
+    await database.runAsync('DELETE FROM sync_outbox');
+  };
+
   try {
-    await database.withTransactionAsync(async () => {
-      // 子から消す（外部キーの順序）。
-      for (const entity of [...RESTORE_ORDER].reverse()) {
-        await database.runAsync(`DELETE FROM ${entity}`);
-      }
-      for (const entity of RESTORE_ORDER) {
-        const columns = SYNC_COLUMNS[entity];
-        const rows = payload.tables[entity] ?? [];
-        const placeholders = columns.map(() => '?').join(', ');
-        for (const row of rows) {
-          await database.runAsync(
-            `INSERT INTO ${entity} (${columns.join(', ')}) VALUES (${placeholders})`,
-            ...columns.map((column) => toSqlValue(row[column])),
-          );
-        }
-      }
-      await database.runAsync('DELETE FROM sync_outbox');
-    });
+    await runSerialized(database, () => database.withTransactionAsync(restoreAll));
   } catch (error) {
     throw new Error(
       `applyBackupPayload failed: ${error instanceof Error ? error.message : String(error)}`,

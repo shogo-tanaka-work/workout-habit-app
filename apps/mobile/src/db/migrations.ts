@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 
 import { SCHEMA_SQL } from './schema';
+import { runSerialized } from './writeQueue';
 
 // SQLite のマイグレーション。`PRAGMA user_version` で適用済みバージョンを管理する。
 //
@@ -168,11 +169,13 @@ export const runMigrations = async (database: SQLite.SQLiteDatabase): Promise<nu
 
   for (const migration of pending) {
     try {
-      await database.withTransactionAsync(async () => {
-        for (const statement of migration.statements) {
-          await database.execAsync(statement);
-        }
-      });
+      await runSerialized(database, () =>
+        database.withTransactionAsync(async () => {
+          for (const statement of migration.statements) {
+            await database.execAsync(statement);
+          }
+        }),
+      );
       // PRAGMA はトランザクション内で設定しても反映されないため、成功後に別途実行する。
       await database.execAsync(`PRAGMA user_version = ${migration.version}`);
     } catch (error) {

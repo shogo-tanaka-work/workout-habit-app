@@ -4,6 +4,7 @@ import { isRecord } from '../utils/isRecord';
 
 import type { SyncEntity } from './syncTables';
 import { SYNC_COLUMNS } from './syncTables';
+import { runSerialized } from './writeQueue';
 
 // 予定（status='planned'）の取り込み。Claude Code が API へ書いた計画を端末へ映す。
 //
@@ -111,58 +112,62 @@ export const replacePlannedWorkouts = async (
   const incomingIds = incomingWorkouts.map((row) => String(row.id));
 
   let result: ImportPlansResult = { imported: 0, skipped: 0 };
-  try {
-    await database.withTransactionAsync(async () => {
-      // 置き換えの前に「端末が先へ進めた予定」を調べる。削除してからでは判別できない。
-      const startedIds = new Set<string>();
-      if (incomingIds.length > 0) {
-        const placeholders = incomingIds.map(() => '?').join(', ');
-        const startedRows = await database.getAllAsync<{ id: string }>(
-          `SELECT id FROM workouts WHERE id IN (${placeholders}) AND status != 'planned'`,
-          ...incomingIds,
-        );
-        for (const startedRow of startedRows) {
-          startedIds.add(startedRow.id);
-        }
-      }
 
-      // 期間内の既存の予定を子から消す（端末スキーマは外部キーの連鎖削除を持たない）。
-      const rangeCondition = "status = 'planned' AND performed_at BETWEEN ? AND ?";
-      await database.runAsync(
-        `DELETE FROM workout_sets WHERE workout_exercise_id IN (
+  const replaceInRange = async () => {
+    // 置き換えの前に「端末が先へ進めた予定」を調べる。削除してからでは判別できない。
+    const startedIds = new Set<string>();
+    if (incomingIds.length > 0) {
+      const placeholders = incomingIds.map(() => '?').join(', ');
+      const startedRows = await database.getAllAsync<{ id: string }>(
+        `SELECT id FROM workouts WHERE id IN (${placeholders}) AND status != 'planned'`,
+        ...incomingIds,
+      );
+      for (const startedRow of startedRows) {
+        startedIds.add(startedRow.id);
+      }
+    }
+
+    // 期間内の既存の予定を子から消す（端末スキーマは外部キーの連鎖削除を持たない）。
+    const rangeCondition = "status = 'planned' AND performed_at BETWEEN ? AND ?";
+    await database.runAsync(
+      `DELETE FROM workout_sets WHERE workout_exercise_id IN (
            SELECT id FROM workout_exercises WHERE workout_id IN (
              SELECT id FROM workouts WHERE ${rangeCondition}))`,
-        payload.from,
-        payload.to,
-      );
-      await database.runAsync(
-        `DELETE FROM workout_exercises WHERE workout_id IN (
+      payload.from,
+      payload.to,
+    );
+    await database.runAsync(
+      `DELETE FROM workout_exercises WHERE workout_id IN (
            SELECT id FROM workouts WHERE ${rangeCondition})`,
-        payload.from,
-        payload.to,
-      );
-      await database.runAsync(
-        `DELETE FROM workouts WHERE ${rangeCondition}`,
-        payload.from,
-        payload.to,
-      );
+      payload.from,
+      payload.to,
+    );
+    await database.runAsync(
+      `DELETE FROM workouts WHERE ${rangeCondition}`,
+      payload.from,
+      payload.to,
+    );
 
-      const workouts = incomingWorkouts.filter((row) => !startedIds.has(String(row.id)));
-      const keptWorkoutIds = new Set(workouts.map((row) => String(row.id)));
-      const workoutExercises = payload.tables.workout_exercises.filter((row) =>
-        keptWorkoutIds.has(String(row.workout_id)),
-      );
-      const keptExerciseIds = new Set(workoutExercises.map((row) => String(row.id)));
-      const workoutSets = payload.tables.workout_sets.filter((row) =>
-        keptExerciseIds.has(String(row.workout_exercise_id)),
-      );
+    const workouts = incomingWorkouts.filter((row) => !startedIds.has(String(row.id)));
+    const keptWorkoutIds = new Set(workouts.map((row) => String(row.id)));
+    const workoutExercises = payload.tables.workout_exercises.filter((row) =>
+      keptWorkoutIds.has(String(row.workout_id)),
+    );
+    const keptExerciseIds = new Set(workoutExercises.map((row) => String(row.id)));
+    const workoutSets = payload.tables.workout_sets.filter((row) =>
+      keptExerciseIds.has(String(row.workout_exercise_id)),
+    );
 
-      await insertRows(database, 'workouts', workouts);
-      await insertRows(database, 'workout_exercises', workoutExercises);
-      await insertRows(database, 'workout_sets', workoutSets);
+    await insertRows(database, 'workouts', workouts);
+    await insertRows(database, 'workout_exercises', workoutExercises);
+    await insertRows(database, 'workout_sets', workoutSets);
 
-      result = { imported: workouts.length, skipped: startedIds.size };
-    });
+    result = { imported: workouts.length, skipped: startedIds.size };
+  };
+
+  try {
+    // 取り込みは記録の書き込みと同じキューに載せる（理由は db/writeQueue.ts）。
+    await runSerialized(database, () => database.withTransactionAsync(replaceInRange));
   } catch (error) {
     throw new Error(
       `replacePlannedWorkouts failed: ${error instanceof Error ? error.message : String(error)}`,

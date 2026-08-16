@@ -26,9 +26,13 @@ export function TimerBanner({
 
   return (
     <View style={[styles.timerBanner, timer.finished && styles.timerFinished]}>
-      <View>
+      {/* 種目名の側だけを縮める。flex と numberOfLines が無いと、名前が長い種目で
+          残り時間と「閉じる」がバナーの外へ押し出される。 */}
+      <View style={styles.flex}>
         <Text style={styles.timerLabel}>{timer.finished ? '休憩終了' : '休憩タイマー'}</Text>
-        <Text style={styles.timerTitle}>{timer.exerciseName}</Text>
+        <Text style={styles.timerTitle} numberOfLines={1}>
+          {timer.exerciseName}
+        </Text>
       </View>
       <Text style={styles.timerTime}>{formatTimer(timer.remaining)}</Text>
       <View style={styles.timerActions}>

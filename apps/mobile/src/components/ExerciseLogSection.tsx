@@ -140,7 +140,9 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <View style={styles.inlineRow}>
+        {/* 種目名の側を縮む枠にする。flex を付けないと、名前が長い種目
+            （インクラインダンベルプレス など）で右の削除ボタンが画面外へ押し出される。 */}
+        <View style={[styles.inlineRow, styles.flex]}>
           <View
             style={[
               styles.exerciseDot,
@@ -148,8 +150,10 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
             ]}
           />
           <View style={styles.flex}>
-            <Text style={styles.logExerciseName}>{exercise?.name ?? '種目'}</Text>
-            <Text style={styles.logExerciseSummary}>
+            <Text style={styles.logExerciseName} numberOfLines={1}>
+              {exercise?.name ?? '種目'}
+            </Text>
+            <Text style={styles.logExerciseSummary} numberOfLines={1}>
               {summary.setCount} セット
               {summary.warmupCount > 0 ? `（＋WU ${summary.warmupCount}）` : ''} ・{' '}
               {formatVolume(summary.totalVolume)}

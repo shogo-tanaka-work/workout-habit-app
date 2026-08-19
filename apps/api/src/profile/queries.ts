@@ -9,6 +9,8 @@ export type UserProfile = {
   trainingGoal: string;
   /** null なら未入力。任意入力の項目。 */
   heightCm: number | null;
+  /** ジムの月額料金（円）。null は未設定で、0（無料のジム）とは区別する。 */
+  gymMonthlyFeeYen: number | null;
   note: string;
   updatedAt: string;
 };
@@ -21,13 +23,14 @@ export const loadUserProfile = async (
   type ProfileRow = {
     training_goal: string;
     height_cm: number | null;
+    gym_monthly_fee_yen: number | null;
     note: string;
     updated_at: string;
   };
   const scope = scopeForUser(user, 'user_id');
   const row = await database
     .prepare(
-      `SELECT training_goal, height_cm, note, updated_at
+      `SELECT training_goal, height_cm, gym_monthly_fee_yen, note, updated_at
        FROM user_profile
        WHERE ${scope.condition}`,
     )
@@ -39,6 +42,7 @@ export const loadUserProfile = async (
   return {
     trainingGoal: row.training_goal,
     heightCm: row.height_cm,
+    gymMonthlyFeeYen: row.gym_monthly_fee_yen,
     note: row.note,
     updatedAt: row.updated_at,
   };

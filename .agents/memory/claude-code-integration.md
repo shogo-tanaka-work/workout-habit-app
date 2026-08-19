@@ -314,6 +314,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/profile"
   "profile": {
     "trainingGoal": "strength",
     "heightCm": 172,
+    "gymMonthlyFeeYen": 8800,
     "note": "腰に持病あり。デッドリフトは慎重に",
     "updatedAt": "2026-08-14T09:00:00.000Z"
   }
@@ -354,7 +355,8 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/profile"
     { "id": "<一意なID>", "at": "2026-08-14T09:00:00.000Z", "op": "upsert",
       "entity": "user_profile",
       "row": { "id": "profile-usr-owner", "training_goal": "strength",
-               "height_cm": 172, "note": "腰に持病あり。デッドリフトは慎重に",
+               "height_cm": 172, "gym_monthly_fee_yen": 8800,
+               "note": "腰に持病あり。デッドリフトは慎重に",
                "created_at": "2026-08-14T09:00:00.000Z",
                "updated_at": "2026-08-14T09:00:00.000Z" } }
   ]
@@ -363,6 +365,8 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/profile"
 
 - `training_goal` は4値のいずれか。DB の CHECK 制約に当たるため、それ以外の値は書けない
 - `height_cm` は省略可（未入力は NULL）。cm 単位の実数
+- `gym_monthly_fee_yen` も省略可（未入力は NULL）。ジムの月額料金（円・整数）。
+  端末のホームが「今月のジム代（1回あたり）」に使う。**トレーニングの評価には使わない**
 - **目的はユーザーのものであり、Claude Code が勝手に変えない。** 書くのは本人の
   明示的な指示があったときだけ（通常の編集経路はモバイルの「トレーニング設定」画面）
 

@@ -229,6 +229,8 @@ export const SYNC_TABLES: readonly SyncTable[] = [
       { name: 'training_goal', type: 'text' },
       { name: 'height_cm', type: 'real', nullable: true, optional: true },
       { name: 'note', type: 'text', optional: true },
+      // ジムの月額料金（migration 0009）。NULL は未設定で、0 円（無料のジム）とは別扱い。
+      { name: 'gym_monthly_fee_yen', type: 'integer', nullable: true, optional: true },
       ...timestamps,
     ],
   },

@@ -45,7 +45,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
     title: '設定',
     items: [
       { route: 'timer', description: '休憩終了時の音と振動' },
-      { route: 'training', description: '目的・身長・メモと、今のフェーズ' },
+      { route: 'training', description: '目的・身長・ジムの月額料金・メモと、今のフェーズ' },
       { route: 'sync', description: 'ログイン・バックアップ・復元' },
     ],
   },

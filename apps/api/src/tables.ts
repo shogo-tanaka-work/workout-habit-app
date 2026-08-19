@@ -32,6 +32,17 @@ export type SyncTable = {
   ownerColumn: 'user_id' | 'owner_user_id';
   columns: readonly SyncColumn[];
   parents?: readonly ParentReference[];
+  /**
+   * id 以外に行を一意に決める列。所有者の列との複合ユニーク制約と対にする
+   * （例: body_logs の `UNIQUE (user_id, measured_at)`）。
+   *
+   * 端末は id をローカルで採番するため、同じ実体を別の経路・別端末が別 id で作りうる。
+   * 適用側（src/sync/apply.ts）はこの列で既存行を引き当て、更新へ寄せる。
+   * 所有者の列だけで一意なテーブル（user_profile）は空配列にする。
+   *
+   * **ユニーク制約を足したら、ここにも同じ組み合わせを足す。**
+   */
+  naturalKey?: readonly string[];
 };
 
 const timestamps: readonly SyncColumn[] = [
@@ -152,6 +163,7 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     // （parentIsUsable が owner === null を許可している）。
     name: 'user_exercise_settings',
     ownerColumn: 'user_id',
+    naturalKey: ['exercise_id'],
     columns: [
       { name: 'id', type: 'text' },
       { name: 'exercise_id', type: 'text' },
@@ -167,6 +179,7 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     // week_start は月曜はじまりの週開始日（YYYY-MM-DD）。同一週の上書きは同じ id を再利用する。
     name: 'weekly_feedback',
     ownerColumn: 'user_id',
+    naturalKey: ['week_start'],
     columns: [
       { name: 'id', type: 'text' },
       { name: 'week_start', type: 'text' },
@@ -179,6 +192,7 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     // （user_exercise_settings と同じ扱い。parentIsUsable が owner === null を許可している）。
     name: 'exercise_goals',
     ownerColumn: 'user_id',
+    naturalKey: ['exercise_id'],
     columns: [
       { name: 'id', type: 'text' },
       { name: 'exercise_id', type: 'text' },
@@ -193,6 +207,7 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     // ended_on が NULL の行が進行中。同じ開始日の書き直しは同じ id を再利用する。
     name: 'training_phases',
     ownerColumn: 'user_id',
+    naturalKey: ['started_on'],
     columns: [
       { name: 'id', type: 'text' },
       { name: 'phase', type: 'text' },
@@ -207,6 +222,8 @@ export const SYNC_TABLES: readonly SyncTable[] = [
     // height_cm は任意入力のため NULL 可。書き直しは同じ id を再利用する。
     name: 'user_profile',
     ownerColumn: 'user_id',
+    // UNIQUE (user_id) なので、所有者の列だけで1行に決まる。
+    naturalKey: [],
     columns: [
       { name: 'id', type: 'text' },
       { name: 'training_goal', type: 'text' },
@@ -218,6 +235,7 @@ export const SYNC_TABLES: readonly SyncTable[] = [
   {
     name: 'body_logs',
     ownerColumn: 'user_id',
+    naturalKey: ['measured_at'],
     columns: [
       { name: 'id', type: 'text' },
       { name: 'measured_at', type: 'text' },

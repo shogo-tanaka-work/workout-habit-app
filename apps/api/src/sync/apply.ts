@@ -5,6 +5,9 @@
 //
 // 競合は後勝ち。ただし「後」は端末の updated_at で判定するため、
 // 手元の行が送られてきた行より新しければ適用しない（stale）。
+//
+// 同じ実体を別 id で作る経路があるため（端末はローカルで id を採番する）、
+// 一意キーを持つテーブルは id より先に一意キーで既存行を引き当てる（resolveByNaturalKey）。
 
 import type { AuthenticatedUser } from '../auth/types';
 import type { SyncTable } from '../tables';
@@ -121,6 +124,46 @@ const parentIsUsable = async (
   return row.owner === null || row.owner === context.user.id;
 };
 
+/**
+ * 一意キー（SyncTable.naturalKey）で既存行を引き当て、見つかれば行の id をそちらへ差し替える。
+ *
+ * 端末は id をローカルで採番するので、同じ実体（同じ測定日のボディログなど）を
+ * 別端末・別の取り込み経路が別 id で作りうる。そのまま INSERT すると `ON CONFLICT(id)` に
+ * 掛からず、`UNIQUE (user_id, <一意キー>)` 違反で拒否される。送信側は拒否された操作を
+ * 数回で諦めて捨てるため、記録が端末にもサーバにも残らないまま消える。
+ * 既存行の更新として扱い、この経路を塞ぐ。
+ *
+ * 送信元の id は変わらないため次回も別 id で送られてくるが、毎回ここで寄せるので実害はない
+ * （端末がクラウド復元を行えばサーバ側の id へ揃う）。
+ */
+const resolveByNaturalKey = async (
+  context: ApplyContext,
+  operation: SyncOperation & { op: 'upsert' },
+): Promise<SyncOperation> => {
+  const table = operation.table;
+  const naturalKey = table.naturalKey;
+  if (!naturalKey) {
+    return operation;
+  }
+  const keyValues = naturalKey.map((column) => operation.row[column]);
+  // 一意キーの列が欠けている行は引き当てられない。id での競合解決（ON CONFLICT）に任せる。
+  if (keyValues.some((value) => value === undefined || value === null)) {
+    return operation;
+  }
+  // 所有者の列を条件に含めるため、引き当てた行は必ず本人のもの。
+  const conditions = [table.ownerColumn, ...naturalKey]
+    .map((column) => `${column} = ?`)
+    .join(' AND ');
+  const existing = await context.database
+    .prepare(`SELECT id FROM ${table.name} WHERE ${conditions}`)
+    .bind(context.user.id, ...keyValues)
+    .first<{ id: string }>();
+  if (!existing || existing.id === operation.row.id) {
+    return operation;
+  }
+  return { ...operation, row: { ...operation.row, id: existing.id } };
+};
+
 const buildUpsertStatement = (
   context: ApplyContext,
   table: SyncTable,
@@ -206,10 +249,14 @@ const updateCacheAfterApply = (
 
 const applyOne = async (
   context: ApplyContext,
-  operation: SyncOperation,
+  incoming: SyncOperation,
   appliedAt: string,
 ): Promise<OperationResult> => {
-  const table = operation.table;
+  const table = incoming.table;
+  // 引き当ては所有者チェック・後勝ち判定・台帳より前に行う。
+  // これらは「どの行を更新するか」が決まっていないと正しく判定できない。
+  const operation =
+    incoming.op === 'upsert' ? await resolveByNaturalKey(context, incoming) : incoming;
   const rowId = operation.op === 'delete' ? operation.rowId : String(operation.row.id);
 
   const ownerCheck = await checkExistingOwner(context, table, rowId);

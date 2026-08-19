@@ -173,6 +173,20 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm + 2,
   },
+  // ジム代は「1回あたり」と添え書きを左右に並べる。カレンダーと日詳細の間に置くため、
+  // sectionBody より詰めた余白にして2行に収める。
+  gymCostBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  gymCostNotes: {
+    alignItems: 'flex-end',
+    gap: spacing.xxs,
+  },
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',

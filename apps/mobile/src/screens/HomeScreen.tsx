@@ -316,14 +316,6 @@ export function HomeScreen({
             onSave={onSaveBodyLog}
           />
 
-          {gymMonthlyFeeYen === null ? null : (
-            <GymCostSection
-              monthlyFeeYen={gymMonthlyFeeYen}
-              cost={gymCost}
-              monthLabel={`${Number(selectedYearMonth.slice(5, 7))}月`}
-            />
-          )}
-
           <PlannedWorkoutSection
             plannedWorkouts={dayPlannedWorkouts}
             workoutExercises={workoutExercises}
@@ -341,6 +333,16 @@ export function HomeScreen({
               </Pressable>
             </View>
           ) : null}
+
+          {/* **画面の高さを取らない位置に置く。** 月の話は毎回見るものではないので、
+              その日の記録・予定・再開の導線をすべて済ませたあと、スクロールの先に置く。 */}
+          {gymMonthlyFeeYen === null ? null : (
+            <GymCostSection
+              monthlyFeeYen={gymMonthlyFeeYen}
+              cost={gymCost}
+              monthLabel={`${Number(selectedYearMonth.slice(5, 7))}月`}
+            />
+          )}
         </ScrollView>
       </View>
     </View>

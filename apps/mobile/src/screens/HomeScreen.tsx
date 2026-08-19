@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BodyLogInput } from '../components/BodyLogInput';
+import { GymCostSection } from '../components/GymCostSection';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { PlannedWorkoutSection } from '../components/PlannedWorkoutSection';
 import { StatSummary } from '../components/StatSummary';
@@ -11,6 +12,7 @@ import type { BodyLog, Exercise, Workout, WorkoutExercise, WorkoutSet } from '..
 import { formatSetsInline, summarizeSets } from '../utils/aggregate';
 import { buildDayMarks } from '../utils/calendarMarks';
 import { formatDate, formatJapaneseDate } from '../utils/datetime';
+import { countVisitDays, summarizeGymCost, yearMonthOfDate } from '../utils/gymCost';
 import { formatCount } from '../utils/number';
 import { exerciseNameOf } from '../utils/workoutTree';
 
@@ -67,6 +69,7 @@ export function HomeScreen({
   visibleSets,
   exerciseById,
   bodyLogs,
+  gymMonthlyFeeYen,
   onResume,
   onBeginPlanned,
   onEditWorkout,
@@ -82,6 +85,8 @@ export function HomeScreen({
   exerciseById: Map<string, Exercise>;
   /** ボディログ（measuredAt 降順）。 */
   bodyLogs: BodyLog[];
+  /** ジムの月額料金（円）。未設定（null）ならジム代の区画を出さない。 */
+  gymMonthlyFeeYen: number | null;
   onResume: () => void;
   onBeginPlanned: (workoutId: string) => void;
   onEditWorkout: (workoutId: string) => void;
@@ -164,6 +169,12 @@ export function HomeScreen({
     dayItems.some((item) => item.id === set.workoutExerciseId),
   );
   const daySummary = summarizeSets(daySets);
+  // ジム代は日ではなく月の話。選んでいる日の月で出す（先月を選べば先月の単価が見られる）。
+  const selectedYearMonth = yearMonthOfDate(selectedDate);
+  const gymCost = summarizeGymCost(
+    gymMonthlyFeeYen ?? 0,
+    countVisitDays(calendarWorkouts, selectedYearMonth),
+  );
   const isResumable = dayActiveWorkouts.length > 0;
   // 未来の実績は作れない（未来日の予定は Claude Code 連携が受け持つ）。
   const isPastDate = selectedDate < today;
@@ -304,6 +315,14 @@ export function HomeScreen({
             latestLog={bodyLogs[0] ?? null}
             onSave={onSaveBodyLog}
           />
+
+          {gymMonthlyFeeYen === null ? null : (
+            <GymCostSection
+              monthlyFeeYen={gymMonthlyFeeYen}
+              cost={gymCost}
+              monthLabel={`${Number(selectedYearMonth.slice(5, 7))}月`}
+            />
+          )}
 
           <PlannedWorkoutSection
             plannedWorkouts={dayPlannedWorkouts}

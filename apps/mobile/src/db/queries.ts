@@ -637,7 +637,12 @@ export const upsertUserExerciseSetting = async (
  */
 export const upsertUserProfile = async (
   database: SQLite.SQLiteDatabase,
-  profile: { trainingGoal: TrainingGoal; heightCm: number | null; note: string },
+  profile: {
+    trainingGoal: TrainingGoal;
+    heightCm: number | null;
+    gymMonthlyFeeYen: number | null;
+    note: string;
+  },
 ): Promise<void> => {
   const timestamp = nowIso();
   await writeInTransaction(database, 'upsertUserProfile', async () => {
@@ -646,16 +651,19 @@ export const upsertUserProfile = async (
     );
     const id = existing?.id ?? newId('profile');
     await database.runAsync(
-      `INSERT INTO user_profile (id, training_goal, height_cm, note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO user_profile
+         (id, training_goal, height_cm, gym_monthly_fee_yen, note, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          training_goal = excluded.training_goal,
          height_cm = excluded.height_cm,
+         gym_monthly_fee_yen = excluded.gym_monthly_fee_yen,
          note = excluded.note,
          updated_at = excluded.updated_at`,
       id,
       profile.trainingGoal,
       profile.heightCm,
+      profile.gymMonthlyFeeYen,
       profile.note,
       timestamp,
       timestamp,

@@ -18,6 +18,9 @@ import { DEFAULT_TRAINING_GOAL, TRAINING_GOAL_OPTIONS } from '../utils/trainingP
 // 0 を未入力として扱い、保存時に null へ寄せる。
 const HEIGHT_STEP_CM = 0.5;
 const UNSET_HEIGHT_CM = 0;
+// 月額は千円単位で動かすことが多い。1円ずつ刻ませると押す回数が現実的でない。
+const GYM_FEE_STEP_YEN = 500;
+const UNSET_GYM_FEE_YEN = 0;
 
 export function TrainingSettingsScreen({
   userProfile,
@@ -31,6 +34,7 @@ export function TrainingSettingsScreen({
   onSaveProfile: (profile: {
     trainingGoal: TrainingGoal;
     heightCm: number | null;
+    gymMonthlyFeeYen: number | null;
     note: string;
   }) => void;
   onSwitchPhase: (params: { phase: TrainingPhaseKind; startedOn: string; note: string }) => void;
@@ -42,6 +46,9 @@ export function TrainingSettingsScreen({
       DEFAULT_TRAINING_GOAL,
   );
   const [heightCm, setHeightCm] = useState(userProfile?.heightCm ?? UNSET_HEIGHT_CM);
+  const [gymMonthlyFeeYen, setGymMonthlyFeeYen] = useState(
+    userProfile?.gymMonthlyFeeYen ?? UNSET_GYM_FEE_YEN,
+  );
   const [note, setNote] = useState(userProfile?.note ?? '');
 
   return (
@@ -86,6 +93,17 @@ export function TrainingSettingsScreen({
             任意。体組成の指標（FFMI）にだけ使います。0 のままなら未設定として保存します。
           </Text>
 
+          <LabeledNumber
+            label="ジムの月額料金"
+            value={gymMonthlyFeeYen}
+            suffix="円"
+            step={GYM_FEE_STEP_YEN}
+            onChange={setGymMonthlyFeeYen}
+          />
+          <Text style={styles.muted}>
+            入れるとホームに「今月のジム代（1回あたり）」が出ます。0 のままなら出しません。
+          </Text>
+
           <Text style={styles.inputLabel}>メモ</Text>
           <TextInput
             value={note}
@@ -102,6 +120,8 @@ export function TrainingSettingsScreen({
               onSaveProfile({
                 trainingGoal,
                 heightCm: heightCm > UNSET_HEIGHT_CM ? heightCm : null,
+                gymMonthlyFeeYen:
+                  gymMonthlyFeeYen > UNSET_GYM_FEE_YEN ? Math.round(gymMonthlyFeeYen) : null,
                 note: note.trim(),
               })
             }

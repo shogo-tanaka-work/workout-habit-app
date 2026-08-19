@@ -91,6 +91,8 @@ export type UserProfileRow = {
   training_goal: string;
   // 任意入力。体組成の指標（FFMI）にだけ使うので、無くても分析は動く。
   height_cm: number | null;
+  // ジムの月額料金（円）。NULL は未設定で、そのときは「今月のジム代」を出さない。
+  gym_monthly_fee_yen: number | null;
   note: string;
 };
 

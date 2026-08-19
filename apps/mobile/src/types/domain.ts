@@ -125,6 +125,8 @@ export type UserProfile = {
   trainingGoal: string;
   /** 任意入力。null は未設定。体組成の指標（FFMI）にだけ使う。 */
   heightCm: number | null;
+  /** ジムの月額料金（円）。null は未設定で、そのときホームの「今月のジム代」を出さない。 */
+  gymMonthlyFeeYen: number | null;
   note: string;
 };
 

@@ -83,6 +83,7 @@ export const toUserProfile = (row: UserProfileRow): UserProfile => ({
   id: row.id,
   trainingGoal: row.training_goal,
   heightCm: row.height_cm,
+  gymMonthlyFeeYen: row.gym_monthly_fee_yen,
   note: row.note,
 });
 

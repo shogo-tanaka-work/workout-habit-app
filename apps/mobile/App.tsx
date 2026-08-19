@@ -460,6 +460,7 @@ export default function App() {
               workoutExercises={data.workoutExercises}
               visibleSets={data.visibleSets}
               exerciseById={data.exerciseById}
+              gymMonthlyFeeYen={data.userProfile?.gymMonthlyFeeYen ?? null}
               bodyLogs={data.bodyLogs}
               onResume={() => setTab('workout')}
               onBeginPlanned={(workoutId) => {

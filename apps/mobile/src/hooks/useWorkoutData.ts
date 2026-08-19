@@ -580,6 +580,7 @@ export function useWorkoutData() {
     async (profile: {
       trainingGoal: TrainingGoal;
       heightCm: number | null;
+      gymMonthlyFeeYen: number | null;
       note: string;
     }): Promise<void> => {
       const database = ensureDb();

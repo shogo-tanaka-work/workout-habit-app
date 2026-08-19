@@ -108,7 +108,7 @@ const TEMPLATE_COLUMNS = 'id, name, created_at';
 
 const TEMPLATE_EXERCISE_COLUMNS = 'id, template_id, exercise_id, order_index';
 
-const USER_PROFILE_COLUMNS = 'id, training_goal, height_cm, note';
+const USER_PROFILE_COLUMNS = 'id, training_goal, height_cm, gym_monthly_fee_yen, note';
 
 const TRAINING_PHASE_COLUMNS = 'id, phase, started_on, ended_on, note';
 

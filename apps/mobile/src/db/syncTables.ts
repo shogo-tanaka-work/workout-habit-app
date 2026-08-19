@@ -112,7 +112,15 @@ export const SYNC_COLUMNS: Record<SyncEntity, readonly string[]> = {
   // トレーニングのフェーズ（減量・増量・維持・中断）の履歴。ended_on が NULL なら進行中。
   training_phases: ['id', 'phase', 'started_on', 'ended_on', 'note', 'created_at', 'updated_at'],
   // 恒常的に持つ基本情報（目的・身長・メモ）。1ユーザー1行。
-  user_profile: ['id', 'training_goal', 'height_cm', 'note', 'created_at', 'updated_at'],
+  user_profile: [
+    'id',
+    'training_goal',
+    'height_cm',
+    'gym_monthly_fee_yen',
+    'note',
+    'created_at',
+    'updated_at',
+  ],
 };
 
 /**

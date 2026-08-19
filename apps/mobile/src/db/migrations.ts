@@ -149,6 +149,15 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    version: 9,
+    description: 'ジムの月額料金（user_profile.gym_monthly_fee_yen）を追加',
+    statements: [
+      // 「今月は何回行って1回あたりいくらか」をホームに出すために持つ。
+      // 未設定は NULL（入力欄は 0 を未入力として NULL へ寄せる。height_cm と同じ流儀）。
+      `ALTER TABLE user_profile ADD COLUMN gym_monthly_fee_yen INTEGER`,
+    ],
+  },
 ];
 
 /** 適用済みの user_version。 */

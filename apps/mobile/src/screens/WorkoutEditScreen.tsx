@@ -56,7 +56,7 @@ export function WorkoutEditScreen({
   onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
   onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
-  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
+  onOpenRestPicker: (workoutExercise: WorkoutExercise, seconds: number) => void;
   onDeleteWorkout: (workoutId: string) => void;
 }) {
   // 種目を選ぶ一覧は開いたときだけ出す。常に出すと、直したいセットが下へ流れる。

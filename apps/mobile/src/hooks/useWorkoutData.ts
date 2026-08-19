@@ -3,6 +3,8 @@ import { useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
 
 import {
+  clearWorkoutExerciseRestOverride,
+  completeStaleActiveWorkouts,
   deleteTemplateDeep,
   deleteWorkoutDeep,
   deleteWorkoutExerciseDeep,
@@ -100,6 +102,10 @@ export function useWorkoutData() {
    */
   const startWorkout = useCallback(async (): Promise<string> => {
     const database = ensureDb();
+    const today = formatDate(new Date());
+    // 前日のまま残った記録を先に閉じる。閉じないと、その記録が「記録中」として
+    // 使い回され、今日のセットが前日の日付で積まれる。
+    await completeStaleActiveWorkouts(database, today);
     const existingActive = await findActiveWorkoutRow(database);
     if (existingActive) {
       // state が知らない記録中の行が DB にあったときの取り込み。書き込みは無い。
@@ -107,10 +113,36 @@ export function useWorkoutData() {
       return existingActive.id;
     }
     const workoutId = newId('workout');
-    await insertWorkout(database, { id: workoutId, performedAt: formatDate(new Date()) });
+    await insertWorkout(database, { id: workoutId, performedAt: today });
     await reloadTables(database, ['workouts']);
     return workoutId;
   }, [ensureDb, reloadTables]);
+
+  /**
+   * 日付をまたいで記録中のまま残った記録を閉じる。起動時とアプリ復帰時に呼ぶ。
+   *
+   * 記録の操作より前に済ませたい後始末なので、失敗しても画面は止めない
+   * （次の契機でやり直せばよい）。
+   */
+  const closeStaleActiveWorkout = useCallback(async (): Promise<void> => {
+    if (!store.database) {
+      return;
+    }
+    const database = store.database;
+    try {
+      const closed = await completeStaleActiveWorkouts(database, formatDate(new Date()));
+      if (closed === 0) {
+        return;
+      }
+      await reloadTables(database, ['workouts']);
+      void syncInBackground();
+    } catch (error: unknown) {
+      console.warn(
+        '[workout] 日付をまたいだ記録の締めに失敗',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }, [store.database, reloadTables, syncInBackground]);
 
   /**
    * 過去の日付の記録を作り、その ID を返す（後から入れ直すとき用）。
@@ -161,25 +193,24 @@ export function useWorkoutData() {
   const addExerciseToWorkout = useCallback(
     async (exercise: Exercise) => {
       const database = ensureDb();
-      const workoutId = activeWorkout?.id ?? (await startWorkout());
-      // 開始直後は activeWorkoutExercises がまだ空なので、既存の記録のときだけ重複を見る。
-      if (activeWorkout) {
-        const alreadyAdded = activeWorkoutExercises.some((item) => item.exerciseId === exercise.id);
-        if (alreadyAdded) {
-          Alert.alert('追加済み', `${exercise.name} は今日の記録に入っています。`);
-          return;
-        }
+      // **追加先は必ず startWorkout に決めさせる。** activeWorkout（state）を直接使うと、
+      // 日付をまたいで残った前日の記録がそのまま追加先になる。
+      const workoutId = await startWorkout();
+      const items = exercisesInWorkout(workoutId, workoutExercises);
+      if (items.some((item) => item.exerciseId === exercise.id)) {
+        Alert.alert('追加済み', `${exercise.name} は今日の記録に入っています。`);
+        return;
       }
       await insertWorkoutExercise(database, {
         id: newId('workout-exercise'),
         workoutId,
         exerciseId: exercise.id,
-        orderIndex: activeWorkoutExercises.length + 1,
+        orderIndex: items.length + 1,
       });
       await touchWorkout(database, workoutId);
       await reloadTables(database, ['workouts', 'workout_exercises']);
     },
-    [activeWorkout, activeWorkoutExercises, ensureDb, reloadTables, startWorkout],
+    [ensureDb, reloadTables, startWorkout, workoutExercises],
   );
 
   /**
@@ -297,11 +328,10 @@ export function useWorkoutData() {
     async (set: WorkoutSet, workoutExercise: WorkoutExercise): Promise<TimerState> => {
       const database = ensureDb();
       const exercise = exerciseById.get(workoutExercise.exerciseId);
-      const duration = Math.max(
-        1,
-        // このセットに保存済みの秒数があればそれを優先する（過去のセットを再開する場合）。
-        set.restSeconds ?? restSecondsFor(workoutExercise, exercise),
-      );
+      // **画面に出ている秒数（restSecondsFor）をそのまま走らせる。**
+      // かつては保存済みの set.restSeconds を優先していたため、予定から取り込んだ
+      // セットや休憩設定を変えた後のセットで「表示は 2:00 なのにタイマーは 3:00」になっていた。
+      const duration = Math.max(1, restSecondsFor(workoutExercise, exercise));
       await patchSet(set.id, { isCompleted: true, restSeconds: duration });
       await insertTimerEvent(database, {
         id: newId('timer'),
@@ -399,15 +429,25 @@ export function useWorkoutData() {
     [ensureDb, reloadTables, syncInBackground, writeExerciseOverride],
   );
 
+  /**
+   * 種目の休憩秒数を変える。
+   *
+   * `workoutExerciseId` を渡すと、その記録の種目に付いた上書き（予定が持ち込む
+   * `rest_seconds_override`）も外す。**外さないと予定の値が勝ち続け、変えたのに
+   * 反映されないように見える。**
+   */
   const updateExerciseRest = useCallback(
-    async (exercise: Exercise, restSeconds: number) => {
+    async (exercise: Exercise, restSeconds: number, workoutExerciseId?: string) => {
       const database = ensureDb();
       if (isCustomExerciseId(exercise.id)) {
         await setExerciseRest(database, exercise.id, restSeconds);
       } else {
         await writeExerciseOverride(database, exercise.id, { restSeconds });
       }
-      await reloadTables(database, ['exercises', 'user_exercise_settings']);
+      if (workoutExerciseId) {
+        await clearWorkoutExerciseRestOverride(database, workoutExerciseId);
+      }
+      await reloadTables(database, ['exercises', 'user_exercise_settings', 'workout_exercises']);
       void syncInBackground();
     },
     [ensureDb, reloadTables, syncInBackground, writeExerciseOverride],
@@ -440,6 +480,9 @@ export function useWorkoutData() {
   const startWorkoutFromTemplate = useCallback(
     async (template: Template) => {
       const database = ensureDb();
+      const today = formatDate(new Date());
+      // 前日のまま残った記録は「記録中」に数えない（startWorkout と同じ扱い）。
+      await completeStaleActiveWorkouts(database, today);
       const existingActive = await findActiveWorkoutRow(database);
       if (existingActive) {
         Alert.alert('記録中のワークアウトがあります', '先に完了するか、再開してください。');
@@ -452,7 +495,7 @@ export function useWorkoutData() {
         .sort((a, b) => a.orderIndex - b.orderIndex);
       await insertWorkoutDeep(database, {
         id: newId('workout'),
-        performedAt: formatDate(new Date()),
+        performedAt: today,
         exerciseEntries: entries.map((entry) => ({
           id: newId('workout-exercise'),
           exerciseId: entry.exerciseId,
@@ -510,9 +553,10 @@ export function useWorkoutData() {
         bodyFatPercentage: bodyFatPercentage && bodyFatPercentage > 0 ? bodyFatPercentage : null,
       });
       await reloadTables(database, ['body_logs']);
+      void syncInBackground();
       return true;
     },
-    [ensureDb, reloadTables],
+    [ensureDb, reloadTables, syncInBackground],
   );
 
   // 基本情報（目的・身長・メモ）の保存。身長は任意入力で、未入力は null のまま保つ。
@@ -581,6 +625,7 @@ export function useWorkoutData() {
     ...sync,
     beginPlannedWorkout,
     startWorkout,
+    closeStaleActiveWorkout,
     addPastWorkout,
     completeWorkout,
     pauseWorkout,

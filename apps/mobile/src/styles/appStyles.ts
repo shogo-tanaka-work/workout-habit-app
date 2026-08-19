@@ -923,7 +923,8 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: fontSize.xs,
   },
-  restRow: {
+  // ラベルと現在値を並べ、タップでピッカーを開く行。休憩秒数と実施日で共有する。
+  settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -934,12 +935,12 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
   },
-  restValue: {
+  settingRowValue: {
     color: colors.accentText,
     fontWeight: '700',
     fontSize: fontSize.lg,
   },
-  restLabel: {
+  settingRowLabel: {
     color: colors.textSecondary,
     fontSize: fontSize.md,
   },

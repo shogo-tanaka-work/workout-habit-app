@@ -74,7 +74,7 @@ export function WorkoutScreen({
   onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
   onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
-  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
+  onOpenRestPicker: (workoutExercise: WorkoutExercise, seconds: number) => void;
 }) {
   // 記録中の種目。workoutExercise の ID ではなく種目 ID で持つ。
   // 追加直後は workoutExercise がまだ手元に無く、再読み込み後に解決するため。

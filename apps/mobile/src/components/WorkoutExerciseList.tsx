@@ -32,7 +32,7 @@ export const WorkoutExerciseList = memo(function WorkoutExerciseList({
   onDeleteExercise: (workoutExercise: WorkoutExercise) => void;
   onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
-  onOpenRestPicker: (exerciseId: string, seconds: number) => void;
+  onOpenRestPicker: (workoutExercise: WorkoutExercise, seconds: number) => void;
 }) {
   return (
     <>

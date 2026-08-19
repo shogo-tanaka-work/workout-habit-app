@@ -53,7 +53,7 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
   /** 渡すと「完了」のタップでそのまま休憩に入る。 */
   onStartRestTimer?: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   /** 渡すと休憩タイマーの行を出す。休憩の秒数はここで決めない（restSecondsFor が正）。 */
-  onOpenRestPicker?: (exerciseId: string, seconds: number) => void;
+  onOpenRestPicker?: (workoutExercise: WorkoutExercise, seconds: number) => void;
 }) {
   const restSeconds = restSecondsFor(workoutExercise, exercise);
   const [actionTarget, setActionTarget] = useState<{ set: WorkoutSet; setNumber: number } | null>(
@@ -171,11 +171,11 @@ export const ExerciseLogSection = memo(function ExerciseLogSection({
       {onOpenRestPicker ? (
         <View style={styles.sectionBody}>
           <Pressable
-            style={styles.restRow}
-            onPress={() => exercise && onOpenRestPicker(exercise.id, restSeconds)}
+            style={styles.settingRow}
+            onPress={() => onOpenRestPicker(workoutExercise, restSeconds)}
           >
-            <Text style={styles.restLabel}>休憩タイマー</Text>
-            <Text style={styles.restValue}>{formatTimer(restSeconds)} ›</Text>
+            <Text style={styles.settingRowLabel}>休憩タイマー</Text>
+            <Text style={styles.settingRowValue}>{formatTimer(restSeconds)} ›</Text>
           </Pressable>
         </View>
       ) : null}

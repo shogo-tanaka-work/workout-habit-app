@@ -67,15 +67,19 @@ export default function App() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   // 編集中の種目 ID。モーダルの表示はこれで決める。
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
-  const [restPicker, setRestPicker] = useState<{ exerciseId: string; seconds: number } | null>(
-    null,
-  );
+  // 休憩ピッカーの対象。記録中の種目（workoutExercise）も持つ。予定が持ち込んだ
+  // 休憩の上書きを外すのに要る（外さないと変更が反映されない）。
+  const [restPicker, setRestPicker] = useState<{
+    workoutExerciseId: string;
+    exerciseId: string;
+    seconds: number;
+  } | null>(null);
   // 設定タブで開いているサブ画面。null なら入口のメニュー。
   const [settingsRoute, setSettingsRoute] = useState<SettingsRoute | null>(null);
 
   // 送信の補助的な契機。バックグラウンドへ移るとき（記録を終えて画面を閉じたとき）と、
   // 戻ってきたとき（通信が復帰している可能性がある）に、溜まった操作を送る。
-  const { syncInBackground, importPlansInBackground } = data;
+  const { syncInBackground, importPlansInBackground, closeStaleActiveWorkout } = data;
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'background' || state === 'active') {
@@ -85,15 +89,19 @@ export default function App() {
       // アプリを閉じる方向では要らない。
       if (state === 'active') {
         void importPlansInBackground();
+        // 日付をまたいで記録中のまま残った前日のワークアウトを閉じる。
+        // 残したままだと、今日の記録が前日の日付で積まれる。
+        void closeStaleActiveWorkout();
       }
     });
     return () => subscription.remove();
-  }, [syncInBackground, importPlansInBackground]);
+  }, [syncInBackground, importPlansInBackground, closeStaleActiveWorkout]);
 
-  // 起動直後にも一度取り込む（AppState の change は起動時には発火しない）。
+  // 起動直後にも一度行う（AppState の change は起動時には発火しない）。
   useEffect(() => {
     void importPlansInBackground();
-  }, [importPlansInBackground]);
+    void closeStaleActiveWorkout();
+  }, [importPlansInBackground, closeStaleActiveWorkout]);
 
   // 記録中の各種目について、直近の完了済み実施記録を新しい順に引く。
   // 記録画面で「過去 n 回分の記録」として並べる（1回だけだと調子の良し悪しが分からない）。
@@ -331,8 +339,12 @@ export default function App() {
     await data.deleteWorkout(workoutId);
   };
 
-  const openRestPicker = useCallback((exerciseId: string, seconds: number) => {
-    setRestPicker({ exerciseId, seconds });
+  const openRestPicker = useCallback((workoutExercise: WorkoutExercise, seconds: number) => {
+    setRestPicker({
+      workoutExerciseId: workoutExercise.id,
+      exerciseId: workoutExercise.exerciseId,
+      seconds,
+    });
   }, []);
 
   // 選んだ対象・期間の記録をCSVにして共有シートへ渡す（ファイル保存・AirDrop・メール等）。
@@ -367,7 +379,7 @@ export default function App() {
     if (restPicker) {
       const exercise = data.exerciseById.get(restPicker.exerciseId);
       if (exercise) {
-        await data.updateExerciseRest(exercise, Math.max(0, seconds));
+        await data.updateExerciseRest(exercise, Math.max(0, seconds), restPicker.workoutExerciseId);
       }
     }
     await data.updateTimerSettings({ ...data.timerSettings, restPresets: presets });

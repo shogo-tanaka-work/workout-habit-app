@@ -7,6 +7,11 @@ import { enqueueDelete, enqueueUpsert } from './outbox';
 import { runSerialized } from './writeQueue';
 
 /**
+ * 前日以前の `active` を閉じるまでの猶予。深夜をまたぐセッションを切らないための幅。
+ */
+const STALE_ACTIVE_WORKOUT_MS = 6 * 60 * 60 * 1000;
+
+/**
  * 書き込みを1トランザクションで実行し、失敗したら操作名つきのエラーへ包む。
  *
  * **この関数は outbox への登録をしない。** 登録は `write` の中で
@@ -245,6 +250,45 @@ export const startPlannedWorkout = async (
   });
 };
 
+/**
+ * 日付をまたいで `active` のまま残った記録を完了にする。
+ *
+ * **記録中のワークアウトは日付を持つ。** 前日に開始してそのままアプリを閉じると、
+ * 翌日に記録を足したときもその記録が使い回され、実施日が前日のまま積まれてしまう。
+ * 日をまたいだ時点で、前日ぶんは終わったものとして閉じる。
+ *
+ * 深夜をまたぐセッション（23時開始 → 0時半終了）まで切らないよう、
+ * 最後の保存から `STALE_ACTIVE_WORKOUT_MS` 以上経ったものだけを対象にする。
+ *
+ * @returns 閉じた記録の件数。0 なら呼び出し側の再読込は要らない。
+ */
+export const completeStaleActiveWorkouts = async (
+  database: SQLite.SQLiteDatabase,
+  today: string,
+): Promise<number> => {
+  const timestamp = nowIso();
+  const staleBefore = new Date(Date.now() - STALE_ACTIVE_WORKOUT_MS).toISOString();
+  let closedCount = 0;
+  await writeInTransaction(database, 'completeStaleActiveWorkouts', async () => {
+    const staleRows = await database.getAllAsync<{ id: string }>(
+      `SELECT id FROM workouts
+       WHERE status = 'active' AND performed_at < ? AND (last_saved_at IS NULL OR last_saved_at < ?)`,
+      today,
+      staleBefore,
+    );
+    for (const row of staleRows) {
+      await database.runAsync(
+        "UPDATE workouts SET status = 'completed', updated_at = ? WHERE id = ?",
+        timestamp,
+        row.id,
+      );
+      await enqueueUpsert(database, 'workouts', row.id);
+    }
+    closedCount = staleRows.length;
+  });
+  return closedCount;
+};
+
 export const setWorkoutStatus = async (
   database: SQLite.SQLiteDatabase,
   workoutId: string,
@@ -330,6 +374,28 @@ export const deleteWorkoutExerciseDeep = async (
     );
     await database.runAsync('DELETE FROM workout_exercises WHERE id = ?', workoutExerciseId);
     await enqueueDelete(database, 'workout_exercises', workoutExerciseId);
+  });
+};
+
+/**
+ * 記録の種目に付いた休憩の上書き（`rest_seconds_override`）を外す。
+ *
+ * 上書きは予定（Claude Code の計画）が持ち込む値で、種目の既定より優先される。
+ * 記録画面で休憩を変えたのに予定の値が使われ続ける、という食い違いを防ぐため、
+ * ユーザーがその場で秒数を決めたときは上書きを外して種目の設定へ戻す。
+ */
+export const clearWorkoutExerciseRestOverride = async (
+  database: SQLite.SQLiteDatabase,
+  workoutExerciseId: string,
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeInTransaction(database, 'clearWorkoutExerciseRestOverride', async () => {
+    await database.runAsync(
+      'UPDATE workout_exercises SET rest_seconds_override = NULL, updated_at = ? WHERE id = ?',
+      timestamp,
+      workoutExerciseId,
+    );
+    await enqueueUpsert(database, 'workout_exercises', workoutExerciseId);
   });
 };
 

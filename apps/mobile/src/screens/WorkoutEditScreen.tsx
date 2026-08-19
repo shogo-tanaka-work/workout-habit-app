@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
+import { DatePickerModal } from '../components/DatePickerModal';
 import { ExerciseSelectList } from '../components/ExerciseSelectList';
 import { StatSummary } from '../components/StatSummary';
 import { WorkoutExerciseList } from '../components/WorkoutExerciseList';
@@ -14,6 +15,7 @@ import type {
   WorkoutSet,
 } from '../types/domain';
 import { summarizeSets } from '../utils/aggregate';
+import { formatJapaneseDate } from '../utils/datetime';
 import { formatCount } from '../utils/number';
 import { setsOfWorkoutExercises } from '../utils/workoutTree';
 
@@ -39,6 +41,7 @@ export function WorkoutEditScreen({
   onSaveMemo,
   onStartRestTimer,
   onOpenRestPicker,
+  onChangeDate,
   onDeleteWorkout,
 }: {
   workout: Workout;
@@ -57,10 +60,13 @@ export function WorkoutEditScreen({
   onSaveMemo: (workoutExercise: WorkoutExercise, memo: string) => void;
   onStartRestTimer: (set: WorkoutSet, workoutExercise: WorkoutExercise) => void;
   onOpenRestPicker: (workoutExercise: WorkoutExercise, seconds: number) => void;
+  /** 実施日の付け替え。予定の日と実際にやった日がずれたときに使う。 */
+  onChangeDate: (workoutId: string, performedAt: string) => void;
   onDeleteWorkout: (workoutId: string) => void;
 }) {
   // 種目を選ぶ一覧は開いたときだけ出す。常に出すと、直したいセットが下へ流れる。
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const workoutSets = setsOfWorkoutExercises(workoutExercises, visibleSets);
   const summary = summarizeSets(workoutSets);
@@ -90,6 +96,15 @@ export function WorkoutEditScreen({
             </View>
           </View>
         ) : null}
+        <View style={styles.sectionBody}>
+          {/* 実施日はここでしか直せない。予定の日と実際にやった日がずれることがあるため、
+              記録を消して入れ直させない。 */}
+          <Pressable style={styles.settingRow} onPress={() => setIsDatePickerOpen(true)}>
+            <Text style={styles.settingRowLabel}>実施日</Text>
+            <Text style={styles.settingRowValue}>{formatJapaneseDate(workout.performedAt)} ›</Text>
+          </Pressable>
+        </View>
+
         <StatSummary
           primary={{ label: '総ボリューム', value: formatCount(summary.totalVolume), unit: 'kg' }}
           items={[
@@ -155,6 +170,19 @@ export function WorkoutEditScreen({
           </Pressable>
         </View>
       </View>
+
+      {isDatePickerOpen ? (
+        <DatePickerModal
+          value={workout.performedAt}
+          onConfirm={(isoDate) => {
+            setIsDatePickerOpen(false);
+            if (isoDate !== workout.performedAt) {
+              onChangeDate(workout.id, isoDate);
+            }
+          }}
+          onCancel={() => setIsDatePickerOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

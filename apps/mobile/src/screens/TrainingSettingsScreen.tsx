@@ -75,7 +75,6 @@ export function TrainingSettingsScreen({
             })}
           </View>
 
-          {/* 単独の入力欄なので inputGrid（横並び用）へは入れない。列方向の親の下で全幅になる。 */}
           <LabeledNumber
             label="身長"
             value={heightCm}

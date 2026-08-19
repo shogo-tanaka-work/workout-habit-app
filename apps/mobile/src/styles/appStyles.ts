@@ -778,16 +778,10 @@ export const styles = StyleSheet.create({
   activePillText: {
     color: colors.accentText,
   },
-  inputGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // 数値入力（LabeledNumber）を縦に積む。**横に並べない。**
+  // ステッパー（44pt × 2）と単位に挟まれると、3桁＋小数の値が見切れる。
+  inputStack: {
     gap: spacing.sm,
-  },
-  // inputGrid の中で横に並べる1枠。**幅は親のレイアウトの責務**なので numberField には持たせない
-  // （持たせると、単独で置いたときも半分の幅になり数値が見切れる）。
-  inputGridItem: {
-    flexGrow: 1,
-    flexBasis: '48%',
   },
   numberField: {
     backgroundColor: colors.surfaceRaised,

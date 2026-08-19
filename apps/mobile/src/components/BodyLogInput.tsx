@@ -43,25 +43,23 @@ export function BodyLogInput({
         </Text>
       </View>
       <View style={styles.sectionBody}>
-        <View style={styles.inputGrid}>
-          <View style={styles.inputGridItem}>
-            <LabeledNumber
-              label="体重"
-              value={bodyWeightKg}
-              suffix="kg"
-              step={BODY_WEIGHT_STEP_KG}
-              onChange={setBodyWeightKg}
-            />
-          </View>
-          <View style={styles.inputGridItem}>
-            <LabeledNumber
-              label="体脂肪率"
-              value={bodyFatPercentage}
-              suffix="%"
-              step={BODY_FAT_STEP_PERCENT}
-              onChange={setBodyFatPercentage}
-            />
-          </View>
+        {/* **横に2つ並べない。** ステッパー（44pt × 2）と単位に挟まれて数値が見切れる。
+            体重は3桁＋小数なので、1つで画面幅を使う。 */}
+        <View style={styles.inputStack}>
+          <LabeledNumber
+            label="体重"
+            value={bodyWeightKg}
+            suffix="kg"
+            step={BODY_WEIGHT_STEP_KG}
+            onChange={setBodyWeightKg}
+          />
+          <LabeledNumber
+            label="体脂肪率"
+            value={bodyFatPercentage}
+            suffix="%"
+            step={BODY_FAT_STEP_PERCENT}
+            onChange={setBodyFatPercentage}
+          />
         </View>
         <Pressable
           style={styles.secondaryButton}

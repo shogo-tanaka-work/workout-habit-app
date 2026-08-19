@@ -289,6 +289,30 @@ export const completeStaleActiveWorkouts = async (
   return closedCount;
 };
 
+/**
+ * 記録の実施日を変える。
+ *
+ * 予定と違う日に実施した記録や、日付を取り違えて入れた記録を後から直すために要る。
+ * **`last_saved_at` は動かさない。** あれは「最後にセットを保存した時刻」で、
+ * 日付の付け替えは記録の中身に触らないため（`completeStaleActiveWorkouts` の判定にも使う）。
+ */
+export const updateWorkoutDate = async (
+  database: SQLite.SQLiteDatabase,
+  workoutId: string,
+  performedAt: string,
+): Promise<void> => {
+  const timestamp = nowIso();
+  await writeInTransaction(database, 'updateWorkoutDate', async () => {
+    await database.runAsync(
+      'UPDATE workouts SET performed_at = ?, updated_at = ? WHERE id = ?',
+      performedAt,
+      timestamp,
+      workoutId,
+    );
+    await enqueueUpsert(database, 'workouts', workoutId);
+  });
+};
+
 export const setWorkoutStatus = async (
   database: SQLite.SQLiteDatabase,
   workoutId: string,

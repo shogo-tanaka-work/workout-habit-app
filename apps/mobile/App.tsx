@@ -504,6 +504,9 @@ export default function App() {
                 onSaveMemo={handleSaveExerciseMemo}
                 onStartRestTimer={handleStartRestTimer}
                 onOpenRestPicker={openRestPicker}
+                onChangeDate={(workoutId, performedAt) =>
+                  runAction(() => data.changeWorkoutDate(workoutId, performedAt))
+                }
                 onDeleteWorkout={(workoutId) => runAction(() => handleDeleteWorkout(workoutId))}
               />
             ) : overlay?.kind === 'settings' ? (

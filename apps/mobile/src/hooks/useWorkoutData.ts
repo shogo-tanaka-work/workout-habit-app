@@ -22,6 +22,7 @@ import {
   startTrainingPhase,
   touchWorkout,
   updateExercise,
+  updateWorkoutDate,
   updateWorkoutExerciseMemo,
   updateWorkoutSet,
   upsertBodyLog,
@@ -177,6 +178,21 @@ export function useWorkoutData() {
       await touchWorkout(ensureDb(), activeWorkout.id);
     }
   }, [activeWorkout, ensureDb]);
+
+  /**
+   * 記録の実施日を付け替える。予定の日と実際にやった日がずれたときに使う。
+   *
+   * 日付は集計と履歴の並びを決める値なので、直したらすぐサーバへ送る。
+   */
+  const changeWorkoutDate = useCallback(
+    async (workoutId: string, performedAt: string) => {
+      const database = ensureDb();
+      await updateWorkoutDate(database, workoutId, performedAt);
+      await reloadTables(database, ['workouts']);
+      void syncInBackground();
+    },
+    [ensureDb, reloadTables, syncInBackground],
+  );
 
   const deleteWorkout = useCallback(
     async (workoutId: string) => {
@@ -627,6 +643,7 @@ export function useWorkoutData() {
     startWorkout,
     closeStaleActiveWorkout,
     addPastWorkout,
+    changeWorkoutDate,
     completeWorkout,
     pauseWorkout,
     deleteWorkout,

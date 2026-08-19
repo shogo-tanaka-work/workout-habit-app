@@ -246,18 +246,16 @@ function RmCalculator({
         <Text style={styles.accentNote}>推定1RM {oneRepMax} kg</Text>
       </View>
       <View style={styles.sectionBody}>
-        <View style={styles.inputGrid}>
-          <View style={styles.inputGridItem}>
-            <LabeledNumber label="重量" value={weightKg} suffix="kg" onChange={setWeightKg} />
-          </View>
-          <View style={styles.inputGridItem}>
-            <LabeledNumber
-              label="回数"
-              value={reps}
-              suffix="回"
-              onChange={(value) => setReps(Math.max(0, Math.round(value)))}
-            />
-          </View>
+        {/* 横に2つ並べるとステッパー（44pt × 2）と単位に挟まれて数値が見切れる
+            （BodyLogInput と同じ理由）。 */}
+        <View style={styles.inputStack}>
+          <LabeledNumber label="重量" value={weightKg} suffix="kg" onChange={setWeightKg} />
+          <LabeledNumber
+            label="回数"
+            value={reps}
+            suffix="回"
+            onChange={(value) => setReps(Math.max(0, Math.round(value)))}
+          />
         </View>
         <View style={styles.setTable}>
           <View style={styles.setTableRow}>

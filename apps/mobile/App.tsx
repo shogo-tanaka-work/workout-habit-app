@@ -44,7 +44,7 @@ import type {
 import type { ExerciseSession } from './src/utils/aggregate';
 import { buildExerciseSessions } from './src/utils/aggregate';
 import { buildBodyLogCsv, buildWorkoutCsv } from './src/utils/csv';
-import { formatJapaneseDate } from './src/utils/datetime';
+import { formatDate, formatJapaneseDate } from './src/utils/datetime';
 import { exercisesInWorkout } from './src/utils/workoutTree';
 
 // 記録画面で見せる過去の実施記録の回数。多すぎると前回との比較がぼやける。
@@ -325,13 +325,59 @@ export default function App() {
     });
   };
 
+  // 今日の予定。**新規に始める導線は、必ずここを経由させる。**
+  // 予定を「開始」せずに別の記録を作ると、予定は planned のまま残る。日詳細には
+  // 出ないため、以前はどこからも消せなくなっていた（PlannedWorkoutSection に
+  // 破棄を足して塞いだが、そもそも孤児を作らせない方が良い）。
+  const todaysPlannedWorkouts = data.plannedWorkouts.filter(
+    (workout) => workout.performedAt === formatDate(new Date()),
+  );
+
+  /**
+   * 今日の予定がある状態で新規に始めようとしたら、予定から始める道を先に見せる。
+   * 予定が無ければそのまま `proceed` を呼ぶ（判断を挟まない）。
+   *
+   * 予定と違う重量・レップでやることは想定内で、開始さえすれば実績として扱われる。
+   * 案内したいのは「別に作ると予定が残る」という一点だけ。
+   */
+  const confirmStartWithPlan = (proceed: () => void) => {
+    if (todaysPlannedWorkouts.length === 0) {
+      proceed();
+      return;
+    }
+    // 予定が複数ある日は、どれで始めるかを alert では選ばせない（ホームで選ぶ）。
+    const singlePlan = todaysPlannedWorkouts.length === 1 ? todaysPlannedWorkouts[0] : null;
+    Alert.alert(
+      '今日は予定があります',
+      singlePlan
+        ? '予定から始めると、重量やレップはその場で直せます。別に記録を作ると、予定は残ったままになります。'
+        : '予定が複数あります。ホームの「予定しているメニュー」から選んで始められます。別に記録を作ると、予定は残ったままになります。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '別に記録を作る', onPress: proceed },
+        ...(singlePlan
+          ? [
+              {
+                text: '予定から開始',
+                onPress: () => {
+                  runAction(() =>
+                    data.beginPlannedWorkout(singlePlan.id).then(() => setTab('workout')),
+                  );
+                },
+              },
+            ]
+          : []),
+      ],
+    );
+  };
+
   // ホーム右下の主操作。記録中なら続きへ、なければ新しく始める。
   const handleFabPress = () => {
     if (data.activeWorkout) {
       setTab('workout');
       return;
     }
-    runAction(handleStart);
+    confirmStartWithPlan(() => runAction(handleStart));
   };
 
   const handleDeleteWorkout = async (workoutId: string) => {
@@ -572,7 +618,7 @@ export default function App() {
                     lastPerformedByExerciseId={lastPerformedByExerciseId}
                     templates={data.templates}
                     templateExercises={data.templateExercises}
-                    onStart={() => runAction(handleStart)}
+                    onStart={() => confirmStartWithPlan(() => runAction(handleStart))}
                     onStartFromTemplate={(template) =>
                       runAction(() => data.startWorkoutFromTemplate(template))
                     }

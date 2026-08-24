@@ -490,6 +490,12 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: fontSize.sm,
   },
+  // 予定の破棄。主操作（この予定で開始）の下に、控えめなテキストリンクとして置く。
+  plannedDeleteButton: {
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
 
   // 種目選択チップ（記録画面の種目追加）
   chipWrap: {

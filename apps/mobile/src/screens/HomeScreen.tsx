@@ -72,6 +72,7 @@ export function HomeScreen({
   gymMonthlyFeeYen,
   onResume,
   onBeginPlanned,
+  onDeletePlanned,
   onEditWorkout,
   onAddPastWorkout,
   onSelectExercise,
@@ -89,6 +90,8 @@ export function HomeScreen({
   gymMonthlyFeeYen: number | null;
   onResume: () => void;
   onBeginPlanned: (workoutId: string) => void;
+  /** 予定を破棄する。実施せずに終えた予定を消す唯一の導線。 */
+  onDeletePlanned: (workoutId: string) => void;
   onEditWorkout: (workoutId: string) => void;
   /** 過去日の記録を作って編集画面を開く（記録が無い過去日でだけ呼ばれる）。 */
   onAddPastWorkout: (performedAt: string) => void;
@@ -323,6 +326,7 @@ export function HomeScreen({
             exerciseById={exerciseById}
             hasActiveWorkout={activeWorkout !== null}
             onBegin={onBeginPlanned}
+            onDelete={onDeletePlanned}
           />
 
           {isResumable ? (

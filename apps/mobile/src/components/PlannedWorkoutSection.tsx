@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { styles } from '../styles/appStyles';
 import { bodyPartColor } from '../styles/theme';
@@ -15,6 +15,10 @@ import { exerciseNameOf, exercisesInWorkout } from '../utils/workoutTree';
 //
 // 予定は下書きであり、開始した後は普通の記録として扱う。
 // 実施しながら重量やレップを直すことは想定内で、予定値は残らない。
+//
+// **破棄の導線をここに持たせる。** 予定を「開始」せずに別で記録を作ると、予定は
+// planned のまま残るが、日詳細（完了・記録中だけを並べる）には出ないため、
+// どこからも消せなくなっていた。破棄は開始と無関係なので、記録中でも出す。
 
 export function PlannedWorkoutSection({
   plannedWorkouts,
@@ -23,6 +27,7 @@ export function PlannedWorkoutSection({
   exerciseById,
   hasActiveWorkout,
   onBegin,
+  onDelete,
 }: {
   plannedWorkouts: Workout[];
   workoutExercises: WorkoutExercise[];
@@ -30,7 +35,16 @@ export function PlannedWorkoutSection({
   exerciseById: Map<string, Exercise>;
   hasActiveWorkout: boolean;
   onBegin: (workoutId: string) => void;
+  onDelete: (workoutId: string) => void;
 }) {
+  // 予定はサーバ側も含めて消える。取り消せないので確認を挟む。
+  const confirmDelete = (workout: Workout) => {
+    Alert.alert('予定を削除', `${workout.performedAt} の予定を削除します。元に戻せません。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: () => onDelete(workout.id) },
+    ]);
+  };
+
   if (plannedWorkouts.length === 0) {
     return null;
   }
@@ -85,6 +99,14 @@ export function PlannedWorkoutSection({
                   <Text style={styles.secondaryButtonText}>この予定で開始</Text>
                 </Pressable>
               )}
+              <Pressable
+                style={styles.plannedDeleteButton}
+                onPress={() => confirmDelete(workout)}
+                accessibilityRole="button"
+                accessibilityLabel={`${workout.performedAt} の予定を削除`}
+              >
+                <Text style={styles.deleteButtonText}>予定を削除</Text>
+              </Pressable>
             </View>
           </View>
         );

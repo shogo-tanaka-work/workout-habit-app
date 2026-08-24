@@ -466,6 +466,7 @@ export default function App() {
               onBeginPlanned={(workoutId) => {
                 runAction(() => data.beginPlannedWorkout(workoutId).then(() => setTab('workout')));
               }}
+              onDeletePlanned={(workoutId) => runAction(() => data.deleteWorkout(workoutId))}
               onEditWorkout={handleEditWorkoutFromHome}
               onAddPastWorkout={handleAddPastWorkout}
               onSelectExercise={setSelectedExerciseId}

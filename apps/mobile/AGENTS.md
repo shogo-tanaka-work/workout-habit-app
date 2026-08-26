@@ -81,7 +81,11 @@ apps/mobile/
     screens/      HomeScreen / WorkoutScreen / HistoryScreen / SettingsScreen
                   ExerciseListScreen / ExerciseDetailScreen / TimerSettingsScreen / WorkoutEditScreen
     styles/       theme.ts（色・余白・フォント）/ appStyles.ts（共有 StyleSheet）
+    test-support/ factories.ts（テスト用のドメイン値）/ fakeDatabase.ts（SQLite の差し替え）
+    **/__tests__/ 対象と同じ階層に置くテスト（*.test.ts / *.test.tsx）
   App.tsx         DB初期化・タブ切替のみの薄いシェル
+  jest.config.js  preset と対象の指定
+  jest.setup.ts   ネイティブ実装（音・通知）の差し替え
 ```
 
 DB行型（snake_case）とドメイン型（camelCase）は分離し、変換は `db/mappers.ts` の
@@ -130,9 +134,12 @@ prebuild を挟まないと wav がアプリバンドルへ入らず、通知が
 ## 開発コマンド
 
 ```bash
+npm test            # jest（jest-expo preset）
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint（eslint-config-expo）
 npm run format      # prettier --write
 npm run ios         # 実機/シミュレータ実行（expo run:ios）
 npm run start       # Metro 起動
 ```
+
+テストの置き場と範囲は `.agents/rules/testing.md` を正本とする。

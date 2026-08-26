@@ -1,6 +1,9 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // jest のグローバル（describe / it / expect / jest）を型に入れる。
+    // テストは src/**/__tests__ に置き、本体と同じ tsc --noEmit で検査する。
+    "types": ["jest"]
   }
 }

@@ -42,10 +42,13 @@ export const removeRestPreset = (presets: number[], selectedIndex: number): Pres
 };
 
 /**
- * この種目に使う休憩秒数。種目ごとの上書き → 種目の既定 → 全体の既定 の順に見る。
+ * この種目に使う休憩秒数。記録ごとの上書き → 種目の既定 → 全体の既定 の順に見る。
  *
  * 画面（表示）とフック（実際に走らせるタイマー）で別々に書いていたため、
  * 既定値を変えると「表示は 2:00 なのにタイマーは別の値」という食い違いが起きる状態だった。
+ *
+ * `restSecondsOverride` に入るのは、その記録で休憩ピッカーから決めた値だけ。
+ * 予定が持ち込む上書きは開始時に外れる（db/queries.ts の `startPlannedWorkout`）。
  */
 export const restSecondsFor = (
   workoutExercise: Pick<WorkoutExercise, 'restSecondsOverride'>,

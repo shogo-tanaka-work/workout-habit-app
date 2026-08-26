@@ -1,15 +1,20 @@
 import type * as SQLite from 'expo-sqlite';
 
 import type { Exercise, TrainingGoal, TrainingPhaseKind, WorkoutSet } from '../types/domain';
-import { isoDatePlusDays, nowIso } from '../utils/datetime';
+import { formatDate, isoDatePlusDays, nowIso } from '../utils/datetime';
 import { newId } from '../utils/id';
 import { enqueueDelete, enqueueUpsert } from './outbox';
 import { runSerialized } from './writeQueue';
 
 /**
- * 前日以前の `active` を閉じるまでの猶予。深夜をまたぐセッションを切らないための幅。
+ * 生活上の日境（時）。0時〜この時刻までは「前日の続き」として扱う。
+ *
+ * 深夜をまたぐセッション（23時開始 → 0時半終了）を途中で切らないための猶予。
+ * **経過時間ではなく時刻で決める。** 「最後の保存から n 時間」で見ていたころは、
+ * 翌日の操作が `last_saved_at` を押し上げるため、一度閉じそこねた記録が
+ * そのまま `active` で残り続け、以後の記録が前日の日付で積まれ続けていた。
  */
-const STALE_ACTIVE_WORKOUT_MS = 6 * 60 * 60 * 1000;
+const DAY_BOUNDARY_HOUR = 4;
 
 /**
  * 書き込みを1トランザクションで実行し、失敗したら操作名つきのエラーへ包む。
@@ -231,6 +236,12 @@ export const insertWorkoutDeep = async (
  *
  * **performed_at は開始した日で上書きする。** 予定日と違う日に実施しても、
  * 記録は実施した日のものとして残るのが正しい（予定日のまま残すと履歴と集計がずれる）。
+ *
+ * **予定が持ち込んだ休憩の上書き（`rest_seconds_override`）はここで外す。**
+ * 予定の休憩指定は予定を見るときの目安どまりで、実施中に走らせるのは種目の設定。
+ * 残したままだと、種目の休憩を変えても予定の値が勝ち続け、
+ * 「設定を直したのにタイマーが変わらない」という食い違いになる。
+ * その場で秒数を変えたときは休憩ピッカーが改めて上書きを書く。
  */
 export const startPlannedWorkout = async (
   database: SQLite.SQLiteDatabase,
@@ -239,14 +250,31 @@ export const startPlannedWorkout = async (
 ): Promise<void> => {
   const timestamp = nowIso();
   await writeInTransaction(database, 'startPlannedWorkout', async () => {
-    await database.runAsync(
+    const started = await database.runAsync(
       "UPDATE workouts SET status = 'active', performed_at = ?, last_saved_at = ?, updated_at = ? WHERE id = ? AND status = 'planned'",
       performedAt,
       timestamp,
       timestamp,
       workoutId,
     );
+    // 予定でなければ何もしない。開始済みの記録へ流れ込んだときに、
+    // ユーザーがその場で決めた休憩の上書きまで消さないため。
+    if (started.changes === 0) {
+      return;
+    }
     await enqueueUpsert(database, 'workouts', workoutId);
+    const overriddenRows = await database.getAllAsync<{ id: string }>(
+      'SELECT id FROM workout_exercises WHERE workout_id = ? AND rest_seconds_override IS NOT NULL',
+      workoutId,
+    );
+    for (const row of overriddenRows) {
+      await database.runAsync(
+        'UPDATE workout_exercises SET rest_seconds_override = NULL, updated_at = ? WHERE id = ?',
+        timestamp,
+        row.id,
+      );
+      await enqueueUpsert(database, 'workout_exercises', row.id);
+    }
   });
 };
 
@@ -257,24 +285,24 @@ export const startPlannedWorkout = async (
  * 翌日に記録を足したときもその記録が使い回され、実施日が前日のまま積まれてしまう。
  * 日をまたいだ時点で、前日ぶんは終わったものとして閉じる。
  *
- * 深夜をまたぐセッション（23時開始 → 0時半終了）まで切らないよう、
- * 最後の保存から `STALE_ACTIVE_WORKOUT_MS` 以上経ったものだけを対象にする。
+ * 締める境目は `DAY_BOUNDARY_HOUR`。深夜（0時〜4時）は前日の続きとみなして残し、
+ * それを過ぎたら日付だけで切る。一昨日以前のものは時刻によらず必ず閉じる。
  *
  * @returns 閉じた記録の件数。0 なら呼び出し側の再読込は要らない。
  */
 export const completeStaleActiveWorkouts = async (
   database: SQLite.SQLiteDatabase,
-  today: string,
+  now: Date = new Date(),
 ): Promise<number> => {
   const timestamp = nowIso();
-  const staleBefore = new Date(Date.now() - STALE_ACTIVE_WORKOUT_MS).toISOString();
+  const today = formatDate(now);
+  // 深夜のうちは前日ぶんを残す（＝一昨日以前だけ閉じる）。4時を過ぎたら前日ぶんも閉じる。
+  const closeBefore = now.getHours() < DAY_BOUNDARY_HOUR ? isoDatePlusDays(today, -1) : today;
   let closedCount = 0;
   await writeInTransaction(database, 'completeStaleActiveWorkouts', async () => {
     const staleRows = await database.getAllAsync<{ id: string }>(
-      `SELECT id FROM workouts
-       WHERE status = 'active' AND performed_at < ? AND (last_saved_at IS NULL OR last_saved_at < ?)`,
-      today,
-      staleBefore,
+      "SELECT id FROM workouts WHERE status = 'active' AND performed_at < ?",
+      closeBefore,
     );
     for (const row of staleRows) {
       await database.runAsync(
@@ -294,7 +322,10 @@ export const completeStaleActiveWorkouts = async (
  *
  * 予定と違う日に実施した記録や、日付を取り違えて入れた記録を後から直すために要る。
  * **`last_saved_at` は動かさない。** あれは「最後にセットを保存した時刻」で、
- * 日付の付け替えは記録の中身に触らないため（`completeStaleActiveWorkouts` の判定にも使う）。
+ * 日付の付け替えは記録の中身に触らないため。
+ *
+ * 記録中（active）の日付を過去へ動かすと、次の締めの契機（`completeStaleActiveWorkouts`）で
+ * 完了になる。過去日の記録中という状態を残さないための意図した挙動。
  */
 export const updateWorkoutDate = async (
   database: SQLite.SQLiteDatabase,
@@ -404,9 +435,8 @@ export const deleteWorkoutExerciseDeep = async (
 /**
  * 記録の種目に付いた休憩の上書き（`rest_seconds_override`）を外す。
  *
- * 上書きは予定（Claude Code の計画）が持ち込む値で、種目の既定より優先される。
- * 記録画面で休憩を変えたのに予定の値が使われ続ける、という食い違いを防ぐため、
- * ユーザーがその場で秒数を決めたときは上書きを外して種目の設定へ戻す。
+ * 上書きは種目の既定より優先されるため、記録画面で休憩を変えたときは
+ * 古い上書きを外して種目の設定へ戻す（外さないと変えたのに反映されないように見える）。
  */
 export const clearWorkoutExerciseRestOverride = async (
   database: SQLite.SQLiteDatabase,

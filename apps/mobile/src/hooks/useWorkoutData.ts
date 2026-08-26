@@ -103,10 +103,11 @@ export function useWorkoutData() {
    */
   const startWorkout = useCallback(async (): Promise<string> => {
     const database = ensureDb();
-    const today = formatDate(new Date());
+    const now = new Date();
+    const today = formatDate(now);
     // 前日のまま残った記録を先に閉じる。閉じないと、その記録が「記録中」として
     // 使い回され、今日のセットが前日の日付で積まれる。
-    await completeStaleActiveWorkouts(database, today);
+    await completeStaleActiveWorkouts(database, now);
     const existingActive = await findActiveWorkoutRow(database);
     if (existingActive) {
       // state が知らない記録中の行が DB にあったときの取り込み。書き込みは無い。
@@ -131,7 +132,7 @@ export function useWorkoutData() {
     }
     const database = store.database;
     try {
-      const closed = await completeStaleActiveWorkouts(database, formatDate(new Date()));
+      const closed = await completeStaleActiveWorkouts(database);
       if (closed === 0) {
         return;
       }
@@ -206,6 +207,11 @@ export function useWorkoutData() {
   // 記録中でなければ、まず開始してからその記録へ種目を足す。
   // かつては開始だけして戻っていたため、呼び出し側が「追加された」前提で画面を進め、
   // 空のワークアウトに存在しない種目のパネルが開いていた。
+  //
+  // **既に入っている種目でも、何もせず戻るのではなくここを通す。** 記録タブは
+  // 「種目を選ぶ＝その種目を開く」操作で、追加済みかどうかは利用者の関心事ではない。
+  // 素通しにしていたころは日付の締め（startWorkout）も飛ばしていたため、
+  // 前日の記録が残ったまま日をまたぐと、今日のセットが前日へ積まれ続けていた。
   const addExerciseToWorkout = useCallback(
     async (exercise: Exercise) => {
       const database = ensureDb();
@@ -214,7 +220,6 @@ export function useWorkoutData() {
       const workoutId = await startWorkout();
       const items = exercisesInWorkout(workoutId, workoutExercises);
       if (items.some((item) => item.exerciseId === exercise.id)) {
-        Alert.alert('追加済み', `${exercise.name} は今日の記録に入っています。`);
         return;
       }
       await insertWorkoutExercise(database, {
@@ -496,9 +501,10 @@ export function useWorkoutData() {
   const startWorkoutFromTemplate = useCallback(
     async (template: Template) => {
       const database = ensureDb();
-      const today = formatDate(new Date());
+      const now = new Date();
+      const today = formatDate(now);
       // 前日のまま残った記録は「記録中」に数えない（startWorkout と同じ扱い）。
-      await completeStaleActiveWorkouts(database, today);
+      await completeStaleActiveWorkouts(database, now);
       const existingActive = await findActiveWorkoutRow(database);
       if (existingActive) {
         Alert.alert('記録中のワークアウトがあります', '先に完了するか、再開してください。');
@@ -540,11 +546,13 @@ export function useWorkoutData() {
     [ensureDb, setTimerSettings],
   );
 
+  // 予定を実績へ移す。予定が持ち込んだ休憩の上書きは queries 側で外れるため、
+  // workout_exercises も読み直す（読み直さないと画面が予定の秒数を出し続ける）。
   const beginPlannedWorkout = useCallback(
     async (workoutId: string): Promise<void> => {
       const database = ensureDb();
       await startPlannedWorkout(database, workoutId, formatDate(new Date()));
-      await reloadTables(database, ['workouts']);
+      await reloadTables(database, ['workouts', 'workout_exercises']);
       void syncInBackground();
     },
     [ensureDb, reloadTables, syncInBackground],

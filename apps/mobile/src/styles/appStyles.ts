@@ -668,11 +668,15 @@ export const styles = StyleSheet.create({
   },
 
   // 一段戻る導線（記録中の種目 → 種目選択）
+  // 当たり判定は文字まわりだけに留める。行いっぱいに広げていたころは、
+  // 数値を入れたあとキーボードを閉じようと右側の余白を叩くと戻ってしまっていた。
   backRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: spacing.sm,
     minHeight: 44,
+    paddingRight: spacing.md,
   },
   backRowText: {
     color: colors.accentText,

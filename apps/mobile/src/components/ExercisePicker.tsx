@@ -3,6 +3,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { styles } from '../styles/appStyles';
 import type { BodyPart, Exercise } from '../types/domain';
 import { daysBetween, formatDate } from '../utils/datetime';
+import { ExerciseRow } from './ExerciseRow';
 import { ExerciseSelectList } from './ExerciseSelectList';
 
 // 記録タブの入口。「次に何をやるか」を選ぶことだけに使う。
@@ -10,8 +11,13 @@ import { ExerciseSelectList } from './ExerciseSelectList';
 // 種目の一覧そのものは ExerciseSelectList が持つ（過去記録の編集画面と共有）。
 // ここが足すのは、記録中にだけ意味のある補足（今日もうやったか・前回いつやったか）と、
 // ワークアウトを締める操作。
+//
+// **先頭に「今日のメニュー」を置く。** 予定やテンプレートから開始すると種目が一度に
+// 入るが、部位タブで区切られた一覧に混ざってしまい、どれがそのメニューの種目か
+// 分からなかった。記録に入っている種目を順番どおり先に並べ、そこから入れるようにする。
 export function ExercisePicker({
   exercises,
+  menuExercises,
   bodyParts,
   todaySetCountByExerciseId,
   lastPerformedByExerciseId,
@@ -24,6 +30,8 @@ export function ExercisePicker({
 }: {
   /** 使用頻度順に並んだ、アーカイブされていない種目。 */
   exercises: Exercise[];
+  /** 記録中のワークアウトに入っている種目（追加された順）。 */
+  menuExercises: Exercise[];
   bodyParts: BodyPart[];
   todaySetCountByExerciseId: Map<string, number>;
   lastPerformedByExerciseId: Map<string, string>;
@@ -50,6 +58,13 @@ export function ExercisePicker({
     ]);
   };
 
+  // 「今日のメニュー」の行に出す一言。まだ手を付けていない種目が一目で分かればよいので、
+  // 前回からの間隔（下の一覧が受け持つ）はここでは出さない。
+  const describeMenuEntry = (exercise: Exercise): string => {
+    const todaySetCount = todaySetCountByExerciseId.get(exercise.id) ?? 0;
+    return todaySetCount > 0 ? `${todaySetCount} セット` : '未記録';
+  };
+
   // 行の右端に出す一言。今日やったかを最優先で、次に前回からの間隔を見せる。
   const describeExercise = (exercise: Exercise): string => {
     const todaySetCount = todaySetCountByExerciseId.get(exercise.id) ?? 0;
@@ -66,6 +81,23 @@ export function ExercisePicker({
 
   return (
     <View style={styles.stack}>
+      {menuExercises.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>今日のメニュー</Text>
+            <Text style={styles.faint}>{menuExercises.length} 種目</Text>
+          </View>
+          {menuExercises.map((exercise) => (
+            <ExerciseRow
+              key={exercise.id}
+              exercise={exercise}
+              note={describeMenuEntry(exercise)}
+              onPress={() => onSelect(exercise)}
+            />
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>種目を選択</Text>

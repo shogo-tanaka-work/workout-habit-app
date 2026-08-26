@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
+import { ExerciseRow } from './ExerciseRow';
 import { styles } from '../styles/appStyles';
 import { bodyPartColor } from '../styles/theme';
 import type { BodyPart, Exercise } from '../types/domain';
@@ -87,21 +88,12 @@ export function ExerciseSelectList({
       </ScrollView>
 
       {visibleExercises.map((exercise) => (
-        <Pressable key={exercise.id} style={styles.exerciseRow} onPress={() => onSelect(exercise)}>
-          <View style={styles.exercisePickerRow}>
-            <View
-              style={[
-                styles.exerciseDot,
-                { backgroundColor: bodyPartColor(exercise.primaryBodyPartId) },
-              ]}
-            />
-            <Text style={styles.exercisePickerName}>{exercise.name}</Text>
-            {describeExercise ? (
-              <Text style={styles.muted}>{describeExercise(exercise)}</Text>
-            ) : null}
-            <Text style={styles.chevron}>›</Text>
-          </View>
-        </Pressable>
+        <ExerciseRow
+          key={exercise.id}
+          exercise={exercise}
+          note={describeExercise?.(exercise)}
+          onPress={() => onSelect(exercise)}
+        />
       ))}
 
       {visibleExercises.length === 0 ? (

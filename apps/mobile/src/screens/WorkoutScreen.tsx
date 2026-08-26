@@ -84,6 +84,22 @@ export function WorkoutScreen({
     ? (workoutExercises.find((item) => item.exerciseId === focusedExerciseId) ?? null)
     : null;
 
+  // 記録に入っている種目を、追加された順のまま種目一覧の先頭へ出すための並び。
+  // 予定やテンプレートから一度に入った種目が、部位タブの奥に埋もれないようにする。
+  //
+  // 種目でひとまとめにする。予定が同じ種目を2行に分けて持つことがあり、
+  // そのまま並べると同じ名前の行が2つ出る（開く先はどちらも同じ種目）。
+  const menuExercises = useMemo(() => {
+    const byExerciseId = new Map<string, Exercise>();
+    for (const item of workoutExercises) {
+      const exercise = exerciseById.get(item.exerciseId);
+      if (exercise && !byExerciseId.has(exercise.id)) {
+        byExerciseId.set(exercise.id, exercise);
+      }
+    }
+    return [...byExerciseId.values()];
+  }, [workoutExercises, exerciseById]);
+
   const todaySetCountByExerciseId = useMemo(() => {
     const countByExerciseId = new Map<string, number>();
     for (const item of workoutExercises) {
@@ -175,15 +191,16 @@ export function WorkoutScreen({
     );
   }
 
-  // 未追加の種目はワークアウトへ入れてから開く。追加済みならそのまま開く。
+  // 選んだ種目をワークアウトへ入れてから開く。
+  //
+  // **追加済みでも onAddExercise を通す。** 追加済みだけ素通しにしていたころは、
+  // 日をまたいだ記録の締め（onAddExercise の先の startWorkout）も飛ばしていたため、
+  // アプリを開いたまま日付が変わると前日の記録に積み続けられた。
   // **追加に失敗したら開かない。** 開いてしまうと、記録できない種目のパネルを操作させることになる。
   const handleSelect = async (exercise: Exercise) => {
-    const alreadyAdded = workoutExercises.some((item) => item.exerciseId === exercise.id);
-    if (!alreadyAdded) {
-      const added = await onAddExercise(exercise);
-      if (!added) {
-        return;
-      }
+    const added = await onAddExercise(exercise);
+    if (!added) {
+      return;
     }
     setFocusedExerciseId(exercise.id);
   };
@@ -191,6 +208,7 @@ export function WorkoutScreen({
   return (
     <ExercisePicker
       exercises={exercises}
+      menuExercises={menuExercises}
       bodyParts={bodyParts}
       todaySetCountByExerciseId={todaySetCountByExerciseId}
       lastPerformedByExerciseId={lastPerformedByExerciseId}

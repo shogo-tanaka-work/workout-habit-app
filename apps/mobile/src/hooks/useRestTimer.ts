@@ -18,6 +18,14 @@ import type { TimerSettings, TimerState } from '../types/domain';
 // 走っている間は OS へローカル通知を予約する。setInterval も expo-audio も
 // 前面にいる間しか動かず、画面を消すと何も起きないため（src/notifications/restTimer.ts）。
 
+/**
+ * 終了表示を残す時間（ミリ秒）。鳴ったことに気づける長さだけ出して、あとは自動で閉じる。
+ *
+ * 休憩が終われば次のセットへ移るだけで、バナーに用は無い。手で閉じさせると、
+ * 記録に戻る前にもう一操作要る。
+ */
+const FINISHED_BANNER_MS = 3000;
+
 /** 保存された状態から現在の残り時間を割り出す。終了済みなら finished にする。 */
 const restoreFromSaved = (saved: TimerState): TimerState => {
   if (!saved.running || saved.endsAt === null) {
@@ -139,6 +147,16 @@ export function useRestTimer(settings: TimerSettings, database: SQLite.SQLiteDat
         });
     }
   }, [timer?.finished, timerPlayer, settings.soundEnabled, settings.vibrationEnabled]);
+
+  // 終了したバナーは少し置いてから自分で閉じる。
+  // 復元した終了（不在中に終わっていた場合）もここで片付く。
+  useEffect(() => {
+    if (!timer?.finished) {
+      return;
+    }
+    const timeout = setTimeout(() => setTimer(null), FINISHED_BANNER_MS);
+    return () => clearTimeout(timeout);
+  }, [timer?.finished, setTimer]);
 
   return { timer, setTimer };
 }

@@ -334,6 +334,46 @@ export const seedExercises: Exercise[] = [
     category: 'strength',
     isArchived: false,
   },
+  // 体幹。部位（core）は最初から定義しているのに種目が1件も無く、記録する器が無かった。
+  // 高重量スクワット・デッドリフトの土台であり、クロスフィットのような複合種目にも直結する。
+  {
+    id: 'ab-roller',
+    name: 'アブローラー',
+    primaryBodyPartId: 'core',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'bodyweight',
+    isArchived: false,
+  },
+  {
+    id: 'hanging-leg-raise',
+    name: 'ハンギングレッグレイズ',
+    primaryBodyPartId: 'core',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'bodyweight',
+    isArchived: false,
+  },
+  {
+    // 体幹で唯一、重量で漸進できる種目。ボリュームと推定1RM が意味を持つのはここだけ。
+    id: 'cable-crunch',
+    name: 'ケーブルクランチ',
+    primaryBodyPartId: 'core',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'strength',
+    isArchived: false,
+  },
+  {
+    // 時間で計る種目。回数欄を秒として記録する（重量は 0 のまま）。
+    id: 'plank',
+    name: 'プランク',
+    primaryBodyPartId: 'core',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'bodyweight',
+    isArchived: false,
+  },
 ];
 
 // マスタ（部位・種目）の初期投入。INSERT OR IGNORE のため何度実行しても重複しない。

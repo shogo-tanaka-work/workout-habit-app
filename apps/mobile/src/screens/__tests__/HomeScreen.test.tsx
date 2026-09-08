@@ -7,7 +7,8 @@ import {
   buildWorkoutSet,
 } from '../../test-support/factories';
 import { formatDate, isoDatePlusDays } from '../../utils/datetime';
-import { HomeScreen } from '../HomeScreen';
+import type { PaneLayout } from '../HomeScreen';
+import { HomeScreen, heightAfterRelease } from '../HomeScreen';
 
 // ホームは常に「今日」を選んだ状態で開く。実行日に左右されないようここから組み立てる。
 const today = formatDate(new Date());
@@ -201,5 +202,33 @@ describe('ボディログ', () => {
     fireEvent.press(screen.getByText('上書き保存'));
 
     expect(onSaveBodyLog).toHaveBeenCalledWith(today, 70, 18);
+  });
+});
+
+// グラバーは指を置いた時点でレスポンダを取るため、タップでも「離す」処理が走る。
+// そこで週スナップを通すと既定値より小さい高さが既定値へ戻り、
+// 「触っただけで配分が初期化される」という不具合になっていた。
+describe('境目のグラバーを離したときの高さ', () => {
+  // カレンダーを全部出すと下半分は 400 になる配分。週1行は 60。
+  const layout: PaneLayout = { container: 1000, calendar: 568, weekRow: 60 };
+  const fullyVisible = layout.container - 32 - layout.calendar;
+
+  it('動かさずに離したら高さを変えない', () => {
+    expect(heightAfterRelease(fullyVisible, 0, layout)).toBeNull();
+  });
+
+  it('しきい値に満たない揺れはタップとして扱う', () => {
+    expect(heightAfterRelease(fullyVisible, 1, layout)).toBeNull();
+    expect(heightAfterRelease(fullyVisible, -1, layout)).toBeNull();
+  });
+
+  it('自分で広げた高さをタップで初期化しない', () => {
+    const widened = fullyVisible + layout.weekRow;
+    expect(heightAfterRelease(widened, 0, layout)).toBeNull();
+  });
+
+  it('実際に動かしたら週単位へ寄せた高さを返す', () => {
+    // 1週ぶん（60）より少し多く持ち上げたら、1週ぶん隠した位置へ寄る。
+    expect(heightAfterRelease(fullyVisible, -70, layout)).toBe(fullyVisible + layout.weekRow);
   });
 });

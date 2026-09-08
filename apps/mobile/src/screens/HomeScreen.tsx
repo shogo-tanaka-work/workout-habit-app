@@ -25,7 +25,7 @@ const HANDLE_HEIGHT = 32;
 // この量より小さい縦移動はタップ扱いにして、ドラッグを始めない。
 const DRAG_THRESHOLD = 2;
 
-type PaneLayout = {
+export type PaneLayout = {
   container: number;
   /** カレンダーを詰めずに全部出したときの高さ。 */
   calendar: number;
@@ -49,6 +49,28 @@ const snapDetailHeight = (value: number, layout: PaneLayout): number => {
   const fullyVisible = layout.container - HANDLE_HEIGHT - layout.calendar;
   const hiddenWeeks = Math.max(0, Math.round((value - fullyVisible) / layout.weekRow));
   return clampDetailHeight(fullyVisible + hiddenWeeks * layout.weekRow, layout);
+};
+
+/**
+ * 指を離したときの高さ。**動かしていなければ null を返し、呼び出し元は何もしない。**
+ *
+ * グラバーは指を置いた時点でレスポンダを取る（`onStartShouldSetPanResponder`）ため、
+ * タップしただけでも離すイベントが走る。そこで snapDetailHeight を通すと、
+ * 既定値（カレンダーを全部出したときの高さ）より小さい高さは hiddenWeeks が
+ * 0 へ潰れて既定値に戻ってしまう。**タップで配分が初期化されるのはこれが原因。**
+ *
+ * 判定にはドラッグ開始と同じ DRAG_THRESHOLD を使う。始まらなかったドラッグを
+ * 終わらせない、という対応関係をここで保つ。
+ */
+export const heightAfterRelease = (
+  startHeight: number,
+  dy: number,
+  layout: PaneLayout,
+): number | null => {
+  if (Math.abs(dy) < DRAG_THRESHOLD) {
+    return null;
+  }
+  return snapDetailHeight(clampDetailHeight(startHeight - dy, layout), layout);
 };
 
 // 実測値の反映。値が変わらないときは同じオブジェクトを返し、
@@ -135,10 +157,10 @@ export function HomeScreen({
         }));
       },
       onPanResponderRelease: (_event, gesture) => {
-        setDrag((current) => ({
-          ...current,
-          height: snapDetailHeight(heightFromGesture(current.start, gesture.dy), layout),
-        }));
+        setDrag((current) => {
+          const released = heightAfterRelease(current.start, gesture.dy, layout);
+          return released === null ? current : { ...current, height: released };
+        });
       },
     });
   }, [layout, defaultDetailHeight]);

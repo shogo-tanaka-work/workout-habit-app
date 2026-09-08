@@ -374,6 +374,67 @@ export const seedExercises: Exercise[] = [
     category: 'bodyweight',
     isArchived: false,
   },
+  // 有酸素。部位（cardio）は最初から定義しているのに種目が1件も無く、
+  // クロスフィットで実施した内容を記録する器が無かった。
+  //
+  // **距離と時間の列がスキーマに無い。** プランクと同じ考え方で、回数欄を「本数」
+  // （インターバルなら1本＝1セット）として使い、距離や時間はセットのメモへ書く。
+  // 重量は 0 のままなので、ボリュームと推定1RM を歪めない
+  // （筋力の指標に有酸素が混ざらない）。
+  {
+    id: 'rowing',
+    name: 'ローイング',
+    primaryBodyPartId: 'cardio',
+    defaultRestSeconds: 120,
+    defaultBarWeightKg: 0,
+    category: 'cardio',
+    isArchived: false,
+  },
+  {
+    id: 'air-bike',
+    name: 'エアバイク',
+    primaryBodyPartId: 'cardio',
+    defaultRestSeconds: 120,
+    defaultBarWeightKg: 0,
+    category: 'cardio',
+    isArchived: false,
+  },
+  {
+    id: 'ski-erg',
+    name: 'スキーエルグ',
+    primaryBodyPartId: 'cardio',
+    defaultRestSeconds: 120,
+    defaultBarWeightKg: 0,
+    category: 'cardio',
+    isArchived: false,
+  },
+  {
+    id: 'running',
+    name: 'ラン',
+    primaryBodyPartId: 'cardio',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'cardio',
+    isArchived: false,
+  },
+  {
+    id: 'jump-rope',
+    name: '縄跳び',
+    primaryBodyPartId: 'cardio',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'cardio',
+    isArchived: false,
+  },
+  {
+    id: 'burpee',
+    name: 'バーピー',
+    primaryBodyPartId: 'cardio',
+    defaultRestSeconds: 60,
+    defaultBarWeightKg: 0,
+    category: 'cardio',
+    isArchived: false,
+  },
 ];
 
 // マスタ（部位・種目）の初期投入。INSERT OR IGNORE のため何度実行しても重複しない。

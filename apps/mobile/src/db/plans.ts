@@ -26,7 +26,7 @@ type PlansPayload = {
   tables: Record<PlanEntity, Record<string, unknown>[]>;
 };
 
-type ImportPlansResult = {
+export type ImportPlansResult = {
   /** 端末へ入れた予定のワークアウト数。 */
   imported: number;
   /** すでに開始・完了していたため取り込まなかったワークアウト数。 */

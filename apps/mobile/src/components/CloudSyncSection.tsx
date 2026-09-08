@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
 
 import type { GoogleAccount } from '../auth/googleAuth';
+import type { ImportPlansResult } from '../db/plans';
 import { styles } from '../styles/appStyles';
 import { colors } from '../styles/theme';
 import type { SyncSettings } from '../types/domain';
@@ -34,23 +35,37 @@ export function CloudSyncSection({
   onSignIn: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onSyncNow: () => Promise<void>;
-  onImportPlans: () => Promise<void>;
+  onImportPlans: () => Promise<ImportPlansResult>;
   onTogglePaused: (isPaused: boolean) => Promise<void>;
   onRestore: () => Promise<void>;
 }) {
   const [apiUrl, setApiUrl] = useState(syncSettings.apiUrl);
   const [isBusy, setIsBusy] = useState(false);
 
-  const run = async (label: string, action: () => Promise<void>) => {
+  // action が文字列を返したら、それを結果の本文として出す。
+  // 「完了しました」だけだと 0 件の取り込みと成功を区別できない（予定の取り込み）。
+  const run = async (label: string, action: () => Promise<string | void>) => {
     setIsBusy(true);
     try {
-      await action();
-      Alert.alert(`${label}が完了しました`);
+      const message = await action();
+      Alert.alert(`${label}が完了しました`, message ?? undefined);
     } catch (error: unknown) {
       Alert.alert(`${label}に失敗しました`, error instanceof Error ? error.message : String(error));
     } finally {
       setIsBusy(false);
     }
+  };
+
+  // 取り込み結果の本文。0 件を「何も無かった」と明示するのが主目的。
+  const describeImport = ({ imported, skipped }: ImportPlansResult): string => {
+    if (imported === 0 && skipped === 0) {
+      return '取り込む予定はありませんでした。';
+    }
+    const parts = [`${imported}件の予定を取り込みました。`];
+    if (skipped > 0) {
+      parts.push(`${skipped}件はすでに開始・完了しているため取り込んでいません。`);
+    }
+    return parts.join('\n');
   };
 
   const confirmRestore = () => {
@@ -146,7 +161,7 @@ export function CloudSyncSection({
           <Pressable
             style={[styles.secondaryButton, styles.flex]}
             disabled={isBusy}
-            onPress={() => void run('予定の取り込み', onImportPlans)}
+            onPress={() => void run('予定の取り込み', async () => describeImport(await onImportPlans()))}
           >
             <Text style={styles.secondaryButtonText}>予定を取り込む</Text>
           </Pressable>

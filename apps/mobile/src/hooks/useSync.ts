@@ -8,6 +8,7 @@ import {
 } from '../auth/googleAuth';
 import { markLastBackupAt, setSyncPaused, upsertSyncConnection } from '../db/appSettings';
 import { countPendingOperations } from '../db/outbox';
+import type { ImportPlansResult } from '../db/plans';
 import { fetchPlansFromCloud, replacePlannedWorkouts } from '../db/plans';
 import { applyBackupPayload, fetchBackupFromCloud } from '../db/sync';
 import { pushPendingOperations } from '../sync/pusher';
@@ -179,13 +180,18 @@ export function useSync(store: WorkoutStore) {
   }, [database, syncSettings.apiUrl, account, syncSettings.isPaused, reloadTables]);
 
   // 手動の取り込み。失敗を画面へ伝えたいので、こちらは例外を投げる。
-  const importPlans = useCallback(async (): Promise<void> => {
+  //
+  // **件数を呼び出し元へ返す。** 取り込みは成功しても 0 件のことがあり
+  // （サーバに予定が無い、期間外）、「完了しました」だけでは押した側が
+  // 何も起きなかったのか成功したのか区別できない。
+  const importPlans = useCallback(async (): Promise<ImportPlansResult> => {
     const openDatabase = ensureDb();
     const connection = ensureSyncConnection();
     const { from, to } = planRange();
     const payload = await fetchPlansFromCloud(connection.apiUrl, await getIdToken(), from, to);
-    await replacePlannedWorkouts(openDatabase, payload);
+    const result = await replacePlannedWorkouts(openDatabase, payload);
     await reloadTables(openDatabase, ['workouts', 'workout_exercises', 'workout_sets']);
+    return result;
   }, [ensureDb, ensureSyncConnection, reloadTables]);
 
   // クラウドのバックアップでローカルを置き換える（復元）。呼び出し側で確認ダイアログを出す。

@@ -26,7 +26,7 @@ const renderSection = (
       onSignIn={jest.fn().mockResolvedValue(undefined)}
       onSignOut={jest.fn().mockResolvedValue(undefined)}
       onSyncNow={jest.fn().mockResolvedValue(undefined)}
-      onImportPlans={jest.fn().mockResolvedValue(undefined)}
+      onImportPlans={jest.fn().mockResolvedValue({ imported: 0, skipped: 0 })}
       onTogglePaused={jest.fn().mockResolvedValue(undefined)}
       onRestore={jest.fn().mockResolvedValue(undefined)}
       {...overrides}
@@ -119,13 +119,60 @@ describe('操作', () => {
   });
 
   it('予定の取り込みは端末の記録に触れない操作として分けている', async () => {
-    const onImportPlans = jest.fn().mockResolvedValue(undefined);
+    const onImportPlans = jest.fn().mockResolvedValue({ imported: 0, skipped: 0 });
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     renderSection({ onImportPlans });
 
     fireEvent.press(screen.getByText('予定を取り込む'));
 
     await waitFor(() => expect(onImportPlans).toHaveBeenCalledTimes(1));
+    alertSpy.mockRestore();
+  });
+
+  // 0件でも「完了しました」だけを出していたため、サーバに予定が無いのか
+  // 取り込めたのかを押した側が区別できなかった。件数まで出す。
+  it('取り込んだ件数を結果に出す', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    renderSection({ onImportPlans: jest.fn().mockResolvedValue({ imported: 2, skipped: 0 }) });
+
+    fireEvent.press(screen.getByText('予定を取り込む'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        '予定の取り込みが完了しました',
+        '2件の予定を取り込みました。',
+      ),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('取り込む予定が無かったことを結果に出す', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    renderSection({ onImportPlans: jest.fn().mockResolvedValue({ imported: 0, skipped: 0 }) });
+
+    fireEvent.press(screen.getByText('予定を取り込む'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        '予定の取り込みが完了しました',
+        '取り込む予定はありませんでした。',
+      ),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('開始済みで取り込まなかったぶんも結果に出す', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    renderSection({ onImportPlans: jest.fn().mockResolvedValue({ imported: 1, skipped: 2 }) });
+
+    fireEvent.press(screen.getByText('予定を取り込む'));
+
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        '予定の取り込みが完了しました',
+        '1件の予定を取り込みました。\n2件はすでに開始・完了しているため取り込んでいません。',
+      ),
+    );
     alertSpy.mockRestore();
   });
 });

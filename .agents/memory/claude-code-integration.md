@@ -389,6 +389,7 @@ curl -s -H "Authorization: Bearer $BODY_SCALE_READER_TOKEN" "$BODY_SCALE_API_URL
 {
   "period": { "days": 28, "from": "...", "to": "..." },
   "measurement_count": 24,
+  "min_days_for_trend": 7,
   "last_measured_at": "2026-10-14T22:10:00.000Z",
   "weight_kg":        { "latest": 58.1, "avg_last_7_days": 58.3, "change": -1.2, "change_per_week": -0.35, "days": 20 },
   "body_fat_pct":     { "latest": 18.9, "change": -0.9, "change_per_week": -0.25, "days": 17 },
@@ -399,7 +400,8 @@ curl -s -H "Authorization: Bearer $BODY_SCALE_READER_TOKEN" "$BODY_SCALE_API_URL
 
 - `change_per_week` は日ごとの平均に引いた回帰直線の傾き（1週間あたり）。`change` は最初の日と最後の日の差
 - 体組成（体脂肪率・除脂肪量）は、手のグリップを握って測った日だけで計算される。`days` が体重より少ないのはそのため
-- 測った日が2日未満なら `change` / `change_per_week` は `null`
+- `change_per_week` は測った日が `min_days_for_trend`（7日）未満なら `null`。`change` は2日未満で `null`。
+  日数が少ないうちの `change` は測った時間帯の差（朝と夜で ±1kg）を含むため、傾向として読まない
 
 #### 読み方
 
